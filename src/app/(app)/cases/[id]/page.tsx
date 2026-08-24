@@ -57,6 +57,7 @@ import { NotesTab } from "./components/NotesTab";
 import { TasksTab } from "./components/TasksTab";
 import { TimelineTab } from "./components/TimelineTab";
 import { ComplianceTab } from "./components/ComplianceTab";
+import { CaseStageStepper } from "./components/CaseStageStepper";
 
 // -- CasesIcon (same as sidebar) --
 const CasesIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -608,7 +609,35 @@ export default function MigrantOverviewPage() {
       {/* ====== CONTENT AREA ====== */}
       <div className="flex-1 px-[32px] py-2xl max-w-full overflow-x-hidden">
         {activeTab === "Overview" ? (
-          <div className="flex gap-[24px] items-start w-full">
+          <div className="flex flex-col w-full">
+            {/* Sponsorship Pipeline Stepper (Current Stage & Immediate Required Action) */}
+            <CaseStageStepper
+              caseData={{
+                approvalStatus: migrant.approvalStatus,
+                visaStatus: migrant.visaStatus,
+                cosStatus: migrant.cos?.status,
+                cosRef: migrant.cosRef,
+                location: migrant.location,
+                socCode: migrant.cos?.socCode || migrant.employment?.socCode,
+                grossSalary: migrant.employment?.grossSalary || migrant.cos?.salary,
+                decision: migrant.approvalStatus === "VISA APPROVED" ? "Granted" : migrant.approvalStatus === "VISA REFUSED" ? "Refused" : undefined,
+                openTasksCount: migrant.openTasksCount,
+                missingDocsCount: migrant.missingDocsCount,
+              }}
+              onActionClick={(actionType) => {
+                if (actionType === "employment") {
+                  setIsEmploymentModalOpen(true);
+                } else if (actionType === "status") {
+                  setIsChangeStatusOpen(true);
+                } else if (actionType === "rtw") {
+                  router.push("/compliance/rtw-checks");
+                } else if (actionType === "compliance") {
+                  setActiveTab("Compliance");
+                }
+              }}
+            />
+
+            <div className="flex gap-[24px] items-start w-full">
             {/* ====== COLUMN 1 (Left 303.5px): Profile & Migration Status & Timeline ====== */}
             <div className="w-[303px] shrink-0 flex flex-col gap-[24px]">
               <ProfileCard
@@ -652,6 +681,7 @@ export default function MigrantOverviewPage() {
               />
             </div>
           </div>
+        </div>
         ) : activeTab === "Personal Details" ? (
           <div className="flex gap-[24px] items-start w-full font-inter max-w-full">
             {/* LEFT COLUMN: Personal details widget */}
@@ -924,6 +954,13 @@ export default function MigrantOverviewPage() {
         open={isChangeStatusOpen}
         onOpenChange={setIsChangeStatusOpen}
         currentStatus={migrant.approvalStatus}
+        caseId={id}
+        migrantId={migrant.migrantId}
+        migrantName={`${migrant.personalInfo.firstName} ${migrant.personalInfo.lastName}`.trim()}
+        migrant={rawMigrantData || migrant}
+        caseData={migrant}
+        onFilesChanged={loadCaseDetail}
+        onNavigateToDocuments={() => setActiveTab("Documents")}
         onApply={async (newStatus: string) => {
           try {
             if (id) {

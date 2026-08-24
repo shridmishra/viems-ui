@@ -64,6 +64,20 @@ function isTaskStatus(st: string): st is TaskItem["status"] {
   return (VALID_STATUSES as readonly string[]).includes(st);
 }
 
+function getSafeString(val: any, fallback = ""): string {
+  if (!val) return fallback;
+  if (typeof val === "string") return val;
+  if (typeof val === "number") return String(val);
+  if (Array.isArray(val)) {
+    const validItems = val.map((v) => getSafeString(v)).filter(Boolean);
+    return validItems.length > 0 ? validItems.join(", ") : fallback;
+  }
+  if (typeof val === "object") {
+    return val.name || val.title || val.value || val.label || fallback;
+  }
+  return fallback;
+}
+
 export function TasksTab({ caseId }: { caseId?: string }) {
   const [tasks, setTasks] = React.useState<TaskItem[]>([]);
   const [error, setError] = React.useState<string | null>(null);
@@ -93,16 +107,19 @@ export function TasksTab({ caseId }: { caseId?: string }) {
         if (!isCancelled) {
           if (rawTasks.length > 0) {
             const mapped: TaskItem[] = rawTasks.map((t: RawTaskPayload, i: number) => {
-              const cat: TaskItem["category"] = t.category && isTaskCategory(t.category) ? t.category : "General";
-              const rawStatus = t.status || (t.isCompleted || t.completed ? "completed" : "general");
+              const rawCat = getSafeString(t.category, "General");
+              const cat: TaskItem["category"] = isTaskCategory(rawCat) ? rawCat : "General";
+              const rawStatus = getSafeString(t.status) || (t.isCompleted || t.completed ? "completed" : "general");
               const st: TaskItem["status"] = isTaskStatus(rawStatus) ? rawStatus : (t.isCompleted || t.completed ? "completed" : "general");
               const hasBackendId = t.id !== undefined && t.id !== null;
+              const safeTitle = getSafeString(t.title) || getSafeString(t.name) || "Task";
+              const safeDesc = getSafeString(t.description, "");
               return {
                 id: String(t.id ?? `t-${i}`),
                 hasBackendId,
                 category: cat,
-                title: t.title || t.name || "Task",
-                description: t.description || "",
+                title: safeTitle,
+                description: safeDesc,
                 status: st,
                 isCompleted: Boolean(t.isCompleted || t.completed || st === "completed"),
               };

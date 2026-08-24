@@ -328,12 +328,16 @@ export default function ComplianceDocumentsPage() {
 
   const handleOpenPreviewDoc = (row: MigrantDocItem) => {
     setPreviewDoc({
-      id: row.id,
+      id: String(row.id || row.caseId),
       name: `${row.name} - ${row.documentType}`,
       subtitle: `${row.documentType.replace(/\s+/g, "_")}.pdf · 1.8 MB`,
       category: row.documentType || "Compliance Document",
       date: row.uploadedDate !== "—" ? row.uploadedDate : row.expiryDate,
       status: row.status === "VERIFIED" ? "uploaded" : "under_review",
+      migrantName: row.name,
+      caseNumber: row.caseId,
+      employer: row.company || "AX Studios",
+      fileUrl: (row as any).fileUrl || (row.id && !isNaN(Number(row.id)) ? ENDPOINTS.files.view(row.id) : undefined),
     });
     setIsPreviewOpen(true);
   };

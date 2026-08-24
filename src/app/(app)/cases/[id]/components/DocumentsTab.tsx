@@ -168,7 +168,7 @@ interface BackendFileResponse {
                 year: "numeric",
               })
             : "Mar 5, 2028",
-          fileUrl: file.fileUrl,
+          fileUrl: file.fileUrl || (file.id ? ENDPOINTS.files.view(file.id) : undefined),
         }));
         setDocuments(mappedDocs);
       }
@@ -197,6 +197,7 @@ interface BackendFileResponse {
       uploadedFiles.forEach((f) => formData.append("files", f));
       formData.append("caseId", String(caseId));
       formData.append("module", "cases");
+      formData.append("moduleName", "cases");
 
       const uploadUrl = `${ENDPOINTS.files.base}/upload/cases/${caseId}`;
 
@@ -205,6 +206,12 @@ interface BackendFileResponse {
       });
 
       toast.success(`Successfully uploaded ${uploadedFiles.length} document(s)`);
+
+      try {
+        await fetchBackendData();
+      } catch {
+        // Fallback local update if fetch fails
+      }
 
       if (activeDocId) {
         setDocuments((prev) =>

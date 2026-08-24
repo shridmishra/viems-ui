@@ -284,10 +284,14 @@ export function PassportTab({ migrant, onEditPassport, onPassportUploaded }: Pas
       const formData = new FormData();
       files.forEach((f) => formData.append("files", f));
       formData.append("migrant_id", String(migrantId));
-      formData.append("category", "passport");
-      formData.append("file_type", "passport");
+      formData.append("module", "migrants");
+      formData.append("moduleName", "migrants");
+      formData.append("category", "18");
 
-      const res = await apiClient.post<FileDocument[] | { files?: FileDocument[] }>(ENDPOINTS.files.upload, formData);
+      const res = await apiClient.post<FileDocument[] | { files?: FileDocument[] }>(
+        ENDPOINTS.files.uploadByEntity("migrants", migrantId),
+        { body: formData }
+      );
       toast.success("Passport document uploaded successfully.");
 
       const uploaded: any = Array.isArray(res) ? res[0] : (res as any)?.files?.[0] || res;

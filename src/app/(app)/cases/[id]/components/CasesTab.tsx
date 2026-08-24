@@ -46,7 +46,7 @@ export function CasesTab({ migrant, migrantId }: CasesTabProps) {
   const [casesList, setCasesList] = React.useState<CaseHistoryRow[]>([]);
   const [loading, setLoading] = React.useState(false);
 
-  const resolvedMigrantId = migrantId || (migrant?.id ? String(migrant.id) : null);
+  const resolvedMigrantId = migrantId || (migrant?.migrantId ? String(migrant.migrantId) : migrant?.id ? String(migrant.id) : null);
 
   React.useEffect(() => {
     let active = true;
@@ -56,27 +56,64 @@ export function CasesTab({ migrant, migrantId }: CasesTabProps) {
         setLoading(true);
         let casesData: RawCaseRecord[] = [];
 
+        // 1. Fetch active / ongoing / closed cases for this migrant using existing filter query
         try {
-          const res = await apiClient.get<RawCaseRecord[]>(`${ENDPOINTS.cases.base}?migrant_id=${resolvedMigrantId}`);
-          if (Array.isArray(res)) {
-            casesData = res;
+          const res = await apiClient.get<any>(`${ENDPOINTS.cases.base}?filter=migrantId.${resolvedMigrantId}`);
+          const list = Array.isArray(res) ? res : res?.data;
+          if (Array.isArray(list)) {
+            casesData.push(...list);
           }
-        } catch {
-          // Fallback to migrant entity cases
+        } catch (err) {
+          console.error("Failed to fetch active cases for migrant:", err);
         }
 
+        // 2. Fetch archived / previous cases for this migrant using existing archive filter query
+        try {
+          const res = await apiClient.get<any>(`${ENDPOINTS.cases.archive}?filter=migrantId.${resolvedMigrantId}`);
+          const list = Array.isArray(res) ? res : res?.data;
+          if (Array.isArray(list)) {
+            casesData.push(...list);
+          }
+        } catch {}
+
+        // 3. Fallback: check migrant entity cases if needed
         if (casesData.length === 0) {
-          const res = await apiClient.get<MigrantCasesResponse | RawCaseRecord[]>(ENDPOINTS.migrants.byId(resolvedMigrantId));
-          if (Array.isArray(res)) {
-            casesData = res;
-          } else if (res && typeof res === "object") {
-            const mCases = (res as MigrantCasesResponse).cases || (res as MigrantCasesResponse).data?.cases;
-            casesData = Array.isArray(mCases) ? mCases : [];
+          try {
+            const res = await apiClient.get<MigrantCasesResponse | RawCaseRecord[]>(ENDPOINTS.migrants.byId(resolvedMigrantId));
+            if (Array.isArray(res)) {
+              casesData.push(...res);
+            } else if (res && typeof res === "object") {
+              const mCases = (res as MigrantCasesResponse).cases || (res as MigrantCasesResponse).data?.cases;
+              if (Array.isArray(mCases)) {
+                casesData.push(...mCases);
+              }
+            }
+          } catch {}
+        }
+
+        // 4. Strict deduplication and migrant scoping
+        const seenIds = new Set<string>();
+        const migrantCasesOnly: RawCaseRecord[] = [];
+
+        for (const c of casesData) {
+          if (!c) continue;
+          const caseKey = String(c.id || c.caseNumber || c.caseIdDisplay || Math.random());
+          if (seenIds.has(caseKey)) continue;
+          seenIds.add(caseKey);
+
+          const cAny = c as any;
+          const cMigrantId = cAny.migrantId ?? cAny.migrant_id ?? cAny.migrant?.id;
+          if (cMigrantId !== undefined && cMigrantId !== null && cMigrantId !== "") {
+            if (String(cMigrantId) === String(resolvedMigrantId)) {
+              migrantCasesOnly.push(c);
+            }
+          } else {
+            migrantCasesOnly.push(c);
           }
         }
 
-        if (Array.isArray(casesData) && casesData.length > 0) {
-          const mapped: CaseHistoryRow[] = casesData.map((c: RawCaseRecord) => {
+        if (Array.isArray(migrantCasesOnly) && migrantCasesOnly.length > 0) {
+          const mapped: CaseHistoryRow[] = migrantCasesOnly.map((c: RawCaseRecord) => {
             const rawStatus = (c.case_status || c.status || "PENDING").toUpperCase().replace(/_/g, " ");
             let statusDisplay = rawStatus;
             let statusType: "approved" | "closed" | "in_progress" = "closed";
@@ -84,7 +121,13 @@ export function CasesTab({ migrant, migrantId }: CasesTabProps) {
             if (rawStatus.includes("APPROVED") || rawStatus.includes("GRANTED") || rawStatus.includes("ACTIVE")) {
               statusDisplay = "VISA APPROVED";
               statusType = "approved";
-            } else if (rawStatus.includes("CLOSED") || rawStatus.includes("COMPLETED") || rawStatus.includes("ARCHIVED") || rawStatus.includes("REFUSED")) {
+            } else if (rawStatus.includes("REFUSED")) {
+              statusDisplay = "VISA REFUSED";
+              statusType = "closed";
+            } else if (rawStatus.includes("WITHDRAWN")) {
+              statusDisplay = "WITHDRAWN";
+              statusType = "closed";
+            } else if (rawStatus.includes("CLOSED") || rawStatus.includes("COMPLETED") || rawStatus.includes("ARCHIVED")) {
               statusDisplay = "CASE CLOSED";
               statusType = "closed";
             } else {
@@ -96,14 +139,14 @@ export function CasesTab({ migrant, migrantId }: CasesTabProps) {
             let immigrationStatus = "LEFT UK";
             let immigrationType: "in_uk" | "left_uk" | "outside" = "left_uk";
 
-            if (statusType === "approved" || isEntered || c.migration === "IN UK") {
+            if (statusType === "approved" || isEntered || c.migration === "IN UK" || c.migration_stage === "ENTERED") {
               immigrationStatus = "IN UK";
               immigrationType = "in_uk";
-            } else if (c.migration === "LEFT UK" || statusType === "closed") {
+            } else if (c.migration === "LEFT UK" || statusType === "closed" || c.migration_stage === "DEPARTURE") {
               immigrationStatus = "LEFT UK";
               immigrationType = "left_uk";
             } else {
-              immigrationStatus = c.migration || "OUTSIDE UK";
+              immigrationStatus = c.migration || c.migration_stage || "OUTSIDE UK";
               immigrationType = "outside";
             }
 
@@ -138,8 +181,8 @@ export function CasesTab({ migrant, migrantId }: CasesTabProps) {
                 ? dateObj.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
                 : "—",
               dateValue,
-              visaType: c.job_title || c.visaType || c.personal?.jobTitle || "—",
-              group: c.group_name || c.personal?.groupName || "—",
+              visaType: c.job_title || c.visaType || c.personal?.jobTitle || (c as any).category || "—",
+              group: c.group_name || c.personal?.groupName || (c as any).groupName || (migrant as any)?.employer || "—",
               countryCode,
               countryLabel,
               status: statusDisplay,

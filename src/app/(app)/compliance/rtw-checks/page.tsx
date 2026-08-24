@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   RiArrowLeftSLine,
+  RiArrowLeftDoubleLine,
   RiSearchLine,
   RiFilter3Line,
   RiArrowDownSLine,
   RiCalendarLine,
   RiMore2Line,
   RiArrowRightSLine,
+  RiArrowRightDoubleLine,
   RiShieldCheckLine,
   RiAlertFill,
   RiFileTextLine,
@@ -315,18 +317,31 @@ export default function RtwChecksPage() {
       return result;
     }, [rtwChecks, activeHeaderTab, selectedFilter, statusDropdown, searchQuery, sortCol, sortDir]);
 
-  const pageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(filteredChecks.length / pageSize));
+  const [itemsPerPage, setItemsPerPage] = React.useState(10);
+  const totalPages = Math.max(1, Math.ceil(filteredChecks.length / itemsPerPage));
   const safePage = Math.max(1, Math.min(currentPage, totalPages));
 
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, statusDropdown, selectedFilter, sortCol, sortDir]);
+  }, [searchQuery, statusDropdown, selectedFilter, sortCol, sortDir, itemsPerPage]);
+
+  const pageNumbers = React.useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (safePage <= 4) {
+      return [1, 2, 3, 4, 5, "...", totalPages];
+    }
+    if (safePage >= totalPages - 3) {
+      return [1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    }
+    return [1, "...", safePage - 1, safePage, safePage + 1, "...", totalPages];
+  }, [safePage, totalPages]);
 
   const paginatedChecks = React.useMemo(() => {
-    const start = (safePage - 1) * pageSize;
-    return filteredChecks.slice(start, start + pageSize);
-  }, [filteredChecks, safePage, pageSize]);
+    const start = (safePage - 1) * itemsPerPage;
+    return filteredChecks.slice(start, start + itemsPerPage);
+  }, [filteredChecks, safePage, itemsPerPage]);
 
   const handleVerifySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -907,6 +922,140 @@ export default function RtwChecksPage() {
               ))
             )}
           </div>
+
+          {/* Pagination Group */}
+          {filteredChecks.length > 0 && (
+            <div className="flex flex-row items-center justify-between w-full h-[32px] gap-[24px]">
+              {/* Left: Page summary */}
+              <div className="w-[200px] h-[32px] py-[6px] flex items-center shrink-0">
+                <span className="text-[14px] font-normal leading-[20px] tracking-[-0.006em] text-[#5C5C5C] font-sans">
+                  Page {safePage} of {totalPages}
+                </span>
+              </div>
+
+              {/* Center: Pagination buttons */}
+              <div className="flex flex-row items-center justify-center gap-[8px] flex-1">
+                {/* First Page */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={safePage === 1}
+                  className="size-8 p-0 rounded-[8px] text-[#5C5C5C] hover:bg-neutral-200 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer border-0 shrink-0"
+                  title="First page"
+                >
+                  <RiArrowLeftDoubleLine className="size-5 text-[#5C5C5C]" />
+                </Button>
+
+                {/* Previous Page */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  className="size-8 p-0 rounded-[8px] text-[#5C5C5C] hover:bg-neutral-200 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer border-0 shrink-0"
+                  title="Previous page"
+                >
+                  <RiArrowLeftSLine className="size-5 text-[#5C5C5C]" />
+                </Button>
+
+                {/* Page number cells */}
+                <div className="flex flex-row items-center gap-[8px]">
+                  {pageNumbers.map((p, pIdx) => {
+                    if (p === "...") {
+                      return (
+                        <span
+                          key={`ellipsis-${pIdx}`}
+                          className="size-8 flex items-center justify-center text-[14px] font-medium text-[#5C5C5C]"
+                        >
+                          ...
+                        </span>
+                      );
+                    }
+
+                    const pageNum = Number(p);
+                    const isActive = safePage === pageNum;
+
+                    return (
+                      <Button
+                        key={`page-${pageNum}`}
+                        type="button"
+                        variant={isActive ? "primary-neutral" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`size-8 p-0 rounded-[8px] text-[14px] font-medium leading-[20px] flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                          isActive
+                            ? "bg-[#171717] text-white border-0 hover:bg-[#171717]"
+                            : "bg-white border border-[#EBEBEB] text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-50 shadow-[0px_1px_2px_rgba(10,13,20,0.03)]"
+                        }`}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                {/* Next Page */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  className="size-8 p-0 rounded-[8px] text-[#5C5C5C] hover:bg-neutral-200 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer border-0 shrink-0"
+                  title="Next page"
+                >
+                  <RiArrowRightSLine className="size-5 text-[#5C5C5C]" />
+                </Button>
+
+                {/* Last Page */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={safePage === totalPages}
+                  className="size-8 p-0 rounded-[8px] text-[#5C5C5C] hover:bg-neutral-200 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer border-0 shrink-0"
+                  title="Last page"
+                >
+                  <RiArrowRightDoubleLine className="size-5 text-[#5C5C5C]" />
+                </Button>
+              </div>
+
+              {/* Right: Items per page selector */}
+              <div className="w-[200px] h-[32px] flex items-center justify-end shrink-0">
+                <DropdownMenu>
+                  <DropdownMenuTrigger render={
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-[99px] h-8 px-[10px] py-[6px] rounded-[8px] border border-[#EBEBEB] bg-white text-[14px] font-normal text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-50 flex items-center justify-between shadow-[0px_1px_2px_rgba(10,13,20,0.03)] cursor-pointer outline-none shrink-0"
+                    >
+                      <span className="leading-[20px]">{itemsPerPage} / page</span>
+                      <RiArrowDownSLine className="size-5 text-[#A4A4A4]" />
+                    </Button>
+                  } />
+                  <DropdownMenuContent align="end" className="w-[110px] bg-white border border-[#EBEBEB] rounded-[10px] shadow-card-large p-1">
+                    {[10, 25, 50].map((size) => (
+                      <DropdownMenuItem
+                        key={size}
+                        onClick={() => {
+                          setItemsPerPage(size);
+                          setCurrentPage(1);
+                        }}
+                        className="text-[13px] text-[#171717] hover:bg-[#F5F5F5] rounded-[6px] px-2 py-1.5 cursor-pointer"
+                      >
+                        {size} / page
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

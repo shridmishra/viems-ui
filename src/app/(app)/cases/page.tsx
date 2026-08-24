@@ -35,6 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChangeCaseStatusModal } from "./components/ChangeCaseStatusModal";
+import { DocumentCompletenessWarningModal } from "./components/DocumentCompletenessWarningModal";
 import { CaseStatusDropdown } from "./components/CaseStatusDropdown";
 import { MarkVisaRefusedModal } from "./components/MarkVisaRefusedModal";
 import { CountryFilterDropdown } from "./components/CountryFilterDropdown";
@@ -46,6 +47,7 @@ import { ArchiveCaseModal } from "./components/ArchiveCaseModal";
 import { DeleteCaseModal } from "./components/DeleteCaseModal";
 import { CaseActionModal } from "./components/CaseActionModal";
 import { CASE_STATUSES, REFUSAL_REASONS } from "./case-status-data";
+import { checkAppendixDCompleteness, isCosAssignedStatus } from "@/lib/appendix-d-checker";
 import { apiClient } from "@/lib/api-client";
 import { formatFullName, getInitials, classifyCaseStage, getCaseAction } from "@/lib/utils";
 import { CaseRow, mapBackendCaseToRow, getMappedCasesWithOverrides, isCaseRefused, isCaseInProgress } from "@/lib/case-mapper";
@@ -170,6 +172,9 @@ export default function CasesPage() {
   // Modal states
   const [statusModalOpen, setStatusModalOpen] = React.useState(false);
   const [statusModalRow, setStatusModalRow] = React.useState<CaseRow | null>(null);
+  const [warningModalOpen, setWarningModalOpen] = React.useState(false);
+  const [warningModalRow, setWarningModalRow] = React.useState<CaseRow | null>(null);
+  const [warningPendingStatus, setWarningPendingStatus] = React.useState<string>("CoS Assigned");
   const [refusedModalOpen, setRefusedModalOpen] = React.useState(false);
   const [refusedModalRow, setRefusedModalRow] = React.useState<CaseRow | null>(null);
   const [archiveModalOpen, setArchiveModalOpen] = React.useState(false);
@@ -655,17 +660,12 @@ export default function CasesPage() {
     });
   };
 
-  // Handler: change case status with real backend call
-  const handleChangeStatus = async (newStatusValue: string, rowOverride?: CaseRow) => {
-    const targetRow = rowOverride || statusModalRow;
-    if (!targetRow) return;
+  const executeStatusChange = async (statusLabel: string, targetRow: CaseRow) => {
     const statusOption = CASE_STATUSES.find(
       (s) =>
-        s.value === newStatusValue ||
-        s.label.toLowerCase() === newStatusValue.toLowerCase() ||
-        s.value.toLowerCase().replace(/_/g, " ") === newStatusValue.toLowerCase().replace(/_/g, " ")
-    );
-    if (!statusOption) return;
+        s.label.toLowerCase() === statusLabel.toLowerCase() ||
+        s.value.toLowerCase() === statusLabel.toLowerCase()
+    ) || { label: statusLabel, value: statusLabel, dotColor: "#1FC16B" };
 
     const applyLocalState = () => {
       const overrideKey = targetRow.id || targetRow.caseId;
@@ -737,6 +737,39 @@ export default function CasesPage() {
     } else {
       applyLocalState();
     }
+  };
+
+  // Handler: change case status with real backend call
+  const handleChangeStatus = async (newStatusValue: string, rowOverride?: CaseRow) => {
+    const targetRow = rowOverride || statusModalRow;
+    if (!targetRow) return;
+    const statusOption = CASE_STATUSES.find(
+      (s) =>
+        s.value === newStatusValue ||
+        s.label.toLowerCase() === newStatusValue.toLowerCase() ||
+        s.value.toLowerCase().replace(/_/g, " ") === newStatusValue.toLowerCase().replace(/_/g, " ")
+    );
+    if (!statusOption) return;
+
+    // Check Appendix D Completeness if status is CoS Assigned / Issued
+    if (isCosAssignedStatus(newStatusValue) || isCosAssignedStatus(statusOption.label) || isCosAssignedStatus(statusOption.value)) {
+      let filesToCheck: any[] = [];
+      if (targetRow.id) {
+        try {
+          const res = await apiClient.get<any[]>(ENDPOINTS.files.listByCase(targetRow.id));
+          if (Array.isArray(res)) filesToCheck = res;
+        } catch (e) {}
+      }
+      const completeness = checkAppendixDCompleteness(filesToCheck, undefined, targetRow);
+      if (!completeness.isComplete) {
+        setWarningModalRow(targetRow);
+        setWarningPendingStatus(statusOption.label);
+        setWarningModalOpen(true);
+        return;
+      }
+    }
+
+    await executeStatusChange(statusOption.label, targetRow);
   };
 
   // Handler: mark as visa refused with real backend call
@@ -2217,6 +2250,10 @@ export default function CasesPage() {
       <ChangeCaseStatusModal
         open={statusModalOpen}
         onOpenChange={setStatusModalOpen}
+        caseId={statusModalRow?.id}
+        migrantName={statusModalRow?.name}
+        caseData={statusModalRow}
+        onFilesChanged={loadCases}
         currentStatus={
           statusModalRow
             ? CASE_STATUSES.find((s) => s.label === statusModalRow.status)?.value || ""
@@ -2234,6 +2271,23 @@ export default function CasesPage() {
             handleChangeStatus(newStatus);
           }
         }}
+      />
+
+      <DocumentCompletenessWarningModal
+        open={warningModalOpen}
+        onOpenChange={setWarningModalOpen}
+        caseId={warningModalRow?.id}
+        migrantName={warningModalRow?.name}
+        caseData={warningModalRow}
+        onProceed={async () => {
+          if (warningModalRow) {
+            await executeStatusChange(warningPendingStatus, warningModalRow);
+          }
+        }}
+        onFilesChanged={loadCases}
+        onNavigateToDocuments={
+          warningModalRow?.id ? () => router.push(`/cases/${warningModalRow.id}?tab=Documents`) : undefined
+        }
       />
 
       <MarkVisaRefusedModal

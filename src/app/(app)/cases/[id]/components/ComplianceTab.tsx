@@ -51,6 +51,20 @@ function ComplianceDonutChart({ percentage = 100 }: { percentage?: number }) {
   );
 }
 
+function getSafeString(val: any, fallback = ""): string {
+  if (!val) return fallback;
+  if (typeof val === "string") return val;
+  if (typeof val === "number") return String(val);
+  if (Array.isArray(val)) {
+    const validItems = val.map((v) => getSafeString(v)).filter(Boolean);
+    return validItems.length > 0 ? validItems.join(", ") : fallback;
+  }
+  if (typeof val === "object") {
+    return val.name || val.title || val.value || val.label || fallback;
+  }
+  return fallback;
+}
+
 interface PriorityTaskItem {
   id: string;
   title: string;
@@ -190,9 +204,14 @@ export function ComplianceTab({
             taskDueDate = `Due ${formattedExpiryDate}`;
           }
 
+          const safeTitle =
+            getSafeString(t.title) ||
+            getSafeString(t.name) ||
+            "Pending Compliance Action";
+
           return {
             id: String(t.id || `pt-${idx}`),
-            title: t.title || t.name || "Pending Compliance Action",
+            title: safeTitle,
             priority,
             badgeBg: isHigh ? "bg-[#FFEBEC]" : isMed ? "bg-[#FFFAEB]" : "bg-[#F5F5F5]",
             badgeText: isHigh ? "text-[#681219]" : isMed ? "text-[#624C18]" : "text-[#5C5C5C]",
@@ -347,11 +366,11 @@ export function ComplianceTab({
           <div className="flex flex-col gap-1 pt-2 border-t border-neutral-100">
             <div className="flex items-center justify-between text-[13px]">
               <span className="text-[#5C5C5C]">Case Type</span>
-              <span className="font-medium text-[#171717]">{caseData?.migrant?.visaType || caseData?.visaType || "Skilled Worker"}</span>
+              <span className="font-medium text-[#171717]">{getSafeString(caseData?.migrant?.visaType || caseData?.visaType || caseData?.personal?.visaType, "Skilled Worker")}</span>
             </div>
             <div className="flex items-center justify-between text-[13px]">
               <span className="text-[#5C5C5C]">Status</span>
-              <span className="font-medium text-[#171717]">{caseData?.status || "Active compliance"}</span>
+              <span className="font-medium text-[#171717]">{getSafeString(caseData?.status || caseData?.case_status, "Active compliance")}</span>
             </div>
           </div>
         </div>
@@ -506,7 +525,7 @@ export function ComplianceTab({
                 <div className="flex flex-col">
                   <span className="font-medium text-[#171717]">Immigration status</span>
                   <span className="text-[11px] text-[#7B7B7B]">
-                    {caseData?.status || "Active compliance"}
+                    {getSafeString(caseData?.status || caseData?.case_status, "Active compliance")}
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
