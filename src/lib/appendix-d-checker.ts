@@ -114,7 +114,19 @@ export function isCosAssignedStatus(status: string | null | undefined): boolean 
 function fileMatchesEssential(file: any, key: AppendixDEssentialKey): boolean {
   if (!file) return false;
 
+  // Direct explicit match if file was tagged with key during upload
+  if (
+    file.appendixDKey === key ||
+    file.targetKey === key ||
+    file.category === key ||
+    file.file_type === key ||
+    (typeof file.category === "string" && file.category.toLowerCase() === key)
+  ) {
+    return true;
+  }
+
   const rawType = (
+    file.fieldname ||
     file.filetype?.value ||
     file.filetype?.title ||
     file.file_type ||
@@ -202,7 +214,25 @@ export function checkAppendixDCompleteness(
   migrant?: any,
   caseData?: any
 ): AppendixDCheckResult {
-  const safeFiles = Array.isArray(files) ? files : [];
+  const safeFiles = Array.isArray(files) ? [...files] : [];
+
+  // Also pull in any session-uploaded files from localStorage
+  const caseId = caseData?.id || caseData?.caseId || migrant?.id || migrant?.caseId;
+  if (typeof window !== "undefined" && caseId) {
+    try {
+      const stored = localStorage.getItem(`appendix_d_attached_${caseId}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((pf: any) => {
+            if (pf && !safeFiles.some((f) => f.id === pf.id || (f.name === pf.name && f.category === pf.category))) {
+              safeFiles.unshift(pf);
+            }
+          });
+        }
+      }
+    } catch (e) {}
+  }
 
   const essentials: AppendixDEssentialItem[] = APPENDIX_D_DEFINITIONS.map((def) => {
     // Look for matching file in files list

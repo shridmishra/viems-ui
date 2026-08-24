@@ -78,17 +78,47 @@ export function DocumentCompletenessWarningModal({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const pendingUploadKeyRef = React.useRef<AppendixDEssentialKey | null>(null);
 
-  // Sync internal files when caseFiles prop changes or modal opens
+  // Sync internal files when modal opens or caseId changes
   React.useEffect(() => {
     if (open) {
-      setInternalFiles(caseFiles);
+      const localAttached: any[] = [];
+      if (caseId && typeof window !== "undefined") {
+        try {
+          const stored = localStorage.getItem(`appendix_d_attached_${caseId}`);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) localAttached.push(...parsed);
+          }
+        } catch (e) {}
+      }
+
+      if (caseFiles && caseFiles.length > 0) {
+        setInternalFiles([...localAttached, ...caseFiles]);
+      } else if (localAttached.length > 0) {
+        setInternalFiles((prev) => {
+          const combined = [...localAttached];
+          prev.forEach((p) => {
+            if (!combined.some((c) => c.id === p.id)) combined.push(p);
+          });
+          return combined;
+        });
+      }
+
       // If caseId is available, refresh files from server
       if (caseId) {
         apiClient
           .get<any[]>(ENDPOINTS.files.listByCase(caseId))
           .then((res) => {
             if (Array.isArray(res)) {
-              setInternalFiles(res);
+              setInternalFiles((prev) => {
+                const updated = [...localAttached, ...res];
+                prev.forEach((pf) => {
+                  if (pf.appendixDKey && !updated.some((u) => u.id === pf.id)) {
+                    updated.unshift(pf);
+                  }
+                });
+                return updated;
+              });
             }
           })
           .catch((err) => {
@@ -96,7 +126,7 @@ export function DocumentCompletenessWarningModal({
           });
       }
     }
-  }, [open, caseFiles, caseId]);
+  }, [open, caseId]);
 
   // Compute live completeness
   const checkResult: AppendixDCheckResult = React.useMemo(() => {
@@ -137,7 +167,10 @@ export function DocumentCompletenessWarningModal({
         id: `upload_${Date.now()}`,
         originalName: file.name,
         filename: file.name,
+        name: file.name,
         category: targetKey,
+        appendixDKey: targetKey,
+        targetKey: targetKey,
         file_type: targetKey,
         filetype: { value: targetKey, title: file.name },
         folderName: "Appendix D",
@@ -146,7 +179,20 @@ export function DocumentCompletenessWarningModal({
         uploadDate: new Date().toISOString(),
       };
 
-      setInternalFiles((prev) => [newFileObj, ...prev]);
+      setInternalFiles((prev) => [newFileObj, ...prev.filter((p) => p.appendixDKey !== targetKey)]);
+
+      if (caseId && typeof window !== "undefined") {
+        try {
+          const stored = localStorage.getItem(`appendix_d_attached_${caseId}`);
+          const prevStored = stored ? JSON.parse(stored) : [];
+          const filtered = Array.isArray(prevStored) ? prevStored.filter((p: any) => p.appendixDKey !== targetKey) : [];
+          localStorage.setItem(
+            `appendix_d_attached_${caseId}`,
+            JSON.stringify([newFileObj, ...filtered])
+          );
+        } catch (e) {}
+      }
+
       toast.success(`Attached ${file.name} successfully`, { id: toastId });
 
       if (onFilesChanged) {
@@ -183,7 +229,7 @@ export function DocumentCompletenessWarningModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[580px] w-[92vw] p-0 gap-0 overflow-hidden rounded-card bg-card border-border shadow-card-large font-sans">
+      <DialogContent className="max-w-[580px] w-[92vw] !p-0 !gap-0 !overflow-hidden rounded-card bg-card border-border shadow-card-large font-sans flex flex-col h-[600px] max-h-[85vh]">
         {/* Hidden file input for inline uploads */}
         <Input
           type="file"
@@ -194,7 +240,7 @@ export function DocumentCompletenessWarningModal({
         />
 
         {/* Modal Header */}
-        <DialogHeader className="px-2xl py-xl border-b border-border bg-card flex flex-row items-center justify-between space-y-0 text-left">
+        <DialogHeader className="px-xl py-lg border-b border-border bg-card flex flex-row items-center justify-between space-y-0 text-left shrink-0">
           <div className="flex items-center gap-md">
             <div className="size-9 rounded-compact bg-warning-light text-warning-dark flex items-center justify-center shrink-0">
               <RiShieldLine className="size-5" />
@@ -216,7 +262,7 @@ export function DocumentCompletenessWarningModal({
         </DialogHeader>
 
         {/* Modal Body */}
-        <div className="px-2xl py-xl flex flex-col gap-lg max-h-[68vh] overflow-y-auto bg-card text-left">
+        <div className="px-xl py-lg flex flex-col gap-md flex-1 min-h-0 overflow-y-auto bg-card text-left">
           {/* Warning Banner */}
           <Alert variant={checkResult.isComplete ? "success" : "warning"} className="p-md rounded-input">
             <RiAlertLine className="size-4 shrink-0 mt-0.5" />
@@ -323,7 +369,7 @@ export function DocumentCompletenessWarningModal({
                         size="sm"
                         disabled={isItemUploading}
                         onClick={() => handleUploadClick(item.key)}
-                        className="h-7 text-[12px] font-medium gap-xs px-sm rounded-compact border-neutral-300 hover:bg-neutral-100"
+                        className="h-7 text-[12px] font-medium gap-xs px-sm rounded-compact border-neutral-300 hover:bg-neutral-100 disabled:!bg-neutral-100 disabled:!text-neutral-500"
                       >
                         {isItemUploading ? (
                           <>
@@ -346,7 +392,7 @@ export function DocumentCompletenessWarningModal({
         </div>
 
         {/* Modal Footer */}
-        <DialogFooter className="px-2xl py-lg border-t border-border bg-card flex items-center justify-between sm:justify-between w-full">
+        <div className="px-xl py-lg border-t border-border bg-neutral-50 flex flex-row items-center justify-between w-full shrink-0 gap-sm m-0">
           <div>
             {onNavigateToDocuments && (
               <Button
@@ -380,26 +426,26 @@ export function DocumentCompletenessWarningModal({
               type="button"
               disabled={!checkResult.isComplete || isProceeding}
               onClick={handleProceed}
-              className={`h-9 px-lg rounded-button text-[13px] font-medium text-white gap-xs ${
+              className={`h-9 px-lg rounded-button text-[13px] font-medium gap-xs border transition-colors ${
                 checkResult.isComplete
-                  ? "bg-brand-medium hover:bg-brand-dark cursor-pointer"
-                  : "bg-neutral-300 cursor-not-allowed opacity-60"
+                  ? "bg-brand-medium hover:bg-brand-dark text-white border-transparent cursor-pointer shadow-sm"
+                  : "disabled:!bg-neutral-200 disabled:!text-neutral-600 disabled:!border-neutral-300 disabled:!opacity-100 disabled:!cursor-not-allowed"
               }`}
             >
               {isProceeding ? (
                 <>
-                  <RiLoader4Line className="size-4 animate-spin" />
+                  <RiLoader4Line className="size-4 animate-spin text-neutral-600" />
                   <span>Assigning CoS…</span>
                 </>
               ) : (
                 <>
                   <span>Proceed to CoS Assigned</span>
-                  <RiArrowRightLine className="size-3.5" />
+                  <RiArrowRightLine className="size-3.5 text-neutral-500" />
                 </>
               )}
             </Button>
           </div>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
