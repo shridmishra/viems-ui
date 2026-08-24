@@ -64,8 +64,8 @@ function isTaskStatus(st: string): st is TaskItem["status"] {
   return (VALID_STATUSES as readonly string[]).includes(st);
 }
 
-function getSafeString(val: any, fallback = ""): string {
-  if (!val) return fallback;
+export function getSafeString(val: any, fallback = ""): string {
+  if (val === null || val === undefined) return fallback;
   if (typeof val === "string") return val;
   if (typeof val === "number") return String(val);
   if (Array.isArray(val)) {
@@ -73,7 +73,12 @@ function getSafeString(val: any, fallback = ""): string {
     return validItems.length > 0 ? validItems.join(", ") : fallback;
   }
   if (typeof val === "object") {
-    return val.name || val.title || val.value || val.label || fallback;
+    const candidate = val.name ?? val.title ?? val.value ?? val.label;
+    if (candidate !== undefined && candidate !== null) {
+      const res = getSafeString(candidate, "");
+      if (res) return res;
+    }
+    return fallback;
   }
   return fallback;
 }

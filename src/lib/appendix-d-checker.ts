@@ -120,12 +120,13 @@ function fileMatchesEssential(file: any, key: AppendixDEssentialKey): boolean {
     file.targetKey === key ||
     file.category === key ||
     file.file_type === key ||
-    (typeof file.category === "string" && file.category.toLowerCase() === key)
+    (typeof file.category === "string" && file.category.toLowerCase() === key) ||
+    (key === "passport" && (file.category === 18 || file.category === "18" || file.category === "migrantpassport"))
   ) {
     return true;
   }
 
-  const rawType = (
+  const rawType = String(
     file.fieldname ||
     file.filetype?.value ||
     file.filetype?.title ||
@@ -135,7 +136,7 @@ function fileMatchesEssential(file: any, key: AppendixDEssentialKey): boolean {
     ""
   ).toLowerCase();
 
-  const rawName = (
+  const rawName = String(
     file.originalName ||
     file.filename ||
     file.name ||
@@ -143,62 +144,70 @@ function fileMatchesEssential(file: any, key: AppendixDEssentialKey): boolean {
     ""
   ).toLowerCase();
 
+  const nameNorm = rawName.replace(/_/g, " ");
+  const typeNorm = rawType.replace(/_/g, " ");
+
   switch (key) {
     case "passport": {
       return (
-        rawType.includes("passport") ||
-        rawType === "migrantpassport" ||
-        rawName.includes("passport")
+        typeNorm.includes("passport") ||
+        typeNorm === "migrantpassport" ||
+        typeNorm === "18" ||
+        nameNorm.includes("passport")
       );
     }
     case "union_letter": {
       return (
-        rawType.includes("union") ||
-        rawType === "letterfrompromoter" ||
-        rawType === "letterfromleadapplicant" ||
-        rawType === "letterfromproductionhouse" ||
-        rawType.includes("consultation") ||
-        rawName.includes("union") ||
-        rawName.includes("consultation") ||
-        rawName.includes("equity") ||
-        rawName.includes("bectu") ||
-        rawName.includes("musicians") ||
-        rawName.includes("promoter letter") ||
-        rawName.includes("production letter") ||
-        rawName.includes("letter from promoter") ||
-        rawName.includes("letter from production")
+        typeNorm.includes("union") ||
+        typeNorm === "letterfrompromoter" ||
+        typeNorm === "letterfromleadapplicant" ||
+        typeNorm === "letterfromproductionhouse" ||
+        typeNorm.includes("consultation") ||
+        nameNorm.includes("union") ||
+        nameNorm.includes("consultation") ||
+        nameNorm.includes("equity") ||
+        nameNorm.includes("bectu") ||
+        nameNorm.includes("musicians") ||
+        nameNorm.includes("promoter letter") ||
+        nameNorm.includes("production letter") ||
+        nameNorm.includes("letter from promoter") ||
+        nameNorm.includes("letter from production")
       );
     }
     case "itinerary": {
       return (
-        rawType === "itineraryofevents" ||
-        rawType === "filmingschedule" ||
-        rawType === "posterfortheevent" ||
-        rawType.includes("itinerary") ||
-        rawType.includes("schedule") ||
-        rawName.includes("itinerary") ||
-        rawName.includes("filming schedule") ||
-        rawName.includes("production schedule") ||
-        rawName.includes("schedule of event") ||
-        rawName.includes("tour schedule")
+        typeNorm === "itineraryofevents" ||
+        typeNorm === "filmingschedule" ||
+        typeNorm === "posterfortheevent" ||
+        typeNorm.includes("itinerary") ||
+        typeNorm.includes("schedule") ||
+        nameNorm.includes("itinerary") ||
+        nameNorm.includes("filming schedule") ||
+        nameNorm.includes("production schedule") ||
+        nameNorm.includes("schedule of event") ||
+        nameNorm.includes("tour schedule") ||
+        nameNorm.includes("schedule")
       );
     }
     case "signed_contract": {
       return (
-        rawType === "agreementbetweeneventimmpromoter" ||
-        rawType === "agreementbetweeneventimmproduction" ||
-        rawType === "employee_contract" ||
-        rawType === "fixed_term_contract" ||
-        rawType.includes("contract") ||
-        rawType.includes("agreement") ||
-        rawType.includes("fee_structure") ||
-        rawName.includes("contract") ||
-        rawName.includes("agreement") ||
-        rawName.includes("fee structure") ||
-        rawName.includes("pay structure") ||
-        rawName.includes("deal memo") ||
-        rawName.includes("signed contract") ||
-        rawName.includes("employment contract")
+        typeNorm === "agreementbetweeneventimmpromoter" ||
+        typeNorm === "agreementbetweeneventimmproduction" ||
+        typeNorm === "employee_contract" ||
+        typeNorm === "employee contract" ||
+        typeNorm === "fixed_term_contract" ||
+        typeNorm === "fixed term contract" ||
+        typeNorm.includes("contract") ||
+        typeNorm.includes("agreement") ||
+        typeNorm.includes("fee_structure") ||
+        typeNorm.includes("fee structure") ||
+        nameNorm.includes("contract") ||
+        nameNorm.includes("agreement") ||
+        nameNorm.includes("fee structure") ||
+        nameNorm.includes("pay structure") ||
+        nameNorm.includes("deal memo") ||
+        nameNorm.includes("signed contract") ||
+        nameNorm.includes("employment contract")
       );
     }
     default:
@@ -269,12 +278,12 @@ export function checkAppendixDCompleteness(
         caseData?.files?.some((f: any) => fileMatchesEssential(f, "passport"))
       );
 
-      if (hasPassportAttachment || (hasPassportNumber && safeFiles.some((f) => fileMatchesEssential(f, "passport")))) {
+      if (hasPassportAttachment || hasPassportNumber) {
         return {
           ...def,
           isAttached: true,
           attachedFile: {
-            name: `${migrant?.personalInfo?.lastName || "Migrant"}_Passport.pdf`,
+            name: `${migrant?.personalInfo?.lastName || caseData?.name || "Migrant"}_Passport.pdf`,
             category: "passport",
           },
         };

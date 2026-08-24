@@ -308,3 +308,23 @@ export function getCaseAction(c: any, completedActions?: Set<string>): { action:
   return { action: "No action required", actionColor: "gray" };
 }
 
+export function getSafeString(val: any, fallback = ""): string {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === "string") return val;
+  if (typeof val === "number") return String(val);
+  if (Array.isArray(val)) {
+    const validItems = val.map((v) => getSafeString(v)).filter(Boolean);
+    return validItems.length > 0 ? validItems.join(", ") : fallback;
+  }
+  if (typeof val === "object") {
+    const candidate = val.name ?? val.title ?? val.value ?? val.label;
+    if (candidate !== undefined && candidate !== null) {
+      const res = getSafeString(candidate, "");
+      if (res) return res;
+    }
+    return fallback;
+  }
+  return fallback;
+}
+
+

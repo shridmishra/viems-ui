@@ -758,7 +758,11 @@ export default function CasesPage() {
         try {
           const res = await apiClient.get<any[]>(ENDPOINTS.files.listByCase(targetRow.id));
           if (Array.isArray(res)) filesToCheck = res;
-        } catch (e) {}
+        } catch (e) {
+          console.error("Failed to check case documents for status change:", e);
+          toast.error("Failed to check case documents. Please try again.");
+          return;
+        }
       }
       const completeness = checkAppendixDCompleteness(filesToCheck, undefined, targetRow);
       if (!completeness.isComplete) {
@@ -2279,6 +2283,7 @@ export default function CasesPage() {
         caseId={warningModalRow?.id}
         migrantName={warningModalRow?.name}
         caseData={warningModalRow}
+        pendingStatusLabel={warningPendingStatus}
         onProceed={async () => {
           if (warningModalRow) {
             await executeStatusChange(warningPendingStatus, warningModalRow);

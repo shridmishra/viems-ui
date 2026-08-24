@@ -112,8 +112,8 @@ interface BackendFileResponse {
 }
 
   // ─── Real Backend Fetch ──────────────────────────────────────────────────
-  const fetchBackendData = React.useCallback(async () => {
-    if (!caseId) return;
+  const fetchBackendData = React.useCallback(async (): Promise<boolean> => {
+    if (!caseId) return false;
     try {
       const [foldersRes, filesRes] = await Promise.allSettled([
         apiClient.get<BackendFolderResponse[]>(ENDPOINTS.folders.system),
@@ -171,9 +171,12 @@ interface BackendFileResponse {
           fileUrl: file.fileUrl || (file.id ? ENDPOINTS.files.view(file.id) : undefined),
         }));
         setDocuments(mappedDocs);
+        return true;
       }
+      return false;
     } catch (err) {
       console.error("Backend fetch error in DocumentsTab:", err);
+      return false;
     }
   }, [caseId]);
 
@@ -199,7 +202,7 @@ interface BackendFileResponse {
       formData.append("module", "cases");
       formData.append("moduleName", "cases");
 
-      const uploadUrl = `${ENDPOINTS.files.base}/upload/cases/${caseId}`;
+      const uploadUrl = ENDPOINTS.files.uploadByEntity("cases", caseId);
 
       await apiClient.post<any>(uploadUrl, {
         body: formData,
@@ -207,45 +210,48 @@ interface BackendFileResponse {
 
       toast.success(`Successfully uploaded ${uploadedFiles.length} document(s)`);
 
+      let refreshed = false;
       try {
-        await fetchBackendData();
+        refreshed = await fetchBackendData();
       } catch {
-        // Fallback local update if fetch fails
+        refreshed = false;
       }
 
-      if (activeDocId) {
-        setDocuments((prev) =>
-          prev.map((doc) => {
-            if (doc.id === activeDocId) {
-              const firstFile = uploadedFiles[0];
-              const fileUrl = firstFile ? URL.createObjectURL(firstFile) : undefined;
-              return {
-                ...doc,
-                status: "uploaded",
-                date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-                dateWarning: undefined,
-                isAlert: false,
-                subtitle: firstFile
-                  ? `${firstFile.name} · ${(firstFile.size / (1024 * 1024)).toFixed(1)} MB`
-                  : doc.subtitle,
-                fileUrl,
-              };
-            }
-            return doc;
-          })
-        );
-      } else {
-        const newDocs: DocumentItem[] = uploadedFiles.map((file, idx) => ({
-          id: "doc_upload_" + Date.now() + "_" + idx,
-          name: file.name.replace(/\.[^/.]+$/, ""),
-          subtitle: `${file.name} · ${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-          folderId: selectedFolderId || "f1",
-          folderName: folders.find((f) => f.id === selectedFolderId)?.name || "Appendix D",
-          status: "uploaded",
-          date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-          fileUrl: URL.createObjectURL(file),
-        }));
-        setDocuments((prev) => [...newDocs, ...prev]);
+      if (!refreshed) {
+        if (activeDocId) {
+          setDocuments((prev) =>
+            prev.map((doc) => {
+              if (doc.id === activeDocId) {
+                const firstFile = uploadedFiles[0];
+                const fileUrl = firstFile ? URL.createObjectURL(firstFile) : undefined;
+                return {
+                  ...doc,
+                  status: "uploaded",
+                  date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+                  dateWarning: undefined,
+                  isAlert: false,
+                  subtitle: firstFile
+                    ? `${firstFile.name} · ${(firstFile.size / (1024 * 1024)).toFixed(1)} MB`
+                    : doc.subtitle,
+                  fileUrl,
+                };
+              }
+              return doc;
+            })
+          );
+        } else {
+          const newDocs: DocumentItem[] = uploadedFiles.map((file, idx) => ({
+            id: "doc_upload_" + Date.now() + "_" + idx,
+            name: file.name.replace(/\.[^/.]+$/, ""),
+            subtitle: `${file.name} · ${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+            folderId: selectedFolderId || "f1",
+            folderName: folders.find((f) => f.id === selectedFolderId)?.name || "Appendix D",
+            status: "uploaded",
+            date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            fileUrl: URL.createObjectURL(file),
+          }));
+          setDocuments((prev) => [...newDocs, ...prev]);
+        }
       }
     } catch (err: any) {
       toast.error(err?.message || "Failed to upload document");

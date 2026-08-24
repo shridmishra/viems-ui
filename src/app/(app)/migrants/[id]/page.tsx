@@ -322,7 +322,7 @@ function mapBackendMigrantToDetail(c: any) {
       expiryDate: passportExpiryDate,
     },
     cos: {
-      status: c.cosStatus?.id || (approvalStatus === "VISA APPROVED" ? "ASSIGNED" : "DRAFT"),
+      status: c.cosStatus?.id || (approvalStatus === "VISA APPROVED" ? "ASSIGNED" : undefined),
       reference: cosRef,
       salary: c.personal?.jobPay ? `$${c.personal.jobPay}` : "",
       startDate: visaStartDate ? new Date(visaStartDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "",

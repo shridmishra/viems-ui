@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import {
   RiArrowLeftSLine,
   RiArrowRightSLine,
@@ -310,7 +310,7 @@ function mapBackendCaseToDetail(c: any) {
       },
     },
     cos: {
-      status: c.cosStatus?.id || (approvalStatus === "VISA APPROVED" ? "ASSIGNED" : "DRAFT"),
+      status: c.cosStatus?.id || (approvalStatus === "VISA APPROVED" ? "ASSIGNED" : undefined),
       reference: c.cosStatus?.assigned?.cosNumber || c.cosReference || "",
       salary: c.personal?.jobPay ? (String(c.personal.jobPay).startsWith("$") || String(c.personal.jobPay).startsWith("£") ? c.personal.jobPay : `$${c.personal.jobPay}`) : "",
       startDate: c.cosStatus?.assigned?.assignedDate ? new Date(c.cosStatus.assigned.assignedDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "",
@@ -459,8 +459,25 @@ function DonutChart({ percentage }: { percentage: number }) {
 export default function MigrantOverviewPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params?.id as string;
-  const [activeTab, setActiveTab] = React.useState("Overview");
+  const tabParam = searchParams.get("tab");
+  const initialTab = React.useMemo(() => {
+    if (!tabParam) return "Overview";
+    const found = tabs.find((t) => t.label.toLowerCase() === tabParam.toLowerCase());
+    return found ? found.label : "Overview";
+  }, [tabParam]);
+
+  const [activeTab, setActiveTab] = React.useState(initialTab);
+
+  React.useEffect(() => {
+    if (tabParam) {
+      const found = tabs.find((t) => t.label.toLowerCase() === tabParam.toLowerCase());
+      if (found) {
+        setActiveTab(found.label);
+      }
+    }
+  }, [tabParam]);
 
   const [migrant, setMigrant] = React.useState<any>(null);
   const [rawMigrantData, setRawMigrantData] = React.useState<any>(null);

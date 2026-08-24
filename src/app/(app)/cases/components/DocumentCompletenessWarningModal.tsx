@@ -2,30 +2,24 @@
 
 import * as React from "react";
 import {
-  RiAlertLine,
-  RiCheckboxCircleFill,
-  RiCloseCircleLine,
-  RiUpload2Line,
-  RiFileTextLine,
-  RiFolderLine,
-  RiArrowRightLine,
   RiShieldLine,
+  RiCheckLine,
+  RiUpload2Line,
   RiLoader4Line,
-  RiPassportLine,
   RiArticleLine,
   RiCalendarEventLine,
+  RiFileTextLine,
+  RiPassportLine,
+  RiArrowRightLine,
+  RiFolderLine,
 } from "@remixicon/react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
@@ -43,10 +37,11 @@ interface DocumentCompletenessWarningModalProps {
   migrantId?: string | number;
   migrantName?: string;
   caseFiles?: any[];
+  pendingStatusLabel?: string;
   migrant?: any;
   caseData?: any;
   /** Called when all 4 essentials are attached and user confirms status change */
-  onProceed?: () => void | Promise<void>;
+  onProceed?: () => void | Promise<any>;
   /** Called when documents are uploaded so parent components can refresh */
   onFilesChanged?: () => void | Promise<void>;
   /** Optional navigation callback to jump to documents tab */
@@ -60,12 +55,15 @@ const ESSENTIAL_ICONS: Record<AppendixDEssentialKey, React.ElementType> = {
   signed_contract: RiFileTextLine,
 };
 
+const EMPTY_CASE_FILES: any[] = [];
+
 export function DocumentCompletenessWarningModal({
   open,
   onOpenChange,
   caseId,
   migrantName,
-  caseFiles = [],
+  caseFiles = EMPTY_CASE_FILES,
+  pendingStatusLabel,
   migrant,
   caseData,
   onProceed,
@@ -78,7 +76,7 @@ export function DocumentCompletenessWarningModal({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const pendingUploadKeyRef = React.useRef<AppendixDEssentialKey | null>(null);
 
-  // Sync internal files when modal opens or caseId changes
+  // Sync internal files when modal opens
   React.useEffect(() => {
     if (open) {
       const localAttached: any[] = [];
@@ -126,7 +124,7 @@ export function DocumentCompletenessWarningModal({
           });
       }
     }
-  }, [open, caseId]);
+  }, [open]);
 
   // Compute live completeness
   const checkResult: AppendixDCheckResult = React.useMemo(() => {
@@ -147,20 +145,24 @@ export function DocumentCompletenessWarningModal({
     if (!files || files.length === 0 || !targetKey) return;
 
     const file = files[0];
+
+    if (!caseId) {
+      toast.error("Invalid case ID for upload");
+      return;
+    }
+
     setUploadingKey(targetKey);
     const toastId = toast.loading(`Uploading ${file.name}…`);
 
     try {
-      if (caseId) {
-        const formData = new FormData();
-        formData.append("files", file);
-        formData.append("caseId", String(caseId));
-        formData.append("module", "cases");
-        formData.append("category", targetKey);
+      const formData = new FormData();
+      formData.append("files", file);
+      formData.append("caseId", String(caseId));
+      formData.append("module", "cases");
+      formData.append("category", targetKey);
 
-        const uploadUrl = `${ENDPOINTS.files.base}/upload/cases/${caseId}`;
-        await apiClient.post(uploadUrl, { body: formData });
-      }
+      const uploadUrl = ENDPOINTS.files.uploadByEntity("cases", caseId);
+      await apiClient.post(uploadUrl, { body: formData });
 
       // Create new attached file descriptor
       const newFileObj = {
@@ -181,7 +183,7 @@ export function DocumentCompletenessWarningModal({
 
       setInternalFiles((prev) => [newFileObj, ...prev.filter((p) => p.appendixDKey !== targetKey)]);
 
-      if (caseId && typeof window !== "undefined") {
+      if (typeof window !== "undefined") {
         try {
           const stored = localStorage.getItem(`appendix_d_attached_${caseId}`);
           const prevStored = stored ? JSON.parse(stored) : [];
@@ -248,128 +250,118 @@ export function DocumentCompletenessWarningModal({
             <div>
               <div className="flex items-center gap-sm">
                 <DialogTitle className="font-aeonik-medium text-label-lg text-foreground tracking-[-0.006em]">
-                  Document Completeness Warning
+                  Appendix D Compliance Checklist
                 </DialogTitle>
-                <Badge variant="warning" className="text-[10px] font-semibold uppercase tracking-wider py-0 px-xs h-4">
-                  PRE COS ISSUANCE
-                </Badge>
               </div>
-              <DialogDescription className="text-paragraph-xs text-muted-foreground mt-xxs">
-                {migrantName ? `Case: ${migrantName}` : "Pre-assignment compliance validation"}
-              </DialogDescription>
+              <p className="text-paragraph-xs text-muted-foreground mt-xxs">
+                {migrantName ? `For ${migrantName}` : "Statutory sponsorship documentation"}
+              </p>
             </div>
+          </div>
+          <div className="flex items-center gap-xs">
+            <span
+              className={`text-label-compact px-sm py-xxs rounded-compact font-medium ${
+                checkResult.isComplete
+                  ? "bg-success-light text-success-dark"
+                  : "bg-warning-light text-warning-dark"
+              }`}
+            >
+              {checkResult.attachedCount} of {checkResult.totalCount} Attached
+            </span>
           </div>
         </DialogHeader>
 
-        {/* Modal Body */}
-        <div className="px-xl py-lg flex flex-col gap-md flex-1 min-h-0 overflow-y-auto bg-card text-left">
-          {/* Warning Banner */}
-          <Alert variant={checkResult.isComplete ? "success" : "warning"} className="p-md rounded-input">
-            <RiAlertLine className="size-4 shrink-0 mt-0.5" />
-            <div className="flex flex-col gap-xxs">
-              <AlertTitle className="text-label-sm font-medium">
-                {checkResult.isComplete
-                  ? "All Appendix D essential documents attached"
-                  : "Missing doc warnings before status changes"}
-              </AlertTitle>
-              <AlertDescription className="text-paragraph-xs">
-                {checkResult.isComplete
-                  ? "All mandatory Appendix D compliance records are verified. You can now proceed to assign or issue the Certificate of Sponsorship (CoS)."
-                  : "Prevent CoS assigned/issued status until Appendix D essentials are attached: Passport, Union engagement letter/consultation, full production itinerary, and signed contract showing compliant fee/pay structure."}
-              </AlertDescription>
+        {/* Modal Body / Checklist */}
+        <div className="p-xl flex-1 overflow-y-auto flex flex-col gap-lg bg-card">
+          {/* Information banner if incomplete */}
+          {!checkResult.isComplete && (
+            <div className="bg-warning-light/50 border border-warning-dark/20 rounded-input p-md flex items-start gap-md text-paragraph-xs text-foreground">
+              <RiShieldLine className="size-4 text-warning-dark shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-warning-dark">Mandatory Home Office Requirement</p>
+                <p className="text-muted-foreground mt-xxs">
+                  Under UKVI Appendix D rules, all 4 essential documents must be on file before issuing or assigning a Certificate of Sponsorship (CoS). Please attach the missing records below.
+                </p>
+              </div>
             </div>
-          </Alert>
+          )}
 
-          {/* Completeness Summary Pill */}
-          <div className="flex items-center justify-between px-md py-sm bg-neutral-50 rounded-compact border border-border">
-            <div className="flex items-center gap-sm">
-              <span className="text-label-xs text-neutral-600 font-medium">Appendix D Essentials Status</span>
-            </div>
-            <div className="flex items-center gap-xs">
-              <span className="text-label-xs font-semibold text-foreground">
-                {checkResult.attachedCount} of {checkResult.totalCount} attached
-              </span>
-              <Badge
-                variant={checkResult.isComplete ? "success" : "destructive"}
-                className="text-[11px] font-medium h-5"
-              >
-                {checkResult.isComplete ? "Complete" : `${checkResult.missingCount} Missing`}
-              </Badge>
-            </div>
-          </div>
-
-          {/* Essentials Checklist */}
+          {/* Checklist Items */}
           <div className="flex flex-col gap-sm">
-            <h4 className="text-label-xs uppercase tracking-wider text-muted-foreground font-semibold px-xxs">
-              Mandatory Appendix D Records
-            </h4>
-
-            {checkResult.essentials.map((item, index) => {
-              const Icon = ESSENTIAL_ICONS[item.key] || RiFileTextLine;
+            {checkResult.essentials.map((item) => {
+              const IconComp = ESSENTIAL_ICONS[item.key] || RiFileTextLine;
               const isItemUploading = uploadingKey === item.key;
 
               return (
                 <div
                   key={item.key}
-                  className={`p-md rounded-input border transition-all flex items-start justify-between gap-md ${
+                  className={`p-lg rounded-card border transition-all flex items-center justify-between gap-md ${
                     item.isAttached
-                      ? "bg-neutral-50/50 border-neutral-200"
-                      : "bg-error-light/10 border-error-dark/20"
+                      ? "bg-neutral-50/50 border-border"
+                      : "bg-card border-dashed border-neutral-300 hover:border-brand-medium/50"
                   }`}
                 >
-                  {/* Left: Icon + Text */}
+                  {/* Left info */}
                   <div className="flex items-start gap-md min-w-0 flex-1">
                     <div
                       className={`size-8 rounded-compact flex items-center justify-center shrink-0 mt-0.5 ${
                         item.isAttached
                           ? "bg-success-light text-success-dark"
-                          : "bg-error-light text-error-dark"
+                          : "bg-neutral-100 text-neutral-500"
                       }`}
                     >
                       {item.isAttached ? (
-                        <RiCheckboxCircleFill className="size-4" />
+                        <RiCheckLine className="size-4 stroke-[3]" />
                       ) : (
-                        <RiCloseCircleLine className="size-4" />
+                        <IconComp className="size-4" />
                       )}
                     </div>
-
                     <div className="flex flex-col min-w-0 flex-1">
-                      <div className="flex items-center gap-sm flex-wrap">
-                        <span className="text-label-sm font-medium text-foreground">
-                          {index + 1}. {item.shortName}
+                      <div className="flex items-center gap-xs flex-wrap">
+                        <span className="text-label-sm text-foreground font-medium truncate">
+                          {item.name}
                         </span>
-                        <Badge
-                          variant={item.isAttached ? "success" : "destructive"}
-                          className="text-[10px] font-semibold py-0 px-xs h-4.5"
-                        >
-                          {item.isAttached ? "Attached" : "Missing"}
-                        </Badge>
+                        {item.isAttached && (
+                          <span className="text-[11px] font-medium text-success-dark bg-success-light px-xs py-0.5 rounded-compact">
+                            Attached
+                          </span>
+                        )}
                       </div>
-
-                      <p className="text-paragraph-xs text-muted-foreground mt-xxs line-clamp-2">
-                        {item.description}
+                      <p className="text-paragraph-xs text-muted-foreground truncate mt-xxs">
+                        {item.isAttached && item.attachedFile
+                          ? item.attachedFile.name || item.attachedFile.filename
+                          : item.description}
                       </p>
-
-                      {/* If attached, show file metadata */}
-                      {item.isAttached && item.attachedFile && (
-                        <div className="mt-xs flex items-center gap-xs text-[11px] text-neutral-600 bg-white/70 px-sm py-xxs rounded-[4px] border border-neutral-200 w-fit max-w-full truncate">
-                          <Icon className="size-3.5 text-neutral-500 shrink-0" />
-                          <span className="truncate font-medium">{item.attachedFile.name}</span>
-                        </div>
-                      )}
                     </div>
                   </div>
 
-                  {/* Right: Upload action for missing documents */}
-                  {!item.isAttached && (
-                    <div className="shrink-0 pt-0.5">
+                  {/* Right: Upload / Replace Action */}
+                  {item.isAttached ? (
+                    <div className="shrink-0">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={isItemUploading}
+                        onClick={() => handleUploadClick(item.key)}
+                        className="text-xs text-muted-foreground hover:text-foreground h-7 px-xs"
+                      >
+                        {isItemUploading ? (
+                          <RiLoader4Line className="size-3.5 animate-spin" />
+                        ) : (
+                          "Replace"
+                        )}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="shrink-0">
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         disabled={isItemUploading}
                         onClick={() => handleUploadClick(item.key)}
-                        className="h-7 text-[12px] font-medium gap-xs px-sm rounded-compact border-neutral-300 hover:bg-neutral-100 disabled:!bg-neutral-100 disabled:!text-neutral-500"
+                        className="h-8 px-md text-xs font-medium border-brand-medium text-brand-dark bg-brand-light/30 hover:bg-brand-light gap-xs rounded-button"
                       >
                         {isItemUploading ? (
                           <>
@@ -435,11 +427,11 @@ export function DocumentCompletenessWarningModal({
               {isProceeding ? (
                 <>
                   <RiLoader4Line className="size-4 animate-spin text-neutral-600" />
-                  <span>Assigning CoS…</span>
+                  <span>Updating status…</span>
                 </>
               ) : (
                 <>
-                  <span>Proceed to CoS Assigned</span>
+                  <span>Proceed to {pendingStatusLabel || "CoS Assigned"}</span>
                   <RiArrowRightLine className="size-3.5 text-neutral-500" />
                 </>
               )}

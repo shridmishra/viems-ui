@@ -46,7 +46,15 @@ export function FilePreviewModal({
   const [blobUrl, setBlobUrl] = React.useState<string | null>(null);
   const [isLoadingBlob, setIsLoadingBlob] = React.useState(false);
   const [mimeType, setMimeType] = React.useState<string>("");
-  const totalPages = 4;
+  const isImageType =
+    mimeType.startsWith("image/") ||
+    Boolean(blobUrl?.match(/\.(jpeg|jpg|gif|png|svg|webp)($|\?)/i)) ||
+    Boolean(document?.fileUrl?.match(/\.(jpeg|jpg|gif|png|svg|webp)($|\?)/i));
+
+  const totalPages =
+    (document as any)?.totalPages ??
+    (document as any)?.pages ??
+    (isImageType ? 1 : undefined);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -83,9 +91,6 @@ export function FilePreviewModal({
       if (document.id && !isNaN(Number(document.id))) {
         candidates.push(ENDPOINTS.files.view(document.id));
         candidates.push(ENDPOINTS.files.customView(document.id));
-      }
-      if (document.name?.toLowerCase().includes("passport")) {
-        candidates.push("/sample-files/TJ_Passport_Scan.pdf");
       }
 
       if (candidates.length === 0) {
@@ -141,7 +146,9 @@ export function FilePreviewModal({
     let url = blobUrl || document.fileUrl;
 
     if (!url) {
-      const summaryText = `VIEMS Official Document Record\n\nDocument: ${document.name}\nReference: DOC-${document.id || "2026-430"}\nCase: ${document.caseNumber || "Case Record"}\nSubject: ${document.migrantName || "Migrant"}\nCategory: ${document.category || "Compliance & Identity"}\nDate: ${uploadDate}\nStatus: Verified Home Office Appendix D Record\nSecurity Hash: SHA256: 8f4a29b1cd4e`;
+      const hashStr = (document as any)?.securityHash || (document as any)?.hash ? `\nSecurity Hash: ${(document as any).securityHash || (document as any).hash}` : "";
+      const statusStr = (document as any)?.verification ? `\nStatus: ${(document as any).verification}` : "";
+      const summaryText = `VIEMS Official Document Record\n\nDocument: ${document.name}\nReference: DOC-${document.id || "Record"}\nCase: ${document.caseNumber || "Case Record"}\nSubject: ${document.migrantName || "Migrant"}\nCategory: ${document.category || "Compliance & Identity"}\nDate: ${uploadDate}${statusStr}${hashStr}`;
       const file = new Blob([summaryText], { type: "text/plain" });
       url = URL.createObjectURL(file);
       isCreatedUrl = true;
@@ -157,11 +164,6 @@ export function FilePreviewModal({
       URL.revokeObjectURL(url);
     }
   };
-
-  const isImageType =
-    mimeType.startsWith("image/") ||
-    Boolean(blobUrl?.match(/\.(jpeg|jpg|gif|png|svg|webp)($|\?)/i)) ||
-    Boolean(document.fileUrl?.match(/\.(jpeg|jpg|gif|png|svg|webp)($|\?)/i));
 
   const isPdfType =
     mimeType.includes("pdf") ||
@@ -400,10 +402,12 @@ export function FilePreviewModal({
                         </span>
                       </div>
                     </div>
-                    <span className="px-2 py-0.5 bg-[#E3F7EC] text-[#0D6332] rounded-full text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1">
-                      <RiShieldCheckFill className="size-3" />
-                      VERIFIED
-                    </span>
+                    {Boolean((document as any)?.isVerified || (document as any)?.verified || (document as any)?.verification) && (
+                      <span className="px-2 py-0.5 bg-[#E3F7EC] text-[#0D6332] rounded-full text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1">
+                        <RiShieldCheckFill className="size-3" />
+                        {typeof (document as any).verification === "string" ? (document as any).verification : "VERIFIED"}
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-1">
@@ -411,7 +415,7 @@ export function FilePreviewModal({
                       {document.name}
                     </h3>
                     <p className="text-[12px] text-[#5C5C5C]">
-                      Document Reference: DOC-{document.id || "2026-430"} · {fileName}
+                      Document Reference: DOC-{document.id || "Record"} · {fileName}
                     </p>
                   </div>
 
@@ -430,12 +434,14 @@ export function FilePreviewModal({
                       <span className="text-[#7B7B7B] block text-[11px]">File Size</span>
                       <span className="font-medium text-[#171717] font-mono">{fileSize}</span>
                     </div>
-                    <div>
-                      <span className="text-[#7B7B7B] block text-[11px]">Security Hash</span>
-                      <span className="font-mono text-[10px] text-[#171717] truncate block">
-                        SHA256: 8f4a...29b1
-                      </span>
-                    </div>
+                    {Boolean((document as any)?.securityHash || (document as any)?.hash || (document as any)?.sha256) && (
+                      <div>
+                        <span className="text-[#7B7B7B] block text-[11px]">Security Hash</span>
+                        <span className="font-mono text-[10px] text-[#171717] truncate block">
+                          {(document as any).securityHash || (document as any).hash || (document as any).sha256}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-1.5 text-[12px] text-[#5C5C5C] leading-relaxed border-t border-neutral-100 pt-2.5">
@@ -448,7 +454,7 @@ export function FilePreviewModal({
                   <div className="flex items-center justify-between border-t border-neutral-200 pt-2 text-[11px] text-[#A4A4A4]">
                     <span>VIEMS Security Stamp: PASS</span>
                     <span>
-                      Page {currentPage} of {totalPages}
+                      {totalPages !== undefined ? `Page ${currentPage} of ${totalPages}` : `Page ${currentPage}`}
                     </span>
                   </div>
                 </div>
@@ -552,21 +558,25 @@ export function FilePreviewModal({
                           {isImageType ? ".png/.jpg" : ".pdf"}
                         </span>
                       </div>
-                      <div className="flex justify-between items-center py-1 border-b border-neutral-100">
-                        <span className="text-muted-foreground">Pages</span>
-                        <span className="font-medium text-foreground">{totalPages}</span>
-                      </div>
+                      {totalPages !== undefined && (
+                        <div className="flex justify-between items-center py-1 border-b border-neutral-100">
+                          <span className="text-muted-foreground">Pages</span>
+                          <span className="font-medium text-foreground">{totalPages}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between items-center py-1 border-b border-neutral-100">
                         <span className="text-muted-foreground">Uploaded</span>
                         <span className="font-medium text-foreground">{uploadDate}</span>
                       </div>
-                      <div className="flex justify-between items-center py-1 border-b border-neutral-100">
-                        <span className="text-muted-foreground">Verification</span>
-                        <span className="font-medium text-[#0D6332] flex items-center gap-1">
-                          <RiShieldCheckFill className="size-3.5" />
-                          Compliant
-                        </span>
-                      </div>
+                      {Boolean((document as any)?.verification || (document as any)?.isVerified || (document as any)?.verified) && (
+                        <div className="flex justify-between items-center py-1 border-b border-neutral-100">
+                          <span className="text-muted-foreground">Verification</span>
+                          <span className="font-medium text-[#0D6332] flex items-center gap-1">
+                            <RiShieldCheckFill className="size-3.5" />
+                            {typeof (document as any).verification === "string" ? (document as any).verification : "Compliant"}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -605,41 +615,55 @@ export function FilePreviewModal({
                     </p>
                   </div>
 
-                  <div className="flex flex-col gap-3 pt-2 text-[13px]">
-                    <div className="flex justify-between items-center py-2 border-b border-neutral-100">
-                      <span className="text-muted-foreground">Visa Type</span>
-                      <div className="flex items-center gap-1.5 font-medium text-foreground">
-                        <span>Creative Worker</span>
-                        <span className="text-[#10B981] font-bold text-[12px]">
-                          <RiCheckLine className="size-3.5" />
-                        </span>
-                      </div>
+                  {(document as any)?.extractedFields || (document as any)?.visaType || (document as any)?.grantDate || (document as any)?.expiryDate || (document as any)?.matchScore ? (
+                    <div className="flex flex-col gap-3 pt-2 text-[13px]">
+                      {(document as any)?.visaType && (
+                        <div className="flex justify-between items-center py-2 border-b border-neutral-100">
+                          <span className="text-muted-foreground">Visa Type</span>
+                          <div className="flex items-center gap-1.5 font-medium text-foreground">
+                            <span>{(document as any).visaType}</span>
+                            <span className="text-[#10B981] font-bold text-[12px]">
+                              <RiCheckLine className="size-3.5" />
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {(document as any)?.grantDate && (
+                        <div className="flex justify-between items-center py-2 border-b border-neutral-100">
+                          <span className="text-muted-foreground">Grant Date</span>
+                          <div className="flex items-center gap-1.5 font-medium text-foreground">
+                            <span>{(document as any).grantDate}</span>
+                            <span className="text-[#10B981] font-bold text-[12px]">
+                              <RiCheckLine className="size-3.5" />
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {(document as any)?.expiryDate && (
+                        <div className="flex justify-between items-center py-2 border-b border-neutral-100">
+                          <span className="text-muted-foreground">Expiry Date</span>
+                          <div className="flex items-center gap-1.5 font-medium text-foreground">
+                            <span>{(document as any).expiryDate}</span>
+                            <span className="text-[#10B981] font-bold text-[12px]">
+                              <RiCheckLine className="size-3.5" />
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {(document as any)?.matchScore && (
+                        <div className="flex justify-between items-center py-2 border-b border-neutral-100">
+                          <span className="text-muted-foreground">Match Score</span>
+                          <div className="flex items-center gap-1.5 font-medium text-[#0D6332]">
+                            <span>{(document as any).matchScore}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-neutral-100">
-                      <span className="text-muted-foreground">Grant Date</span>
-                      <div className="flex items-center gap-1.5 font-medium text-foreground">
-                        <span>Mar 8, 2028</span>
-                        <span className="text-[#10B981] font-bold text-[12px]">
-                          <RiCheckLine className="size-3.5" />
-                        </span>
-                      </div>
+                  ) : (
+                    <div className="py-8 text-center text-muted-foreground text-paragraph-sm">
+                      No AI extracted fields available for this document.
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-neutral-100">
-                      <span className="text-muted-foreground">Expiry Date</span>
-                      <div className="flex items-center gap-1.5 font-medium text-foreground">
-                        <span>Mar 8, 2027</span>
-                        <span className="text-[#10B981] font-bold text-[12px]">
-                          <RiCheckLine className="size-3.5" />
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center py-2 border-b border-neutral-100">
-                      <span className="text-muted-foreground">Match Score</span>
-                      <div className="flex items-center gap-1.5 font-medium text-[#0D6332]">
-                        <span>99.4% Verified</span>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
 

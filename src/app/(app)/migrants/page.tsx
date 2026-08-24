@@ -860,7 +860,6 @@ export default function MigrantsPage() {
             onOpenChange={setStatusModalOpen}
             currentStatus={selectedRow.status}
             caseId={selectedRow.id}
-            migrantId={(selectedRow as any).migrantId || selectedRow.id}
             migrantName={selectedRow.name}
             caseData={selectedRow}
             onFilesChanged={fetchCasesData}

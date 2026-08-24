@@ -119,6 +119,7 @@ export default function RtwChecksPage() {
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
 
   const handleSort = (col: string) => {
+    setCurrentPage(1);
     if (sortCol === col) {
       if (sortDir === "asc") setSortDir("desc");
       else {
@@ -321,10 +322,6 @@ export default function RtwChecksPage() {
   const totalPages = Math.max(1, Math.ceil(filteredChecks.length / itemsPerPage));
   const safePage = Math.max(1, Math.min(currentPage, totalPages));
 
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, statusDropdown, selectedFilter, sortCol, sortDir, itemsPerPage]);
-
   const pageNumbers = React.useMemo(() => {
     if (totalPages <= 7) {
       return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -455,7 +452,10 @@ export default function RtwChecksPage() {
             {/* Tab 1: RTW Checks */}
             <button
               type="button"
-              onClick={() => setActiveHeaderTab("RTW_CHECKS")}
+              onClick={() => {
+                setActiveHeaderTab("RTW_CHECKS");
+                setCurrentPage(1);
+              }}
               className={`relative flex items-center gap-1.5 h-full pb-3 text-[14px] font-medium transition-colors cursor-pointer border-0 bg-transparent ${
                 activeHeaderTab === "RTW_CHECKS"
                   ? "text-[#171717]"
@@ -475,7 +475,10 @@ export default function RtwChecksPage() {
             {/* Tab 2: Verification History */}
             <button
               type="button"
-              onClick={() => setActiveHeaderTab("HISTORY")}
+              onClick={() => {
+                setActiveHeaderTab("HISTORY");
+                setCurrentPage(1);
+              }}
               className={`relative flex items-center gap-1.5 h-full pb-3 text-[14px] font-medium transition-colors cursor-pointer border-0 bg-transparent ${
                 activeHeaderTab === "HISTORY"
                   ? "text-[#171717]"
@@ -547,7 +550,10 @@ export default function RtwChecksPage() {
           {/* Card 2: OVERDUE CHECKS */}
           <button
             type="button"
-            onClick={() => setSelectedFilter("OVERDUE")}
+            onClick={() => {
+              setSelectedFilter("OVERDUE");
+              setCurrentPage(1);
+            }}
             className="bg-[#FFEBEC] rounded-[8px] p-3 px-4 flex flex-col justify-between relative overflow-hidden h-[70px] hover:shadow-x-small transition-shadow cursor-pointer border-0 text-left"
           >
             <span className="text-[11px] font-medium text-[#171717] uppercase tracking-[0.02em] leading-[12px]">
@@ -562,7 +568,10 @@ export default function RtwChecksPage() {
           {/* Card 3: DUE SOON */}
           <button
             type="button"
-            onClick={() => setSelectedFilter("DUE")}
+            onClick={() => {
+              setSelectedFilter("DUE");
+              setCurrentPage(1);
+            }}
             className="bg-[#FFFAEB] rounded-[8px] p-3 px-4 flex flex-col justify-between relative overflow-hidden h-[70px] hover:shadow-x-small transition-shadow cursor-pointer border-0 text-left"
           >
             <span className="text-[11px] font-medium text-[#171717] uppercase tracking-[0.02em] leading-[12px]">
@@ -577,7 +586,10 @@ export default function RtwChecksPage() {
           {/* Card 4: COMPLETED THIS MONTH */}
           <button
             type="button"
-            onClick={() => setSelectedFilter("COMPLIANT")}
+            onClick={() => {
+              setSelectedFilter("COMPLIANT");
+              setCurrentPage(1);
+            }}
             className="bg-[#E3F7EC] rounded-[8px] p-3 px-4 flex flex-col justify-between relative overflow-hidden h-[70px] hover:shadow-x-small transition-shadow cursor-pointer border-0 text-left"
           >
             <span className="text-[11px] font-medium text-[#171717] uppercase tracking-[0.02em] leading-[12px]">
@@ -604,7 +616,10 @@ export default function RtwChecksPage() {
                 aria-label="Search migrants"
                 placeholder="Search..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="h-full border-0 bg-transparent px-2 text-[14px] text-[#171717] placeholder:text-[#A4A4A4] focus-visible:ring-0 focus-visible:border-0 shadow-none py-0"
               />
             </div>
@@ -626,19 +641,19 @@ export default function RtwChecksPage() {
                 <RiArrowDownSLine className="size-5 text-[#5C5C5C]" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-40">
-                <DropdownMenuItem onClick={() => setStatusDropdown("All status")}>
+                <DropdownMenuItem onClick={() => { setStatusDropdown("All status"); setCurrentPage(1); }}>
                   All status
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusDropdown("Overdue")}>
+                <DropdownMenuItem onClick={() => { setStatusDropdown("Overdue"); setCurrentPage(1); }}>
                   Overdue
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusDropdown("Due Soon")}>
+                <DropdownMenuItem onClick={() => { setStatusDropdown("Due Soon"); setCurrentPage(1); }}>
                   Due Soon
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusDropdown("Compliant")}>
+                <DropdownMenuItem onClick={() => { setStatusDropdown("Compliant"); setCurrentPage(1); }}>
                   Compliant
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusDropdown("Follow-up")}>
+                <DropdownMenuItem onClick={() => { setStatusDropdown("Follow-up"); setCurrentPage(1); }}>
                   Follow-up
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -651,7 +666,10 @@ export default function RtwChecksPage() {
             <div className="inline-flex items-center gap-1 bg-[#EBEBEB] rounded-full p-1 h-7">
               <button
                 type="button"
-                onClick={() => setSelectedFilter("ALL")}
+                onClick={() => {
+                  setSelectedFilter("ALL");
+                  setCurrentPage(1);
+                }}
                 className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none flex items-center justify-center transition-all cursor-pointer border-0 ${
                   selectedFilter === "ALL"
                     ? "bg-white text-[#171717] shadow-x-small"
@@ -662,7 +680,10 @@ export default function RtwChecksPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setSelectedFilter("OVERDUE")}
+                onClick={() => {
+                  setSelectedFilter("OVERDUE");
+                  setCurrentPage(1);
+                }}
                 className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
                   selectedFilter === "OVERDUE"
                     ? "bg-white text-[#171717] shadow-x-small"
@@ -674,7 +695,10 @@ export default function RtwChecksPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setSelectedFilter("DUE")}
+                onClick={() => {
+                  setSelectedFilter("DUE");
+                  setCurrentPage(1);
+                }}
                 className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
                   selectedFilter === "DUE"
                     ? "bg-white text-[#171717] shadow-x-small"
@@ -686,7 +710,10 @@ export default function RtwChecksPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setSelectedFilter("COMPLIANT")}
+                onClick={() => {
+                  setSelectedFilter("COMPLIANT");
+                  setCurrentPage(1);
+                }}
                 className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
                   selectedFilter === "COMPLIANT"
                     ? "bg-white text-[#171717] shadow-x-small"
@@ -698,7 +725,10 @@ export default function RtwChecksPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setSelectedFilter("FOLLOW-UP")}
+                onClick={() => {
+                  setSelectedFilter("FOLLOW-UP");
+                  setCurrentPage(1);
+                }}
                 className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
                   selectedFilter === "FOLLOW-UP"
                     ? "bg-white text-[#171717] shadow-x-small"
@@ -787,6 +817,7 @@ export default function RtwChecksPage() {
                     setSearchQuery("");
                     setSelectedFilter("ALL");
                     setStatusDropdown("All status");
+                    setCurrentPage(1);
                   }}
                   className="bg-[#262626] text-white hover:bg-[#383838]"
                 >
