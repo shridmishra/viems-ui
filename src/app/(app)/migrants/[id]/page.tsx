@@ -29,6 +29,7 @@ import {
 import { PassportTab } from "@/app/(app)/cases/[id]/components/PassportTab";
 import { CasesTab } from "@/app/(app)/cases/[id]/components/CasesTab";
 import { TravelHistoryTab } from "@/app/(app)/cases/[id]/components/TravelHistoryTab";
+import { CaseStageStepper } from "@/app/(app)/cases/[id]/components/CaseStageStepper";
 import { EditPersonalDetailsModal } from "@/app/(app)/cases/components/EditPersonalDetailsModal";
 import { EditHomeAddressModal } from "@/app/(app)/cases/components/EditHomeAddressModal";
 import { EditContactDetailsModal } from "@/app/(app)/cases/components/EditContactDetailsModal";
@@ -43,7 +44,7 @@ const migrantTabs = [
   { label: "Overview", iconLine: RiLayoutMasonryLine, iconFill: RiLayoutMasonryFill },
   { label: "Passport", iconLine: RiPassportLine, iconFill: RiPassportFill },
   { label: "Cases", iconLine: RiFoldersLine, iconFill: RiFoldersFill },
-  { label: "Travel History", iconLine: RiSuitcase2Line, iconFill: RiSuitcase2Fill },
+  { label: "UK Travel History", iconLine: RiSuitcase2Line, iconFill: RiSuitcase2Fill },
 ];
 
 function sanitizeFirstAndLastName(rawFirst: string, rawLast: string) {
@@ -321,7 +322,7 @@ function mapBackendMigrantToDetail(c: any) {
       expiryDate: passportExpiryDate,
     },
     cos: {
-      status: c.cosStatus?.id || (approvalStatus === "VISA APPROVED" ? "ASSIGNED" : "DRAFT"),
+      status: c.cosStatus?.id || (approvalStatus === "VISA APPROVED" ? "ASSIGNED" : undefined),
       reference: cosRef,
       salary: c.personal?.jobPay ? `$${c.personal.jobPay}` : "",
       startDate: visaStartDate ? new Date(visaStartDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "",
@@ -405,7 +406,7 @@ export default function MigrantDetailPage() {
 
         if (migrantData) {
           try {
-            const casesRes = await apiClient.get<any>(`${ENDPOINTS.cases.base}?migrant_id=${id}`);
+            const casesRes = await apiClient.get<any>(`${ENDPOINTS.cases.base}?filter=migrantId.${id}`);
             const casesArr = Array.isArray(casesRes) ? casesRes : casesRes?.data || [];
             if (casesArr.length > 0) {
               caseData = casesArr[0];
@@ -486,7 +487,7 @@ export default function MigrantDetailPage() {
           onDelete={() => setIsDeleteOpen(true)}
         />
 
-        {/* ====== TAB MENU (Overview, Passport, Cases, Travel History) ====== */}
+        {/* ====== TAB MENU (Overview, Passport, Cases, UK Travel History) ====== */}
         <div className="px-[64px] flex items-center gap-[24px] h-[50px] border-b border-[#EBEBEB]">
           {migrantTabs.map((tab) => {
             const isActive = activeTab === tab.label;
@@ -516,48 +517,74 @@ export default function MigrantDetailPage() {
       {/* ====== CONTENT AREA ====== */}
       <div className="flex-1 px-[64px] py-[32px] max-w-full overflow-x-hidden">
         {activeTab === "Overview" ? (
-          <div className="flex gap-[24px] items-start w-full font-sans max-w-full">
-            {/* COLUMN 1: Profile, Migration Status, Case Status (width: 303px) */}
-            <div className="w-[303px] shrink-0 flex flex-col gap-[24px]">
-              <MigrantProfileCard
-                name={migrant.name}
-                initials={migrant.avatarText}
-                avatar={migrant.avatar}
-                employer={migrant.employer}
-                status={migrant.visaStatus}
-              />
+          <div className="flex flex-col w-full font-sans">
+            <CaseStageStepper
+              caseData={{
+                approvalStatus: migrant.approvalStatus,
+                visaStatus: migrant.visaStatus,
+                cosStatus: migrant.cos?.status,
+                cosRef: migrant.cosRef,
+                location: migrant.location,
+                socCode: migrant.cos?.socCode,
+                grossSalary: migrant.cos?.salary,
+                decision: migrant.approvalStatus === "VISA APPROVED" ? "Granted" : migrant.approvalStatus === "VISA REFUSED" ? "Refused" : undefined,
+              }}
+              onActionClick={(actionType) => {
+                if (actionType === "employment") {
+                  setIsPersonalModalOpen(true);
+                } else if (actionType === "status") {
+                  setIsChangeStatusOpen(true);
+                } else if (actionType === "rtw") {
+                  router.push("/compliance/rtw-checks");
+                } else if (actionType === "compliance") {
+                  router.push("/compliance");
+                }
+              }}
+            />
 
-              <MigrantMigrationStatusCard
-                location={migrant.location}
-                visa={migrant.visa}
-              />
+            <div className="flex gap-[24px] items-start w-full font-sans max-w-full">
+              {/* COLUMN 1: Profile, Migration Status, Case Status (width: 303px) */}
+              <div className="w-[303px] shrink-0 flex flex-col gap-[24px]">
+                <MigrantProfileCard
+                  name={migrant.name}
+                  initials={migrant.avatarText}
+                  avatar={migrant.avatar}
+                  employer={migrant.employer}
+                  status={migrant.visaStatus}
+                />
 
-              <MigrantCaseStatusCard
-                caseId={migrant.caseId}
-                employer={migrant.employer}
-                status={migrant.approvalStatus}
-                onViewCase={() => router.push(`/cases/${migrant.caseNumericId || id}`)}
-              />
-            </div>
+                <MigrantMigrationStatusCard
+                  location={migrant.location}
+                  visa={migrant.visa}
+                />
 
-            {/* COLUMN 2: Personal Details, Home Address, Contact Details (flex-1) */}
-            <div className="flex-1 min-w-0 flex flex-col gap-[24px]">
-              <MigrantPersonalDetailsCard
-                personalInfo={migrant.personalInfo}
-                passport={migrant.passport}
-                onEdit={() => setIsPersonalModalOpen(true)}
-              />
+                <MigrantCaseStatusCard
+                  caseId={migrant.caseId}
+                  employer={migrant.employer}
+                  status={migrant.approvalStatus}
+                  onViewCase={() => router.push(`/cases/${migrant.caseNumericId || id}`)}
+                />
+              </div>
 
-              <MigrantHomeAddressCard
-                address={migrant.contact?.homeAddress}
-                onEdit={() => setIsAddressModalOpen(true)}
-              />
+              {/* COLUMN 2: Personal Details, Home Address, Contact Details (flex-1) */}
+              <div className="flex-1 min-w-0 flex flex-col gap-[24px]">
+                <MigrantPersonalDetailsCard
+                  personalInfo={migrant.personalInfo}
+                  passport={migrant.passport}
+                  onEdit={() => setIsPersonalModalOpen(true)}
+                />
 
-              <MigrantContactDetailsCard
-                contact={migrant.contact}
-                emergencyContact={migrant.emergencyContact}
-                onEdit={() => setIsContactModalOpen(true)}
-              />
+                <MigrantHomeAddressCard
+                  address={migrant.contact?.homeAddress}
+                  onEdit={() => setIsAddressModalOpen(true)}
+                />
+
+                <MigrantContactDetailsCard
+                  contact={migrant.contact}
+                  emergencyContact={migrant.emergencyContact}
+                  onEdit={() => setIsContactModalOpen(true)}
+                />
+              </div>
             </div>
           </div>
         ) : activeTab === "Passport" ? (
@@ -578,6 +605,12 @@ export default function MigrantDetailPage() {
         open={isChangeStatusOpen}
         onOpenChange={setIsChangeStatusOpen}
         currentStatus={migrant.approvalStatus}
+        caseId={migrant.caseNumericId || (migrant.cases?.[0]?.id)}
+        migrantId={migrant.migrantId || id}
+        migrantName={migrant.name}
+        migrant={migrant}
+        caseData={migrant}
+        onFilesChanged={() => loadMigrantDetail()}
         onApply={async (newStatus: string) => {
           try {
             if (!id) {

@@ -53,6 +53,8 @@ export const ENDPOINTS = {
     base: `${API_BASE}/migrants`,
     /** GET /migrants/:id */
     byId: (id: number | string) => `${API_BASE}/migrants/${id}`,
+    /** GET /migrants/:id/cases */
+    casesById: (id: number | string) => `${API_BASE}/migrants/${id}/cases`,
     cases: `${API_BASE}/migrants/cases`,
     credibility: `${API_BASE}/migrants/credibility`,
     credibilityInsights: `${API_BASE}/migrants/credibility/insights`,
@@ -148,6 +150,9 @@ export const ENDPOINTS = {
     archive: `${API_BASE}/files/archive`,
     rename: `${API_BASE}/files/rename`,
     upload: `${API_BASE}/files/upload`,
+    /** POST /files/upload/:entity/:entityId */
+    uploadByEntity: (entity: string, entityId: number | string) =>
+      `${API_BASE}/files/upload/${entity}/${entityId}`,
     /** POST /files/upload/custom/:folderId */
     uploadCustom: (folderId: number | string) =>
       `${API_BASE}/files/upload/custom/${folderId}`,

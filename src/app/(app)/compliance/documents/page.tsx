@@ -64,6 +64,8 @@ interface MigrantDocItem {
   expiryTimestamp: number;
   uploadedDate: string;
   uploadedTimestamp: number;
+  fileUrl?: string;
+  fileId?: string | number;
 }
 
 const DOCUMENT_TYPE_TEMPLATES = [
@@ -159,6 +161,17 @@ export default function ComplianceDocumentsPage() {
               })
             : "—";
 
+          const matchingFile =
+            Array.isArray(c.files) && c.files.length > 0
+              ? c.files[0]
+              : c.file || null;
+          const fileUrl =
+            c.fileUrl ||
+            matchingFile?.url ||
+            matchingFile?.fileUrl ||
+            (matchingFile?.id ? ENDPOINTS.files.view(matchingFile.id) : undefined);
+          const fileId = matchingFile?.id || c.fileId || undefined;
+
           return {
             id: String(c.id || i + 1),
             entityId: c.id,
@@ -174,6 +187,8 @@ export default function ComplianceDocumentsPage() {
             expiryTimestamp: expTime,
             uploadedDate: uploaded,
             uploadedTimestamp: uploadTime,
+            fileUrl,
+            fileId,
           };
         });
 
@@ -328,12 +343,16 @@ export default function ComplianceDocumentsPage() {
 
   const handleOpenPreviewDoc = (row: MigrantDocItem) => {
     setPreviewDoc({
-      id: row.id,
+      id: row.fileId ? String(row.fileId) : String(row.id || row.caseId),
       name: `${row.name} - ${row.documentType}`,
       subtitle: `${row.documentType.replace(/\s+/g, "_")}.pdf · 1.8 MB`,
       category: row.documentType || "Compliance Document",
       date: row.uploadedDate !== "—" ? row.uploadedDate : row.expiryDate,
       status: row.status === "VERIFIED" ? "uploaded" : "under_review",
+      migrantName: row.name,
+      caseNumber: row.caseId,
+      employer: row.company || "AX Studios",
+      fileUrl: row.fileUrl,
     });
     setIsPreviewOpen(true);
   };

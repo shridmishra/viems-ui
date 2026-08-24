@@ -833,7 +833,7 @@ export default function MigrantsPage() {
                   </Button>
                 } />
                 <DropdownMenuContent align="end" className="w-[110px] bg-white border border-[#EBEBEB] rounded-[10px] shadow-card-large p-1">
-                  {[10, 20, 50, 100].map((size) => (
+                  {[10, 25, 50].map((size) => (
                     <DropdownMenuItem
                       key={size}
                       onClick={() => {
@@ -859,6 +859,10 @@ export default function MigrantsPage() {
             open={statusModalOpen}
             onOpenChange={setStatusModalOpen}
             currentStatus={selectedRow.status}
+            caseId={selectedRow.id}
+            migrantName={selectedRow.name}
+            caseData={selectedRow}
+            onFilesChanged={fetchCasesData}
             onApply={async (newStatus: string) => {
               try {
                 if (!selectedRow.id) {

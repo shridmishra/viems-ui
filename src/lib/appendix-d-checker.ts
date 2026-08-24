@@ -1,0 +1,312 @@
+/**
+ * Appendix D Document Completeness Checker
+ * 
+ * Enforces Home Office UKVI Appendix D record-keeping essentials prior to
+ * Certificate of Sponsorship (CoS) issuance/assignment.
+ * 
+ * Required essentials:
+ * 1. Passport (Migrant passport / travel document identity copy)
+ * 2. Union engagement letter/consultation (Union consultation letter / engagement letter)
+ * 3. Full production itinerary (Complete itinerary of events / filming schedule)
+ * 4. Signed contract showing compliant fee/pay structure (Executed contract / fee structure)
+ */
+
+export type AppendixDEssentialKey =
+  | "passport"
+  | "union_letter"
+  | "itinerary"
+  | "signed_contract";
+
+export interface AppendixDEssentialDefinition {
+  key: AppendixDEssentialKey;
+  name: string;
+  shortName: string;
+  description: string;
+  complianceRule: string;
+  defaultFolder: string;
+  categoryTag: string;
+}
+
+export const APPENDIX_D_DEFINITIONS: AppendixDEssentialDefinition[] = [
+  {
+    key: "passport",
+    name: "Passport (Identity Page Scan)",
+    shortName: "Passport",
+    description: "Valid copy of migrant's current passport or travel document identity pages.",
+    complianceRule: "Appendix D, Part 1: Mandatory identification & nationality proof",
+    defaultFolder: "Appendix D",
+    categoryTag: "passport",
+  },
+  {
+    key: "union_letter",
+    name: "Union Engagement Letter / Consultation",
+    shortName: "Union Consultation Letter",
+    description: "Union consultation/engagement letter (Equity, Musicians' Union, BECTU, or promoter consultation).",
+    complianceRule: "Appendix D, Creative Worker / Code of Practice union endorsement",
+    defaultFolder: "Appendix D",
+    categoryTag: "union_consultation",
+  },
+  {
+    key: "itinerary",
+    name: "Full Production Itinerary",
+    shortName: "Production Itinerary",
+    description: "Comprehensive schedule of performances, filming, venues, dates, and locations in the UK.",
+    complianceRule: "Appendix D, Section 3: Timeframe, venue engagement & itinerary evidence",
+    defaultFolder: "Appendix D",
+    categoryTag: "itinerary",
+  },
+  {
+    key: "signed_contract",
+    name: "Signed Contract (Compliant Fee / Pay Structure)",
+    shortName: "Signed Contract",
+    description: "Fully executed contract or deal memo showing compliant fee/salary structure meeting UKVI going rate.",
+    complianceRule: "Appendix D, Section 2: Statutory minimum remuneration & contract compliance",
+    defaultFolder: "Appendix D",
+    categoryTag: "contract",
+  },
+];
+
+export interface AttachedFileInfo {
+  id?: string | number;
+  name: string;
+  filename?: string;
+  size?: string | number;
+  date?: string;
+  fileUrl?: string;
+  category?: string;
+}
+
+export interface AppendixDEssentialItem extends AppendixDEssentialDefinition {
+  isAttached: boolean;
+  attachedFile?: AttachedFileInfo;
+}
+
+export interface AppendixDCheckResult {
+  isComplete: boolean;
+  totalCount: number;
+  attachedCount: number;
+  missingCount: number;
+  essentials: AppendixDEssentialItem[];
+  missingEssentials: AppendixDEssentialItem[];
+  attachedEssentials: AppendixDEssentialItem[];
+}
+
+/**
+ * Checks if a status string represents "CoS Assigned" / "CoS Issued"
+ */
+export function isCosAssignedStatus(status: string | null | undefined): boolean {
+  if (!status) return false;
+  const norm = status.toLowerCase().replace(/[-_]/g, " ").trim();
+  return (
+    norm === "cos assigned" ||
+    norm === "cos assigned status" ||
+    norm === "assigned" ||
+    norm === "cos issued" ||
+    norm === "issued" ||
+    norm.startsWith("cos assigned") ||
+    norm.startsWith("cos_assigned")
+  );
+}
+
+/**
+ * Evaluates whether a generic file matches a specific Appendix D essential
+ */
+function fileMatchesEssential(file: any, key: AppendixDEssentialKey): boolean {
+  if (!file) return false;
+
+  // Direct explicit match if file was tagged with key during upload
+  if (
+    file.appendixDKey === key ||
+    file.targetKey === key ||
+    file.category === key ||
+    file.file_type === key ||
+    (typeof file.category === "string" && file.category.toLowerCase() === key) ||
+    (key === "passport" && (file.category === 18 || file.category === "18" || file.category === "migrantpassport"))
+  ) {
+    return true;
+  }
+
+  const rawType = String(
+    file.fieldname ||
+    file.filetype?.value ||
+    file.filetype?.title ||
+    file.file_type ||
+    file.category ||
+    file.folderName ||
+    ""
+  ).toLowerCase();
+
+  const rawName = String(
+    file.originalName ||
+    file.filename ||
+    file.name ||
+    file.title ||
+    ""
+  ).toLowerCase();
+
+  const nameNorm = rawName.replace(/_/g, " ");
+  const typeNorm = rawType.replace(/_/g, " ");
+
+  switch (key) {
+    case "passport": {
+      return (
+        typeNorm.includes("passport") ||
+        typeNorm === "migrantpassport" ||
+        typeNorm === "18" ||
+        nameNorm.includes("passport")
+      );
+    }
+    case "union_letter": {
+      return (
+        typeNorm.includes("union") ||
+        typeNorm === "letterfrompromoter" ||
+        typeNorm === "letterfromleadapplicant" ||
+        typeNorm === "letterfromproductionhouse" ||
+        typeNorm.includes("consultation") ||
+        nameNorm.includes("union") ||
+        nameNorm.includes("consultation") ||
+        nameNorm.includes("equity") ||
+        nameNorm.includes("bectu") ||
+        nameNorm.includes("musicians") ||
+        nameNorm.includes("promoter letter") ||
+        nameNorm.includes("production letter") ||
+        nameNorm.includes("letter from promoter") ||
+        nameNorm.includes("letter from production")
+      );
+    }
+    case "itinerary": {
+      return (
+        typeNorm === "itineraryofevents" ||
+        typeNorm === "filmingschedule" ||
+        typeNorm === "posterfortheevent" ||
+        typeNorm.includes("itinerary") ||
+        typeNorm.includes("schedule") ||
+        nameNorm.includes("itinerary") ||
+        nameNorm.includes("filming schedule") ||
+        nameNorm.includes("production schedule") ||
+        nameNorm.includes("schedule of event") ||
+        nameNorm.includes("tour schedule") ||
+        nameNorm.includes("schedule")
+      );
+    }
+    case "signed_contract": {
+      return (
+        typeNorm === "agreementbetweeneventimmpromoter" ||
+        typeNorm === "agreementbetweeneventimmproduction" ||
+        typeNorm === "employee_contract" ||
+        typeNorm === "employee contract" ||
+        typeNorm === "fixed_term_contract" ||
+        typeNorm === "fixed term contract" ||
+        typeNorm.includes("contract") ||
+        typeNorm.includes("agreement") ||
+        typeNorm.includes("fee_structure") ||
+        typeNorm.includes("fee structure") ||
+        nameNorm.includes("contract") ||
+        nameNorm.includes("agreement") ||
+        nameNorm.includes("fee structure") ||
+        nameNorm.includes("pay structure") ||
+        nameNorm.includes("deal memo") ||
+        nameNorm.includes("signed contract") ||
+        nameNorm.includes("employment contract")
+      );
+    }
+    default:
+      return false;
+  }
+}
+
+/**
+ * Checks Appendix D document completeness for a case or migrant
+ */
+export function checkAppendixDCompleteness(
+  files: any[] = [],
+  migrant?: any,
+  caseData?: any
+): AppendixDCheckResult {
+  const safeFiles = Array.isArray(files) ? [...files] : [];
+
+  // Also pull in any session-uploaded files from localStorage
+  const caseId = caseData?.id || caseData?.caseId || migrant?.id || migrant?.caseId;
+  if (typeof window !== "undefined" && caseId) {
+    try {
+      const stored = localStorage.getItem(`appendix_d_attached_${caseId}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((pf: any) => {
+            if (pf && !safeFiles.some((f) => f.id === pf.id || (f.name === pf.name && f.category === pf.category))) {
+              safeFiles.unshift(pf);
+            }
+          });
+        }
+      }
+    } catch (e) {}
+  }
+
+  const essentials: AppendixDEssentialItem[] = APPENDIX_D_DEFINITIONS.map((def) => {
+    // Look for matching file in files list
+    const matchingFile = safeFiles.find((f) => fileMatchesEssential(f, def.key));
+
+    if (matchingFile) {
+      return {
+        ...def,
+        isAttached: true,
+        attachedFile: {
+          id: matchingFile.id,
+          name: matchingFile.originalName || matchingFile.filename || matchingFile.name || def.name,
+          filename: matchingFile.filename || matchingFile.originalName || matchingFile.name,
+          size: matchingFile.size,
+          date: matchingFile.uploadDate || matchingFile.createdAt || matchingFile.date,
+          fileUrl: matchingFile.fileUrl || matchingFile.url,
+          category: matchingFile.category || def.categoryTag,
+        },
+      };
+    }
+
+    // Special check for passport in migrant details
+    if (def.key === "passport") {
+      const hasPassportNumber = Boolean(
+        (migrant?.passport?.number && migrant.passport.number !== "—" && migrant.passport.number !== "") ||
+        (caseData?.passport?.number && caseData.passport.number !== "—" && caseData.passport.number !== "") ||
+        (caseData?.passportNumber && caseData.passportNumber !== "—" && caseData.passportNumber !== "")
+      );
+
+      const hasPassportAttachment = Boolean(
+        migrant?.passport?.file ||
+        migrant?.passportFile ||
+        caseData?.passportFile ||
+        caseData?.files?.some((f: any) => fileMatchesEssential(f, "passport"))
+      );
+
+      if (hasPassportAttachment || hasPassportNumber) {
+        return {
+          ...def,
+          isAttached: true,
+          attachedFile: {
+            name: `${migrant?.personalInfo?.lastName || caseData?.name || "Migrant"}_Passport.pdf`,
+            category: "passport",
+          },
+        };
+      }
+    }
+
+    return {
+      ...def,
+      isAttached: false,
+      attachedFile: undefined,
+    };
+  });
+
+  const missingEssentials = essentials.filter((e) => !e.isAttached);
+  const attachedEssentials = essentials.filter((e) => e.isAttached);
+
+  return {
+    isComplete: missingEssentials.length === 0,
+    totalCount: essentials.length,
+    attachedCount: attachedEssentials.length,
+    missingCount: missingEssentials.length,
+    essentials,
+    missingEssentials,
+    attachedEssentials,
+  };
+}

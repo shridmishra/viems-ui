@@ -297,10 +297,10 @@ export function LeadFormModal({
               </div>
             )}
 
-            <label className="mt-[2px] h-[40px] px-[12px] border border-dashed border-[#D4D4D4] hover:border-brand-medium rounded-[10px] flex items-center justify-center gap-[8px] text-[13px] font-medium text-[#5C5C5C] hover:text-[#171717] cursor-pointer transition-colors select-none">
+            <Label className="mt-[2px] h-[40px] px-[12px] border border-dashed border-[#D4D4D4] hover:border-brand-medium rounded-[10px] flex items-center justify-center gap-[8px] text-[13px] font-medium text-[#5C5C5C] hover:text-[#171717] cursor-pointer transition-colors select-none">
               <RiAttachment2 className="size-4" />
               Attach files
-              <input
+              <Input
                 type="file"
                 multiple
                 className="hidden"
@@ -310,7 +310,7 @@ export function LeadFormModal({
                   e.target.value = "";
                 }}
               />
-            </label>
+            </Label>
           </div>
         </div>
 

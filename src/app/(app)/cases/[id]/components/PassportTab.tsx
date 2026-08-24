@@ -207,10 +207,20 @@ export function PassportTab({ migrant, onEditPassport, onPassportUploaded }: Pas
         );
         const filesList: FileDocument[] = Array.isArray(res) ? res : res?.data || res?.files || [];
 
-        const passportDoc = filesList.find((f: FileDocument) =>
-          ((f as any).category || (f as any).type || f.originalName || f.filename || "").toLowerCase().includes("passport") ||
-          ((f as any).file_type || "").toLowerCase().includes("passport")
-        );
+        const passportDoc = filesList.find((f: FileDocument) => {
+          const cat = (f as any).category;
+          if (cat === 18 || cat === "18") return true;
+          const catStr = String(cat || "");
+          const typeStr = String((f as any).type || "");
+          const nameStr = String(f.originalName || f.filename || "");
+          const fileTypeStr = String((f as any).file_type || "");
+          return (
+            catStr.toLowerCase().includes("passport") ||
+            typeStr.toLowerCase().includes("passport") ||
+            nameStr.toLowerCase().includes("passport") ||
+            fileTypeStr.toLowerCase().includes("passport")
+          );
+        });
 
         if (active && passportDoc) {
           setPassportFile({
@@ -284,10 +294,14 @@ export function PassportTab({ migrant, onEditPassport, onPassportUploaded }: Pas
       const formData = new FormData();
       files.forEach((f) => formData.append("files", f));
       formData.append("migrant_id", String(migrantId));
-      formData.append("category", "passport");
-      formData.append("file_type", "passport");
+      formData.append("module", "migrants");
+      formData.append("moduleName", "migrants");
+      formData.append("category", "18");
 
-      const res = await apiClient.post<FileDocument[] | { files?: FileDocument[] }>(ENDPOINTS.files.upload, formData);
+      const res = await apiClient.post<FileDocument[] | { files?: FileDocument[] }>(
+        ENDPOINTS.files.uploadByEntity("migrants", migrantId),
+        { body: formData }
+      );
       toast.success("Passport document uploaded successfully.");
 
       const uploaded: any = Array.isArray(res) ? res[0] : (res as any)?.files?.[0] || res;
