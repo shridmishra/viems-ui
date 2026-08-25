@@ -19,6 +19,7 @@ import {
   RiBuildingLine,
 } from "@remixicon/react";
 import { toast } from "sonner";
+import { getTokenPayload } from "@/lib/auth";
 import {
   AddSubsidiaryModal,
   SubsidiaryCompany,
@@ -28,14 +29,32 @@ import {
   LicenceGroup,
 } from "./modals/add-licence-group-modal";
 
-export type CompanySubTab =
+export const COMPANY_SUB_TABS = [
+  "details",
+  "address",
+  "size",
+  "licence-details",
+  "structure",
+  "subsidiary",
+  "licence-groups",
+] as const;
+
+export type CompanySubTab = (typeof COMPANY_SUB_TABS)[number];
+
+export type SectionId =
   | "details"
   | "address"
   | "size"
-  | "licence-details"
+  | "licence"
   | "structure"
-  | "subsidiary"
+  | "subsidiaries"
   | "licence-groups";
+
+function getStorageKey(key: string): string {
+  const payload = getTokenPayload();
+  const userId = payload?.email || (payload as any)?.id || (payload as any)?.sub;
+  return userId ? `viems_org_${userId}_${key}` : `viems_org_${key}`;
+}
 
 interface CompanyTabProps {
   activeSubTab: CompanySubTab;
@@ -114,47 +133,141 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
   // Load from localStorage on mount
   React.useEffect(() => {
     try {
-      const savedDetails = localStorage.getItem("viems_org_details");
-      if (savedDetails) setCompanyDetails(JSON.parse(savedDetails));
+      const savedDetails = localStorage.getItem(getStorageKey("details"));
+      if (savedDetails) {
+        const parsed = JSON.parse(savedDetails);
+        if (parsed && typeof parsed === "object") {
+          setCompanyDetails({ ...DEFAULT_DETAILS, ...parsed });
+        }
+      }
 
-      const savedAddress = localStorage.getItem("viems_org_address");
-      if (savedAddress) setAddressData(JSON.parse(savedAddress));
+      const savedAddress = localStorage.getItem(getStorageKey("address"));
+      if (savedAddress) {
+        const parsed = JSON.parse(savedAddress);
+        if (parsed && typeof parsed === "object") {
+          setAddressData({ ...DEFAULT_ADDRESS, ...parsed });
+        }
+      }
 
-      const savedSize = localStorage.getItem("viems_org_size");
-      if (savedSize) setSizeData(JSON.parse(savedSize));
+      const savedSize = localStorage.getItem(getStorageKey("size"));
+      if (savedSize) {
+        const parsed = JSON.parse(savedSize);
+        if (parsed && typeof parsed === "object") {
+          setSizeData({ ...DEFAULT_SIZE, ...parsed });
+        }
+      }
 
-      const savedLicence = localStorage.getItem("viems_org_licence");
-      if (savedLicence) setLicenceData(JSON.parse(savedLicence));
+      const savedLicence = localStorage.getItem(getStorageKey("licence"));
+      if (savedLicence) {
+        const parsed = JSON.parse(savedLicence);
+        if (parsed && typeof parsed === "object") {
+          setLicenceData({ ...DEFAULT_LICENCE, ...parsed });
+        }
+      }
 
-      const savedStructure = localStorage.getItem("viems_org_structure");
-      if (savedStructure) setStructureData(JSON.parse(savedStructure));
+      const savedStructure = localStorage.getItem(getStorageKey("structure"));
+      if (savedStructure) {
+        const parsed = JSON.parse(savedStructure);
+        if (parsed && typeof parsed === "object") {
+          setStructureData({ ...DEFAULT_STRUCTURE, ...parsed });
+        }
+      }
 
-      const savedSubs = localStorage.getItem("viems_org_subsidiaries");
-      if (savedSubs) setSubsidiaries(JSON.parse(savedSubs));
+      const savedSubs = localStorage.getItem(getStorageKey("subsidiaries"));
+      if (savedSubs) {
+        const parsed = JSON.parse(savedSubs);
+        if (Array.isArray(parsed)) {
+          setSubsidiaries(parsed);
+        }
+      }
 
-      const savedGroups = localStorage.getItem("viems_org_licence_groups");
-      if (savedGroups) setLicenceGroups(JSON.parse(savedGroups));
+      const savedGroups = localStorage.getItem(getStorageKey("licence_groups"));
+      if (savedGroups) {
+        const parsed = JSON.parse(savedGroups);
+        if (Array.isArray(parsed)) {
+          setLicenceGroups(parsed);
+        }
+      }
     } catch {
       // ignore
     }
   }, []);
 
-  const handleSave = (sectionName: string) => {
+  const handleSave = (section: SectionId, label: string) => {
     try {
-      localStorage.setItem("viems_org_details", JSON.stringify(companyDetails));
-      localStorage.setItem("viems_org_address", JSON.stringify(addressData));
-      localStorage.setItem("viems_org_size", JSON.stringify(sizeData));
-      localStorage.setItem("viems_org_licence", JSON.stringify(licenceData));
-      localStorage.setItem("viems_org_structure", JSON.stringify(structureData));
-      localStorage.setItem("viems_org_subsidiaries", JSON.stringify(subsidiaries));
-      localStorage.setItem("viems_org_licence_groups", JSON.stringify(licenceGroups));
-      toast.success(`${sectionName} changes saved successfully`);
+      switch (section) {
+        case "details":
+          localStorage.setItem(getStorageKey("details"), JSON.stringify(companyDetails));
+          break;
+        case "address":
+          localStorage.setItem(getStorageKey("address"), JSON.stringify(addressData));
+          break;
+        case "size":
+          localStorage.setItem(getStorageKey("size"), JSON.stringify(sizeData));
+          break;
+        case "licence":
+          localStorage.setItem(getStorageKey("licence"), JSON.stringify(licenceData));
+          break;
+        case "structure":
+          localStorage.setItem(getStorageKey("structure"), JSON.stringify(structureData));
+          break;
+        case "subsidiaries":
+          localStorage.setItem(getStorageKey("subsidiaries"), JSON.stringify(subsidiaries));
+          break;
+        case "licence-groups":
+          localStorage.setItem(getStorageKey("licence_groups"), JSON.stringify(licenceGroups));
+          break;
+      }
+      toast.success(`${label} changes saved successfully`);
     } catch {
       toast.error("Failed to save changes");
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = (section: SectionId) => {
+    try {
+      switch (section) {
+        case "details": {
+          const saved = localStorage.getItem(getStorageKey("details"));
+          setCompanyDetails(saved ? { ...DEFAULT_DETAILS, ...JSON.parse(saved) } : DEFAULT_DETAILS);
+          break;
+        }
+        case "address": {
+          const saved = localStorage.getItem(getStorageKey("address"));
+          setAddressData(saved ? { ...DEFAULT_ADDRESS, ...JSON.parse(saved) } : DEFAULT_ADDRESS);
+          break;
+        }
+        case "size": {
+          const saved = localStorage.getItem(getStorageKey("size"));
+          setSizeData(saved ? { ...DEFAULT_SIZE, ...JSON.parse(saved) } : DEFAULT_SIZE);
+          break;
+        }
+        case "licence": {
+          const saved = localStorage.getItem(getStorageKey("licence"));
+          setLicenceData(saved ? { ...DEFAULT_LICENCE, ...JSON.parse(saved) } : DEFAULT_LICENCE);
+          break;
+        }
+        case "structure": {
+          const saved = localStorage.getItem(getStorageKey("structure"));
+          setStructureData(saved ? { ...DEFAULT_STRUCTURE, ...JSON.parse(saved) } : DEFAULT_STRUCTURE);
+          break;
+        }
+        case "subsidiaries": {
+          const saved = localStorage.getItem(getStorageKey("subsidiaries"));
+          const parsed = saved ? JSON.parse(saved) : null;
+          setSubsidiaries(Array.isArray(parsed) ? parsed : []);
+          break;
+        }
+        case "licence-groups": {
+          const saved = localStorage.getItem(getStorageKey("licence_groups"));
+          const parsed = saved ? JSON.parse(saved) : null;
+          setLicenceGroups(Array.isArray(parsed) ? parsed : []);
+          break;
+        }
+      }
+    } catch {
+      // ignore
+    }
     toast.info("Changes reverted to saved values");
   };
 
@@ -162,7 +275,7 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
     const updated = [...subsidiaries, sub];
     setSubsidiaries(updated);
     try {
-      localStorage.setItem("viems_org_subsidiaries", JSON.stringify(updated));
+      localStorage.setItem(getStorageKey("subsidiaries"), JSON.stringify(updated));
     } catch {
       // ignore
     }
@@ -172,7 +285,7 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
     const updated = subsidiaries.filter((s) => s.id !== id);
     setSubsidiaries(updated);
     try {
-      localStorage.setItem("viems_org_subsidiaries", JSON.stringify(updated));
+      localStorage.setItem(getStorageKey("subsidiaries"), JSON.stringify(updated));
     } catch {
       // ignore
     }
@@ -183,7 +296,7 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
     const updated = [...licenceGroups, grp];
     setLicenceGroups(updated);
     try {
-      localStorage.setItem("viems_org_licence_groups", JSON.stringify(updated));
+      localStorage.setItem(getStorageKey("licence_groups"), JSON.stringify(updated));
     } catch {
       // ignore
     }
@@ -193,7 +306,7 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
     const updated = licenceGroups.filter((g) => g.id !== id);
     setLicenceGroups(updated);
     try {
-      localStorage.setItem("viems_org_licence_groups", JSON.stringify(updated));
+      localStorage.setItem(getStorageKey("licence_groups"), JSON.stringify(updated));
     } catch {
       // ignore
     }
@@ -210,6 +323,37 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
     { id: "licence-groups", label: "Licence groups" },
   ];
 
+  function SectionFooter({
+    section,
+    label,
+    onSave,
+    onCancel,
+  }: {
+    section: SectionId;
+    label: string;
+    onSave?: () => void;
+    onCancel?: () => void;
+  }) {
+    return (
+      <div className="flex items-center justify-end gap-3 pt-3">
+        <button
+          type="button"
+          onClick={() => (onCancel ? onCancel() : handleCancel(section))}
+          className="h-10 px-5 text-[14px] font-medium text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-200/50 rounded-[10px] transition-colors border-0 bg-transparent cursor-pointer"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => (onSave ? onSave() : handleSave(section, label))}
+          className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
+        >
+          Save changes
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-[40px] items-start w-full">
       {/* Left Sub-Menu Column (Sticky & styled matching Figma plain text navigation) */}
@@ -221,12 +365,16 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
           COMPANY
         </span>
 
-        <div className="flex flex-col gap-[14px]">
+        <div role="tablist" aria-label="Company sub-navigation" className="flex flex-col gap-[14px]">
           {subNavItems.map((item) => {
             const isActive = activeSubTab === item.id;
             return (
               <button
                 key={item.id}
+                role="tab"
+                id={`subtab-${item.id}`}
+                aria-selected={isActive}
+                aria-controls={`subtabpanel-${item.id}`}
                 type="button"
                 onClick={() => onSubTabChange(item.id)}
                 className={`text-left text-[14px] leading-[20px] transition-colors border-0 bg-transparent p-0 cursor-pointer outline-none ${
@@ -243,7 +391,12 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
       </nav>
 
       {/* Right Content Area */}
-      <div className="flex-1 min-w-0 flex flex-col gap-4">
+      <div
+        role="tabpanel"
+        id={`subtabpanel-${activeSubTab}`}
+        aria-labelledby={`subtab-${activeSubTab}`}
+        className="flex-1 min-w-0 flex flex-col gap-4"
+      >
         {/* 1. DETAILS */}
         {activeSubTab === "details" && (
           <div className="flex flex-col gap-4">
@@ -525,22 +678,7 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
             </div>
 
             {/* Footer Buttons matching Figma bottom right placement */}
-            <div className="flex items-center justify-end gap-3 pt-3">
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="h-10 px-5 text-[14px] font-medium text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-200/50 rounded-[10px] transition-colors border-0 bg-transparent cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSave("Details")}
-                className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
-              >
-                Save changes
-              </button>
-            </div>
+            <SectionFooter section="details" label="Details" />
           </div>
         )}
 
@@ -702,22 +840,7 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
             </div>
 
             {/* Footer Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-3">
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="h-10 px-5 text-[14px] font-medium text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-200/50 rounded-[10px] transition-colors border-0 bg-transparent cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSave("Address")}
-                className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
-              >
-                Save changes
-              </button>
-            </div>
+            <SectionFooter section="address" label="Address" />
           </div>
         )}
 
@@ -819,22 +942,7 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
             </div>
 
             {/* Footer Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-3">
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="h-10 px-5 text-[14px] font-medium text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-200/50 rounded-[10px] transition-colors border-0 bg-transparent cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSave("Size")}
-                className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
-              >
-                Save changes
-              </button>
-            </div>
+            <SectionFooter section="size" label="Size" />
           </div>
         )}
 
@@ -997,22 +1105,7 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
             </div>
 
             {/* Footer Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-3">
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="h-10 px-5 text-[14px] font-medium text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-200/50 rounded-[10px] transition-colors border-0 bg-transparent cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSave("Licence details")}
-                className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
-              >
-                Save changes
-              </button>
-            </div>
+            <SectionFooter section="licence" label="Licence details" />
           </div>
         )}
 
@@ -1105,22 +1198,7 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
             </div>
 
             {/* Footer Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-3">
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="h-10 px-5 text-[14px] font-medium text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-200/50 rounded-[10px] transition-colors border-0 bg-transparent cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSave("Structure")}
-                className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
-              >
-                Save changes
-              </button>
-            </div>
+            <SectionFooter section="structure" label="Structure" />
           </div>
         )}
 
@@ -1195,22 +1273,7 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
             )}
 
             {/* Footer Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-3">
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="h-10 px-5 text-[14px] font-medium text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-200/50 rounded-[10px] transition-colors border-0 bg-transparent cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSave("Subsidiary")}
-                className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
-              >
-                Save changes
-              </button>
-            </div>
+            <SectionFooter section="subsidiaries" label="Subsidiaries" />
           </div>
         )}
 
@@ -1280,22 +1343,7 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
             )}
 
             {/* Footer Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-3">
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="h-10 px-5 text-[14px] font-medium text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-200/50 rounded-[10px] transition-colors border-0 bg-transparent cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSave("Licence groups")}
-                className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
-              >
-                Save changes
-              </button>
-            </div>
+            <SectionFooter section="licence-groups" label="Licence groups" />
           </div>
         )}
       </div>
@@ -1311,6 +1359,7 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
         open={isAddGroupOpen}
         onOpenChange={setIsAddGroupOpen}
         onAdd={handleAddLicenceGroup}
+        existingGroups={licenceGroups}
       />
     </div>
   );

@@ -36,12 +36,14 @@ interface AddLicenceGroupModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAdd: (group: LicenceGroupItem) => void;
+  existingGroups?: LicenceGroupItem[];
 }
 
 export function AddLicenceGroupModal({
   open,
   onOpenChange,
   onAdd,
+  existingGroups = [],
 }: AddLicenceGroupModalProps) {
   const [name, setName] = React.useState("");
   const [code, setCode] = React.useState("");
@@ -56,12 +58,34 @@ export function AddLicenceGroupModal({
       return;
     }
 
+    const numCos = parseInt(cosAllocated, 10);
+    if (isNaN(numCos) || numCos < 0) {
+      toast.error("Please enter a valid non-negative CoS allocation");
+      return;
+    }
+
+    // Derive group code or use entered code
+    const derivedCode = code.trim()
+      ? code.trim().toUpperCase()
+      : name
+          .trim()
+          .split(/\s+/)
+          .map((w) => w[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 6) || `LG-${Math.floor(100 + Math.random() * 900)}`;
+
+    if (existingGroups.some((g) => g.code.toUpperCase() === derivedCode.toUpperCase())) {
+      toast.error(`A licence group with code "${derivedCode}" already exists`);
+      return;
+    }
+
     const newGroup: LicenceGroupItem = {
-      id: String(Date.now()),
+      id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
       name: name.trim(),
-      code: code.trim() || `LG-${Math.floor(100 + Math.random() * 900)}`,
+      code: derivedCode,
       tier,
-      cosAllocated: cosAllocated || "0",
+      cosAllocated: String(numCos),
       branch,
     };
 
@@ -70,6 +94,9 @@ export function AddLicenceGroupModal({
     onOpenChange(false);
     setName("");
     setCode("");
+    setTier("Skilled Worker");
+    setCosAllocated("10");
+    setBranch("Main Headquarters (London)");
   };
 
   return (
@@ -120,6 +147,7 @@ export function AddLicenceGroupModal({
               <Input
                 id="lg-cos"
                 type="number"
+                min="0"
                 placeholder="10"
                 value={cosAllocated}
                 onChange={(e) => setCosAllocated(e.target.value)}

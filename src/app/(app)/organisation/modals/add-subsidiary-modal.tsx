@@ -57,7 +57,7 @@ export function AddSubsidiaryModal({
     }
 
     const newSub: SubsidiaryItem = {
-      id: String(Date.now()),
+      id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
       name: name.trim(),
       registrationNumber: registrationNumber.trim() || "N/A",
       country,
@@ -70,6 +70,9 @@ export function AddSubsidiaryModal({
     onOpenChange(false);
     setName("");
     setRegistrationNumber("");
+    setCountry("United Kingdom");
+    setShareholding("100%");
+    setRelationship("Wholly Owned Subsidiary");
   };
 
   return (

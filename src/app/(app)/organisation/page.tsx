@@ -14,9 +14,10 @@ import {
   RiDownload2Line,
 } from "@remixicon/react";
 import { toast } from "sonner";
-import { CompanyTab, CompanySubTab } from "./company-tab";
+import { CompanyTab, CompanySubTab, COMPANY_SUB_TABS } from "./company-tab";
 
-type MainTab = "company" | "documents" | "history" | "team";
+export const MAIN_TABS = ["company", "documents", "history", "team"] as const;
+export type MainTab = (typeof MAIN_TABS)[number];
 
 function TabPlaceholder({
   title,
@@ -42,50 +43,19 @@ function OrganisationPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const tabParam = (searchParams.get("tab")?.toLowerCase() as MainTab) || "company";
-  const subParam = searchParams.get("sub") || "details";
+  const tabParam = searchParams.get("tab")?.toLowerCase();
+  const activeTab: MainTab =
+    tabParam && (MAIN_TABS as readonly string[]).includes(tabParam)
+      ? (tabParam as MainTab)
+      : "company";
 
-  const [activeTab, setActiveTab] = React.useState<MainTab>(
-    ["company", "documents", "history", "team"].includes(tabParam) ? tabParam : "company"
-  );
-  const [companySubTab, setCompanySubTab] = React.useState<CompanySubTab>(
-    [
-      "details",
-      "address",
-      "size",
-      "licence-details",
-      "structure",
-      "subsidiary",
-      "licence-groups",
-    ].includes(subParam as any)
+  const subParam = searchParams.get("sub")?.toLowerCase();
+  const companySubTab: CompanySubTab =
+    subParam && (COMPANY_SUB_TABS as readonly string[]).includes(subParam)
       ? (subParam as CompanySubTab)
-      : "details"
-  );
-
-  React.useEffect(() => {
-    const currentTab = searchParams.get("tab")?.toLowerCase() as MainTab;
-    const currentSub = searchParams.get("sub");
-    if (currentTab && ["company", "documents", "history", "team"].includes(currentTab)) {
-      setActiveTab(currentTab);
-    }
-    if (
-      currentSub &&
-      [
-        "details",
-        "address",
-        "size",
-        "licence-details",
-        "structure",
-        "subsidiary",
-        "licence-groups",
-      ].includes(currentSub as any)
-    ) {
-      setCompanySubTab(currentSub as CompanySubTab);
-    }
-  }, [searchParams]);
+      : "details";
 
   const handleTabSelect = (tab: MainTab) => {
-    setActiveTab(tab);
     let newSub = "";
     if (tab === "company") newSub = companySubTab;
     const url = newSub ? `/organisation?tab=${tab}&sub=${newSub}` : `/organisation?tab=${tab}`;
@@ -93,7 +63,6 @@ function OrganisationPageContent() {
   };
 
   const handleCompanySubTabSelect = (sub: CompanySubTab) => {
-    setCompanySubTab(sub);
     router.replace(`/organisation?tab=company&sub=${sub}`, { scroll: false });
   };
 
@@ -155,7 +124,11 @@ function OrganisationPageContent() {
           </div>
 
           {/* ─── 4 Top-Level Horizontal Tabs: Company, Documents, History, Team — ALWAYS VISIBLE ─── */}
-          <div className="flex items-center gap-8 overflow-x-auto border-b border-transparent -mb-[1px]">
+          <div
+            role="tablist"
+            aria-label="Organisation navigation"
+            className="flex items-center gap-8 overflow-x-auto border-b border-transparent -mb-[1px]"
+          >
             {mainTabs.map((tab) => {
               const isActive = activeTab === tab.id;
               const Icon = isActive ? tab.iconActive : tab.iconInactive;
@@ -163,6 +136,10 @@ function OrganisationPageContent() {
               return (
                 <button
                   key={tab.id}
+                  role="tab"
+                  id={`tab-${tab.id}`}
+                  aria-selected={isActive}
+                  aria-controls={`tabpanel-${tab.id}`}
                   type="button"
                   onClick={() => handleTabSelect(tab.id)}
                   className={`relative flex items-center gap-2 pb-3.5 text-[14px] leading-[20px] font-medium transition-colors border-0 bg-transparent cursor-pointer whitespace-nowrap outline-none ${
@@ -186,7 +163,12 @@ function OrganisationPageContent() {
       </div>
 
       {/* ─── Main Content Canvas ─── */}
-      <div className="max-w-[1232px] mx-auto px-6 md:px-[64px] pt-[32px]">
+      <div
+        role="tabpanel"
+        id={`tabpanel-${activeTab}`}
+        aria-labelledby={`tab-${activeTab}`}
+        className="max-w-[1232px] mx-auto px-6 md:px-[64px] pt-[32px]"
+      >
         {activeTab === "company" && (
           <CompanyTab
             activeSubTab={companySubTab}
