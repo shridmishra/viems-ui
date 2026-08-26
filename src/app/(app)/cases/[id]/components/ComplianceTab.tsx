@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api-client";
 import { ENDPOINTS } from "@/lib/api-endpoints";
+import { TourGapCheckerCard } from "../../components/TourGapCheckerCard";
 
 // ─── Donut Chart Component ──────────────────────────────────
 function ComplianceDonutChart({ percentage = 100 }: { percentage?: number }) {
@@ -595,6 +596,12 @@ export function ComplianceTab({
           </div>
         </div>
       </div>
+
+      {/* ─── 14-Day Tour Gap Limits (UKVI Appendix Creative Worker Rules) ── */}
+      <TourGapCheckerCard
+        caseId={id}
+        migrantName={caseData?.name || caseData?.migrant?.name}
+      />
 
       {/* ─── Compliance Breakdown Section ──────────────────────────────────── */}
       <div className="flex flex-col gap-3 w-full">

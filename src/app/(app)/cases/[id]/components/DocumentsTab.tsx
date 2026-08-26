@@ -13,13 +13,16 @@ import {
   RiEyeLine,
   RiRepeatLine,
   RiTimer2Line,
+  RiCalendarEventLine,
 } from "@remixicon/react";
+import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api-client";
 import { ENDPOINTS } from "@/lib/api-endpoints";
 import { toast } from "sonner";
 import { SmartUploadModal } from "../../components/SmartUploadModal";
 import { FilePreviewModal } from "../../components/FilePreviewModal";
 import { ReplaceFileModal } from "../../components/ReplaceFileModal";
+import { TourGapScheduleModal } from "../../components/TourGapScheduleModal";
 
 interface FolderItem {
   id: string;
@@ -59,6 +62,9 @@ export function DocumentsTab({ caseId }: { caseId?: string }) {
   // Replace File Modal State
   const [replaceDoc, setReplaceDoc] = React.useState<DocumentItem | null>(null);
   const [isReplaceOpen, setIsReplaceOpen] = React.useState(false);
+
+  // 14-Day Tour Gap Limits Schedule Modal State
+  const [isTourGapModalOpen, setIsTourGapModalOpen] = React.useState(false);
 
   const handleOpenPreview = (
     doc: DocumentItem,
@@ -337,6 +343,13 @@ interface BackendFileResponse {
         onReplaceSuccess={handleReplaceSuccess}
       />
 
+      {/* 14-Day Tour Gap Schedule Limits Modal */}
+      <TourGapScheduleModal
+        open={isTourGapModalOpen}
+        onOpenChange={setIsTourGapModalOpen}
+        caseId={caseId}
+      />
+
       {/* ─── Top Control Bar: Segmented Control & Upload documents Button ───── */}
       <div className="flex items-center justify-between w-full">
         {/* Segmented Control Pill (232px width, 36px height, bg #EBEBEB) */}
@@ -368,15 +381,28 @@ interface BackendFileResponse {
           </button>
         </div>
 
-        {/* Upload documents Primary Button */}
-        <button
-          type="button"
-          onClick={() => handleOpenSmartUpload("Upload files with Smart Upload")}
-          className="h-[36px] px-4 bg-[#7D52F4] hover:bg-[#693fd9] text-white text-[14px] font-medium rounded-[8px] flex items-center gap-2 transition-colors cursor-pointer border-0"
-        >
-          <RiUpload2Line className="size-5 shrink-0" />
-          <span>Upload documents</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setIsTourGapModalOpen(true)}
+            className="h-[36px] px-3.5 bg-white border border-[#EBEBEB] hover:bg-neutral-50 text-[#171717] text-[13px] font-medium rounded-[8px] flex items-center gap-2 transition-colors cursor-pointer shadow-x-small"
+          >
+            <RiCalendarEventLine className="size-4 text-[#7D52F4]" />
+            <span>14-Day Tour Gap Checker</span>
+          </Button>
+
+          {/* Upload documents Primary Button */}
+          <button
+            type="button"
+            onClick={() => handleOpenSmartUpload("Upload files with Smart Upload")}
+            className="h-[36px] px-4 bg-[#7D52F4] hover:bg-[#693fd9] text-white text-[14px] font-medium rounded-[8px] flex items-center gap-2 transition-colors cursor-pointer border-0"
+          >
+            <RiUpload2Line className="size-5 shrink-0" />
+            <span>Upload documents</span>
+          </button>
+        </div>
       </div>
 
       {/* ─── TAB VIEW 1: Checklist View (Screenshot 2) ───────────────────── */}
@@ -635,19 +661,32 @@ interface BackendFileResponse {
           {selectedFolderId ? (
             /* ─── INNER FOLDER DETAIL VIEW (Figma Frame 110 / 304 / 208) ───────── */
             <div className="flex flex-col gap-4 w-full">
-              {/* Back Link Breadcrumb (< All Folders / Folder Name) */}
-              <button
-                type="button"
-                onClick={() => setSelectedFolderId(null)}
-                className="flex items-center gap-1 text-[14px] font-medium text-[#5C5C5C] hover:text-[#171717] transition-colors cursor-pointer border-0 bg-transparent self-start"
-              >
-                <RiArrowLeftSLine className="size-5 shrink-0" />
-                <span>All Folders</span>
-                <span className="text-[#A4A4A4] mx-1">/</span>
-                <span className="text-[#171717] font-semibold">
-                  {computedFolders.find((f) => f.id === selectedFolderId)?.name || "Appendix D"}
-                </span>
-              </button>
+              {/* Back Link Breadcrumb & 14-Day Checker Button */}
+              <div className="flex items-center justify-between w-full">
+                <button
+                  type="button"
+                  onClick={() => setSelectedFolderId(null)}
+                  className="flex items-center gap-1 text-[14px] font-medium text-[#5C5C5C] hover:text-[#171717] transition-colors cursor-pointer border-0 bg-transparent self-start"
+                >
+                  <RiArrowLeftSLine className="size-5 shrink-0" />
+                  <span>All Folders</span>
+                  <span className="text-[#A4A4A4] mx-1">/</span>
+                  <span className="text-[#171717] font-semibold">
+                    {computedFolders.find((f) => f.id === selectedFolderId)?.name || "Appendix D"}
+                  </span>
+                </button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsTourGapModalOpen(true)}
+                  className="h-8 px-3 bg-white border border-[#EBEBEB] hover:bg-neutral-50 text-[#171717] text-[12px] font-medium rounded-[8px] flex items-center gap-1.5 shadow-x-small cursor-pointer"
+                >
+                  <RiCalendarEventLine className="size-3.5 text-[#7D52F4]" />
+                  <span>14-Day Tour Gap Limits</span>
+                </Button>
+              </div>
 
               {/* Gray Outer Frame Container (Frame 110) */}
               <div className="bg-[#F5F5F5] rounded-[16px] p-6 flex flex-col gap-8 w-full border border-neutral-100">
