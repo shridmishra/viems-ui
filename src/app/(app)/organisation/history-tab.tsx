@@ -20,7 +20,7 @@ import {
 } from "@remixicon/react";
 import { toast } from "sonner";
 
-interface HistoryLogItem {
+export interface HistoryLogItem {
   id: string;
   date: string;
   action: string;
@@ -30,6 +30,64 @@ interface HistoryLogItem {
   author: string;
   authorInitials: string;
   type: "document" | "organisation" | "licence" | "team";
+}
+
+export interface TimelineEntryProps {
+  icon: React.ReactNode;
+  badgeLabel: string;
+  badgeClassName?: string;
+  action: string;
+  refCode: string;
+  time: string;
+  author: string;
+  authorInitials: string;
+}
+
+export function TimelineEntry({
+  icon,
+  badgeLabel,
+  badgeClassName = "bg-[#EFEBFF] text-[#7D52F4]",
+  action,
+  refCode,
+  time,
+  author,
+  authorInitials,
+}: TimelineEntryProps) {
+  return (
+    <div className="relative flex items-center gap-3">
+      <div className="size-8 rounded-[8px] bg-white border border-[#EBEBEB] shadow-x-small flex items-center justify-center text-[#737373] shrink-0 -ml-[33px]">
+        {icon}
+      </div>
+
+      <div className="bg-white rounded-[16px] border border-[#EBEBEB] p-4 flex-1 shadow-x-small flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-[#D4D4D4] transition-all">
+        <div>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${badgeClassName}`}>
+            {badgeLabel}
+          </span>
+          <p className="text-[14px] font-medium text-[#171717] mt-1">
+            {action}
+          </p>
+          <p className="text-[12px] text-[#737373] mt-0.5">
+            {refCode}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-4 self-end sm:self-center">
+          <span className="text-[12px] text-[#737373]">
+            {time}
+          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="size-6 rounded-full bg-[#EFEBFF] text-[#7D52F4] flex items-center justify-center text-[10px] font-medium">
+              {authorInitials}
+            </span>
+            <span className="text-[13px] font-medium text-[#171717]">
+              {author}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const INITIAL_HISTORY: HistoryLogItem[] = [
@@ -80,17 +138,18 @@ const INITIAL_HISTORY: HistoryLogItem[] = [
 ];
 
 export function HistoryTab() {
+  const [historyLogs] = React.useState<HistoryLogItem[]>(INITIAL_HISTORY);
   const [search, setSearch] = React.useState("");
   const [selectedCategory, setSelectedCategory] = React.useState("All Categories");
 
-  const filteredHistory = INITIAL_HISTORY.filter((item) => {
+  const filteredHistory = historyLogs.filter((log) => {
     const matchesSearch =
-      item.action.toLowerCase().includes(search.toLowerCase()) ||
-      item.refCode.toLowerCase().includes(search.toLowerCase()) ||
-      item.author.toLowerCase().includes(search.toLowerCase());
+      log.action.toLowerCase().includes(search.toLowerCase()) ||
+      log.refCode.toLowerCase().includes(search.toLowerCase()) ||
+      log.author.toLowerCase().includes(search.toLowerCase());
 
     const matchesCategory =
-      selectedCategory === "All Categories" || item.category === selectedCategory;
+      selectedCategory === "All Categories" || log.category === selectedCategory;
 
     return matchesSearch && matchesCategory;
   });
@@ -99,7 +158,7 @@ export function HistoryTab() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-[40px] items-start w-full">
-      {/* Left Sub-Menu Column (Sticky & styled matching Figma plain text navigation) */}
+      {/* Left Sub-Menu Column */}
       <nav
         className="sticky top-[152px] self-start flex flex-col gap-3 pt-1 shrink-0 w-full"
         aria-label="History navigation"
@@ -113,7 +172,7 @@ export function HistoryTab() {
             type="button"
             className="text-left text-[14px] leading-[20px] font-medium text-[#171717] border-0 bg-transparent p-0 cursor-pointer outline-none"
           >
-            History log
+            Audit trail
           </button>
         </div>
       </nav>
@@ -138,6 +197,7 @@ export function HistoryTab() {
 
           <button
             type="button"
+            aria-label="Filter"
             className="size-10 rounded-[10px] border border-[#EBEBEB] bg-white flex items-center justify-center text-[#5C5C5C] hover:text-[#171717] shadow-x-small shrink-0 transition-colors cursor-pointer"
           >
             <RiFilter3Line className="size-4" />
@@ -181,45 +241,24 @@ export function HistoryTab() {
 
                   <div className="space-y-3 relative pl-6 border-l border-[#EBEBEB] ml-1">
                     {itemsOnDate.map((item) => (
-                      <div key={item.id} className="relative flex items-center gap-3">
-                        <div className="size-8 rounded-[8px] bg-white border border-[#EBEBEB] shadow-x-small flex items-center justify-center text-[#737373] shrink-0 -ml-[33px]">
-                          {item.type === "document" ? (
+                      <TimelineEntry
+                        key={item.id}
+                        icon={
+                          item.type === "document" ? (
                             <RiFileTextLine className="size-4" />
                           ) : item.type === "organisation" ? (
                             <RiBuildingLine className="size-4" />
                           ) : (
                             <RiCheckboxCircleLine className="size-4" />
-                          )}
-                        </div>
-
-                        <div className="bg-white rounded-[16px] border border-[#EBEBEB] p-4 flex-1 shadow-x-small flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-[#D4D4D4] transition-all">
-                          <div>
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-[#EFEBFF] text-[#7D52F4]">
-                              {item.category.toUpperCase()}
-                            </span>
-                            <p className="text-[14px] font-medium text-[#171717] mt-1">
-                              {item.action}
-                            </p>
-                            <p className="text-[12px] text-[#737373] mt-0.5">
-                              {item.refCode}
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-4 self-end sm:self-center">
-                            <span className="text-[12px] text-[#737373]">
-                              {item.time}
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                              <span className="size-6 rounded-full bg-[#EFEBFF] text-[#7D52F4] flex items-center justify-center text-[10px] font-medium">
-                                {item.authorInitials}
-                              </span>
-                              <span className="text-[13px] font-medium text-[#171717]">
-                                {item.author}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                          )
+                        }
+                        badgeLabel={item.category.toUpperCase()}
+                        action={item.action}
+                        refCode={item.refCode}
+                        time={item.time}
+                        author={item.author}
+                        authorInitials={item.authorInitials}
+                      />
                     ))}
                   </div>
                 </div>

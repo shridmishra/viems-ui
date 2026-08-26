@@ -22,11 +22,14 @@ import {
 import { RiUploadCloud2Line, RiFileTextLine } from "@remixicon/react";
 import { toast } from "sonner";
 
+export const DOCUMENT_CATEGORIES = ["Compliance", "Licence", "Insurance", "Legal", "HR"] as const;
+export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number];
+
 export interface CompanyDocumentItem {
   id: string;
   title: string;
   subtitle: string;
-  category: "Compliance" | "Licence" | "Insurance" | "Legal" | "HR";
+  category: DocumentCategory;
   date: string;
   status: "CURRENT" | "ARCHIVED";
   fileName?: string;
@@ -41,21 +44,42 @@ interface UploadDocumentModalProps {
   onUpload: (document: CompanyDocumentItem) => void;
 }
 
+const ALLOWED_EXTENSIONS = [".pdf", ".doc", ".docx", ".png", ".jpg", ".jpeg"];
+const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB
+
+function validateFile(selectedFile: File): boolean {
+  if (selectedFile.size > MAX_FILE_SIZE_BYTES) {
+    toast.error("File exceeds maximum allowed size of 25MB");
+    return false;
+  }
+  const extension = selectedFile.name.substring(selectedFile.name.lastIndexOf(".")).toLowerCase();
+  if (!ALLOWED_EXTENSIONS.includes(extension)) {
+    toast.error("Invalid file type. Please upload a PDF, DOC, DOCX, PNG, or JPG file.");
+    return false;
+  }
+  return true;
+}
+
 export function UploadDocumentModal({
   open,
   onOpenChange,
   onUpload,
 }: UploadDocumentModalProps) {
   const [title, setTitle] = React.useState("");
-  const [category, setCategory] = React.useState<"Compliance" | "Licence" | "Insurance" | "Legal" | "HR">("Compliance");
+  const [category, setCategory] = React.useState<DocumentCategory>("Compliance");
   const [file, setFile] = React.useState<File | null>(null);
   const [isDragging, setIsDragging] = React.useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const selectedFile = e.target.files[0];
+      if (!validateFile(selectedFile)) {
+        e.target.value = "";
+        return;
+      }
+      setFile(selectedFile);
       if (!title) {
-        setTitle(e.target.files[0].name.replace(/\.[^/.]+$/, ""));
+        setTitle(selectedFile.name.replace(/\.[^/.]+$/, ""));
       }
     }
   };
@@ -64,9 +88,11 @@ export function UploadDocumentModal({
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
+      const droppedFile = e.dataTransfer.files[0];
+      if (!validateFile(droppedFile)) return;
+      setFile(droppedFile);
       if (!title) {
-        setTitle(e.dataTransfer.files[0].name.replace(/\.[^/.]+$/, ""));
+        setTitle(droppedFile.name.replace(/\.[^/.]+$/, ""));
       }
     }
   };
@@ -101,6 +127,7 @@ export function UploadDocumentModal({
     onOpenChange(false);
     setTitle("");
     setFile(null);
+    setCategory("Compliance");
   };
 
   return (
@@ -134,16 +161,23 @@ export function UploadDocumentModal({
             <Label htmlFor="doc-cat" className="text-label-sm text-foreground">
               Document category
             </Label>
-            <Select value={category} onValueChange={(val) => { if (val) setCategory(val as any); }}>
+            <Select
+              value={category}
+              onValueChange={(val) => {
+                if (val && (DOCUMENT_CATEGORIES as readonly string[]).includes(val)) {
+                  setCategory(val as DocumentCategory);
+                }
+              }}
+            >
               <SelectTrigger id="doc-cat" className="rounded-input h-10 shadow-x-small w-full">
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent className="rounded-card">
-                <SelectItem value="Compliance">Compliance</SelectItem>
-                <SelectItem value="Licence">Licence</SelectItem>
-                <SelectItem value="Insurance">Insurance</SelectItem>
-                <SelectItem value="Legal">Legal</SelectItem>
-                <SelectItem value="HR">HR</SelectItem>
+                {DOCUMENT_CATEGORIES.map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

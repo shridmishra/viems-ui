@@ -38,6 +38,7 @@ import {
   ChangeUkviRoleModal,
   UkviRoleAssignment,
 } from "./modals/change-ukvi-role-modal";
+import { TimelineEntry } from "./history-tab";
 
 export const TEAM_SUB_TABS = ["members", "ukvi-roles", "activity-log"] as const;
 export type TeamSubTab = (typeof TEAM_SUB_TABS)[number];
@@ -170,32 +171,55 @@ const INITIAL_ACTIVITY_LOG: ActivityLogItem[] = [
     authorInitials: "PN",
     type: "contract",
   },
+  {
+    id: "act-4",
+    date: "24 MAR 2026",
+    action: "Alex Marin added Nathan Wood to Level 1 SMS Users",
+    refCode: "SMS-4402",
+    time: "10:30 AM",
+    author: "Alex Marin",
+    authorInitials: "AM",
+    type: "general",
+  },
 ];
 
 export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
+  // Members State
   const [members, setMembers] = React.useState<TeamMember[]>(INITIAL_MEMBERS);
-  const [ukviRoles, setUkviRoles] = React.useState<UkviRoleAssignment[]>(INITIAL_UKVI_ROLES);
-  const [activityLog] = React.useState<ActivityLogItem[]>(INITIAL_ACTIVITY_LOG);
-
-  // Filter & Search states
-  const [activitySearch, setActivitySearch] = React.useState("");
-  const [selectedAuthor, setSelectedAuthor] = React.useState("Everyone");
-  const [sortField, setSortField] = React.useState<"name" | "role" | "smsRole" | null>(null);
+  const [memberSearch, setMemberSearch] = React.useState("");
+  const [sortField, setSortField] = React.useState<keyof TeamMember | null>(null);
   const [sortDirection, setSortDirection] = React.useState<"asc" | "desc">("asc");
 
-  // Modals state
+  // UKVI Roles State
+  const [ukviRoles, setUkviRoles] = React.useState<UkviRoleAssignment[]>(INITIAL_UKVI_ROLES);
+  const [activeRoleModal, setActiveRoleModal] = React.useState<UkviRoleAssignment | null>(null);
+
+  // Activity Log State
+  const [activityLog] = React.useState<ActivityLogItem[]>(INITIAL_ACTIVITY_LOG);
+  const [activitySearch, setActivitySearch] = React.useState("");
+  const [selectedAuthor, setSelectedAuthor] = React.useState("Everyone");
+
+  // Modals State
   const [isInviteOpen, setIsInviteOpen] = React.useState(false);
   const [editingMember, setEditingMember] = React.useState<TeamMember | null>(null);
-  const [editingUkviRole, setEditingUkviRole] = React.useState<UkviRoleAssignment | null>(null);
 
-  // Load persistence
+  // Load from localStorage
   React.useEffect(() => {
     try {
       const savedMembers = localStorage.getItem("viems_org_team_members");
-      if (savedMembers) setMembers(JSON.parse(savedMembers));
-
-      const savedUkvi = localStorage.getItem("viems_org_ukvi_roles");
-      if (savedUkvi) setUkviRoles(JSON.parse(savedUkvi));
+      if (savedMembers) {
+        const parsed = JSON.parse(savedMembers);
+        if (Array.isArray(parsed)) {
+          setMembers(parsed);
+        }
+      }
+      const savedRoles = localStorage.getItem("viems_org_ukvi_roles");
+      if (savedRoles) {
+        const parsed = JSON.parse(savedRoles);
+        if (Array.isArray(parsed)) {
+          setUkviRoles(parsed);
+        }
+      }
     } catch {
       // ignore
     }
@@ -210,7 +234,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
     }
   };
 
-  const handleSort = (field: "name" | "role" | "smsRole") => {
+  const handleSort = (field: keyof TeamMember) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
@@ -219,23 +243,36 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
     }
   };
 
+  // Filtered and Sorted Members
   const sortedMembers = React.useMemo(() => {
-    if (!sortField) return members;
-    return [...members].sort((a, b) => {
+    let result = members.filter(
+      (m) =>
+        m.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
+        m.email.toLowerCase().includes(memberSearch.toLowerCase()) ||
+        m.role.toLowerCase().includes(memberSearch.toLowerCase())
+    );
+
+    if (!sortField) return result;
+
+    return [...result].sort((a, b) => {
       const valA = String(a[sortField] || "").toLowerCase();
       const valB = String(b[sortField] || "").toLowerCase();
       if (valA < valB) return sortDirection === "asc" ? -1 : 1;
       if (valA > valB) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
-  }, [members, sortField, sortDirection]);
+  }, [members, memberSearch, sortField, sortDirection]);
 
   // Derived metrics
   const activeCount = members.filter((m) => m.status === "active").length;
   const pendingCount = members.filter((m) => m.status === "invited").length;
   const smsCount = members.filter((m) => m.smsRole && m.smsRole !== "—").length;
 
-  const handleRoleSave = (roleCode: "AO" | "KC" | "L1" | "L2", updatedMembers: string[]) => {
+  const handleRoleSave = (
+    roleCode: "AO" | "KC" | "L1" | "L2",
+    updatedMembers: string[],
+    _meta?: { effectiveDate: string; notes?: string }
+  ) => {
     const updated = ukviRoles.map((r) =>
       r.roleCode === roleCode ? { ...r, assignedMembers: updatedMembers } : r
     );
@@ -321,6 +358,10 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
     return matchesSearch && matchesAuthor;
   });
 
+  const activityDates = React.useMemo(() => {
+    return Array.from(new Set(filteredActivity.map((a) => a.date)));
+  }, [filteredActivity]);
+
   const subNavItems: { id: TeamSubTab; label: string }[] = [
     { id: "members", label: "Members" },
     { id: "ukvi-roles", label: "UKVI Roles" },
@@ -329,7 +370,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-[40px] items-start w-full">
-      {/* Left Sub-Menu Column (Sticky & styled matching Figma plain text navigation) */}
+      {/* Left Sub-Menu Column */}
       <nav
         className="sticky top-[152px] self-start flex flex-col gap-3 pt-1 shrink-0 w-full"
         aria-label="Team navigation"
@@ -393,7 +434,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
 
             <div className="bg-white rounded-[16px] p-6 shadow-x-small border border-[#EBEBEB] flex flex-col justify-between h-[104px]">
               <span className="text-[11px] font-medium uppercase tracking-wider text-[#737373]">
-                SMS USERS
+                SMS ROLES ASSIGNED
               </span>
               <p className="font-aeonik-medium text-[32px] leading-[40px] font-medium text-[#171717]">
                 {smsCount}
@@ -405,9 +446,10 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
         {/* 1. MEMBERS SUB-TAB */}
         {activeSubTab === "members" && (
           <div className="flex flex-col gap-4">
+            {/* Title and Invite Button Row */}
             <div className="flex items-center justify-between">
               <h2 className="font-aeonik-medium text-[20px] leading-[28px] font-medium text-[#171717]">
-                Members
+                Team members
               </h2>
 
               <button
@@ -419,30 +461,48 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
               </button>
             </div>
 
+            {/* Search Input Bar */}
+            <div className="relative max-w-[280px]">
+              <RiSearchLine className="size-4 absolute left-3 top-3 text-[#8C8C8C] pointer-events-none" />
+              <Input
+                value={memberSearch}
+                onChange={(e) => setMemberSearch(e.target.value)}
+                placeholder="Search..."
+                className="rounded-[10px] h-10 pl-9 pr-3 shadow-x-small bg-white border-[#EBEBEB] text-[13px]"
+              />
+            </div>
+
             {/* Column Header Row */}
             <div className="grid grid-cols-12 gap-4 px-4 py-2 text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider select-none">
-              <div
-                className="col-span-12 sm:col-span-6 flex items-center gap-1 cursor-pointer hover:text-[#171717] transition-colors"
+              <button
+                type="button"
+                className="col-span-12 sm:col-span-6 flex items-center gap-1 cursor-pointer hover:text-[#171717] transition-colors border-0 bg-transparent p-0 text-left text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider outline-none"
                 onClick={() => handleSort("name")}
+                aria-sort={sortField === "name" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
               >
                 <span>MEMBER</span>
-              </div>
-              <div
-                className="hidden sm:flex sm:col-span-3 items-center gap-1 cursor-pointer hover:text-[#171717] transition-colors"
+                <RiArrowUpDownLine className="size-3.5 text-[#8C8C8C]" />
+              </button>
+              <button
+                type="button"
+                className="hidden sm:flex sm:col-span-3 items-center gap-1 cursor-pointer hover:text-[#171717] transition-colors border-0 bg-transparent p-0 text-left text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider outline-none"
                 onClick={() => handleSort("role")}
+                aria-sort={sortField === "role" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
               >
                 <span>ROLE</span>
                 <RiArrowUpDownLine className="size-3.5 text-[#8C8C8C]" />
-              </div>
-              <div
-                className="hidden sm:flex sm:col-span-3 items-center justify-between cursor-pointer hover:text-[#171717] transition-colors"
+              </button>
+              <button
+                type="button"
+                className="hidden sm:flex sm:col-span-3 items-center justify-between cursor-pointer hover:text-[#171717] transition-colors border-0 bg-transparent p-0 text-left text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider outline-none"
                 onClick={() => handleSort("smsRole")}
+                aria-sort={sortField === "smsRole" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
               >
                 <div className="flex items-center gap-1">
                   <span>SMS ROLE</span>
                   <RiArrowUpDownLine className="size-3.5 text-[#8C8C8C]" />
                 </div>
-              </div>
+              </button>
             </div>
 
             {/* Members Cards List matching Figma EXACTLY */}
@@ -471,44 +531,44 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
                   </div>
 
                   {/* Role Badge */}
-                  <div className="col-span-6 sm:col-span-3">
+                  <div className="hidden sm:block sm:col-span-3">
                     {getRoleBadge(m.role)}
                   </div>
 
-                  {/* SMS Role & Menu */}
-                  <div className="col-span-6 sm:col-span-3 flex items-center justify-between">
-                    <span className="text-[13px] text-[#5C5C5C]">
-                      {m.smsRole || "—"}
+                  {/* SMS Role & Actions */}
+                  <div className="col-span-12 sm:col-span-3 flex items-center justify-between">
+                    <span className="text-[14px] text-[#171717]">
+                      {m.smsRole}
                     </span>
 
                     <DropdownMenu>
-                      <DropdownMenuTrigger className="size-8 rounded-[8px] text-[#8C8C8C] hover:text-[#171717] hover:bg-neutral-100 flex items-center justify-center cursor-pointer border-0 bg-transparent transition-colors outline-none">
+                      <DropdownMenuTrigger className="size-8 rounded-[8px] hover:bg-neutral-200/50 flex items-center justify-center text-[#737373] transition-colors border-0 bg-transparent cursor-pointer">
                         <RiMore2Line className="size-4.5" />
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44 rounded-[12px] bg-white border border-[#EBEBEB] shadow-card-large p-1">
+                      <DropdownMenuContent align="end" className="w-44 rounded-card">
                         <DropdownMenuItem
                           onClick={() => setEditingMember(m)}
-                          className="gap-2 cursor-pointer text-[13px] px-3 py-2 text-[#171717] hover:bg-neutral-50 rounded-[6px]"
+                          className="cursor-pointer gap-2 text-label-sm"
                         >
-                          <RiEditLine className="size-4 text-[#737373]" />
+                          <RiEditLine className="size-4 text-muted-foreground" />
                           Edit details
                         </DropdownMenuItem>
                         {m.status === "invited" && (
                           <DropdownMenuItem
                             onClick={() => handleResendInvite(m)}
-                            className="gap-2 cursor-pointer text-[13px] px-3 py-2 text-[#171717] hover:bg-neutral-50 rounded-[6px]"
+                            className="cursor-pointer gap-2 text-label-sm"
                           >
-                            <RiMailSendLine className="size-4 text-[#737373]" />
-                            Resend invitation
+                            <RiMailSendLine className="size-4 text-muted-foreground" />
+                            Resend invite
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuSeparator className="my-1 border-t border-[#EBEBEB]" />
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => handleMemberDelete(m.id)}
-                          className="gap-2 cursor-pointer text-[#FB3748] hover:bg-red-50 text-[13px] px-3 py-2 rounded-[6px]"
+                          className="cursor-pointer gap-2 text-label-sm text-destructive focus:text-destructive"
                         >
                           <RiDeleteBinLine className="size-4" />
-                          Remove member
+                          Remove
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -521,17 +581,14 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
             <div className="flex items-center justify-end gap-3 pt-3">
               <button
                 type="button"
-                onClick={() => toast.info("No unsaved changes")}
+                onClick={() => toast.info("Team members list refreshed")}
                 className="h-10 px-5 text-[14px] font-medium text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-200/50 rounded-[10px] transition-colors border-0 bg-transparent cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  saveMembersList(members);
-                  toast.success("Team settings saved successfully");
-                }}
+                onClick={() => toast.success("Team changes saved successfully")}
                 className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
               >
                 Save changes
@@ -543,95 +600,46 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
         {/* 2. UKVI ROLES SUB-TAB */}
         {activeSubTab === "ukvi-roles" && (
           <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <h2 className="font-aeonik-medium text-[20px] leading-[28px] font-medium text-[#171717]">
-                UKVI roles
-              </h2>
+            <h2 className="font-aeonik-medium text-[20px] leading-[28px] font-medium text-[#171717]">
+              Key personnel
+            </h2>
 
-              <button
-                type="button"
-                onClick={() => setIsInviteOpen(true)}
-                className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
-              >
-                Invite member
-              </button>
+            {/* Blue Info Notice Card matching Figma */}
+            <div className="bg-[#F5F8FF] border border-[#DCE7FF] rounded-[16px] p-5 flex items-start gap-3.5">
+              <RiInformationFill className="size-5 text-[#335CFF] shrink-0 mt-0.5" />
+              <p className="text-[13px] leading-[20px] text-[#335CFF]">
+                UKVI requires sponsor licence holders to maintain appointed key personnel at all times. Any changes must be reported via SMS within 20 working days.
+              </p>
             </div>
 
-            {/* Column Header Row */}
-            <div className="grid grid-cols-12 gap-4 px-4 py-2 text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider select-none">
-              <div className="col-span-6 sm:col-span-8 flex items-center gap-1">
-                <span>MEMBER</span>
-              </div>
-              <div className="col-span-6 sm:col-span-4 flex items-center justify-end gap-1">
-                <span>COUNT</span>
-                <RiArrowUpDownLine className="size-3.5 text-[#8C8C8C]" />
-              </div>
-            </div>
-
-            {/* Roles List Cards matching Figma EXACTLY */}
-            <div className="flex flex-col gap-2.5">
+            {/* 4 UKVI Role Cards matching Figma EXACTLY */}
+            <div className="space-y-3">
               {ukviRoles.map((role) => (
                 <div
                   key={role.roleCode}
-                  className="bg-white rounded-[16px] border border-[#EBEBEB] p-4 shadow-x-small flex items-center justify-between hover:border-[#D4D4D4] transition-all"
+                  className="bg-white rounded-[16px] border border-[#EBEBEB] p-6 shadow-x-small flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                 >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="size-10 rounded-[10px] bg-[#E8F8F0] text-[#12B76A] flex items-center justify-center font-semibold text-[13px] shrink-0">
+                  <div className="space-y-1">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-[#EBF1FF] text-[#335CFF]">
                       {role.roleCode}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[14px] font-medium text-[#171717]">
-                        {role.roleTitle}
-                      </p>
-                      <p className="text-[12px] text-[#737373] mt-0.5">
-                        {role.assignedMembers.join(", ") || "Unassigned"}
-                      </p>
-                    </div>
+                    </span>
+                    <h3 className="text-[15px] font-medium text-[#171717]">
+                      {role.roleTitle}
+                    </h3>
+                    <p className="text-[13px] text-[#737373]">
+                      Assigned to: {role.assignedMembers.join(", ") || "Unassigned"}
+                    </p>
                   </div>
 
                   <button
                     type="button"
-                    onClick={() => setEditingUkviRole(role)}
-                    className="h-9 px-4 rounded-[10px] bg-[#F5F5F5] hover:bg-[#EBEBEB] text-[#171717] text-[13px] font-medium transition-colors border-0 cursor-pointer"
+                    onClick={() => setActiveRoleModal(role)}
+                    className="h-9 px-4 rounded-[10px] bg-[#F5F5F5] hover:bg-[#EBEBEB] text-[#171717] text-[13px] font-medium border border-[#EBEBEB] shadow-x-small transition-all cursor-pointer self-start sm:self-auto shrink-0"
                   >
                     Change
                   </button>
                 </div>
               ))}
-            </div>
-
-            {/* Info Notice Banner matching Figma EXACTLY (Purple background) */}
-            <div className="p-4 rounded-[16px] bg-[#EFEBFF] flex items-start gap-3 mt-4 border-0">
-              <RiInformationFill className="size-5 shrink-0 mt-0.5 text-[#7D52F4]" />
-              <p className="text-[13px] leading-[20px] text-[#171717]">
-                Every sponsor must maintain an Authorising Officer, Key Contact, and at least one
-                Level 1 User. Changes must be reported via SMS within 20 working days.
-              </p>
-            </div>
-
-            {/* Footer Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-3">
-              <button
-                type="button"
-                onClick={() => toast.info("No unsaved changes")}
-                className="h-10 px-5 text-[14px] font-medium text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-200/50 rounded-[10px] transition-colors border-0 bg-transparent cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  try {
-                    localStorage.setItem("viems_org_ukvi_roles", JSON.stringify(ukviRoles));
-                    toast.success("UKVI roles saved successfully");
-                  } catch {
-                    // ignore
-                  }
-                }}
-                className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
-              >
-                Save changes
-              </button>
             </div>
           </div>
         )}
@@ -657,6 +665,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
 
               <button
                 type="button"
+                aria-label="Filter"
                 className="size-10 rounded-[10px] border border-[#EBEBEB] bg-white flex items-center justify-center text-[#5C5C5C] hover:text-[#171717] shadow-x-small shrink-0 transition-colors cursor-pointer"
               >
                 <RiFilter3Line className="size-4" />
@@ -675,137 +684,50 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
               </Select>
             </div>
 
-            {/* Activity Timeline matching Figma EXACTLY */}
+            {/* Activity Timeline with Dynamic Date Grouping */}
             <div className="space-y-6 pt-2">
-              {filteredActivity.length === 0 ? (
+              {activityDates.length === 0 ? (
                 <div className="py-12 text-center text-[14px] text-[#737373] bg-white rounded-[16px] border border-[#EBEBEB]">
                   No activity logs match your filter.
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {/* 26 MAR 2026 */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <span className="size-2 rounded-full bg-[#D4D4D4]" />
-                      <span className="text-[11px] font-semibold uppercase tracking-wider text-[#737373]">
-                        26 MAR 2026
-                      </span>
-                    </div>
+                activityDates.map((dateStr) => {
+                  const itemsOnDate = filteredActivity.filter((a) => a.date === dateStr);
+                  return (
+                    <div key={dateStr} className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <span className="size-2 rounded-full bg-[#D4D4D4]" />
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-[#737373]">
+                          {dateStr}
+                        </span>
+                      </div>
 
-                    <div className="space-y-3 relative pl-6 border-l border-[#EBEBEB] ml-1">
-                      {filteredActivity
-                        .filter((a) => a.date === "26 MAR 2026")
-                        .map((item) => (
-                          <div key={item.id} className="relative flex items-center gap-3">
-                            <div className="size-8 rounded-[8px] bg-white border border-[#EBEBEB] shadow-x-small flex items-center justify-center text-[#737373] shrink-0 -ml-[33px]">
-                              {item.type === "cos" ? (
+                      <div className="space-y-3 relative pl-6 border-l border-[#EBEBEB] ml-1">
+                        {itemsOnDate.map((item) => (
+                          <TimelineEntry
+                            key={item.id}
+                            icon={
+                              item.type === "cos" ? (
                                 <RiFileTextLine className="size-4" />
-                              ) : (
+                              ) : item.type === "rtw" ? (
                                 <RiCheckboxCircleLine className="size-4" />
-                              )}
-                            </div>
-
-                            <div className="bg-white rounded-[16px] border border-[#EBEBEB] p-4 flex-1 shadow-x-small flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-[#D4D4D4] transition-all">
-                              <div>
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-[#EFEBFF] text-[#7D52F4]">
-                                  ACTIVITY
-                                </span>
-                                <p className="text-[14px] font-medium text-[#171717] mt-1">
-                                  {item.action}
-                                </p>
-                                <p className="text-[12px] text-[#737373] mt-0.5">
-                                  {item.refCode}
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-4 self-end sm:self-center">
-                                <span className="text-[12px] text-[#737373]">
-                                  {item.time}
-                                </span>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="size-6 rounded-full bg-[#EFEBFF] text-[#7D52F4] flex items-center justify-center text-[10px] font-medium">
-                                    {item.authorInitials}
-                                  </span>
-                                  <span className="text-[13px] font-medium text-[#171717]">
-                                    {item.author}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
+                              ) : (
+                                <RiTimeLine className="size-4" />
+                              )
+                            }
+                            badgeLabel="ACTIVITY"
+                            action={item.action}
+                            refCode={item.refCode}
+                            time={item.time}
+                            author={item.author}
+                            authorInitials={item.authorInitials}
+                          />
                         ))}
+                      </div>
                     </div>
-                  </div>
-
-                  {/* 24 MAR 2026 */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <span className="size-2 rounded-full bg-[#D4D4D4]" />
-                      <span className="text-[11px] font-semibold uppercase tracking-wider text-[#737373]">
-                        24 MAR 2026
-                      </span>
-                    </div>
-
-                    <div className="space-y-3 relative pl-6 border-l border-[#EBEBEB] ml-1">
-                      {filteredActivity
-                        .filter((a) => a.date === "24 MAR 2026")
-                        .map((item) => (
-                          <div key={item.id} className="relative flex items-center gap-3">
-                            <div className="size-8 rounded-[8px] bg-white border border-[#EBEBEB] shadow-x-small flex items-center justify-center text-[#737373] shrink-0 -ml-[33px]">
-                              <RiTimeLine className="size-4" />
-                            </div>
-
-                            <div className="bg-white rounded-[16px] border border-[#EBEBEB] p-4 flex-1 shadow-x-small flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-[#D4D4D4] transition-all">
-                              <div>
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-[#EFEBFF] text-[#7D52F4]">
-                                  ACTIVITY
-                                </span>
-                                <p className="text-[14px] font-medium text-[#171717] mt-1">
-                                  {item.action}
-                                </p>
-                                <p className="text-[12px] text-[#737373] mt-0.5">
-                                  {item.refCode}
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-4 self-end sm:self-center">
-                                <span className="text-[12px] text-[#737373]">
-                                  {item.time}
-                                </span>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="size-6 rounded-full bg-[#EFEBFF] text-[#7D52F4] flex items-center justify-center text-[10px] font-medium">
-                                    {item.authorInitials}
-                                  </span>
-                                  <span className="text-[13px] font-medium text-[#171717]">
-                                    {item.author}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                </div>
+                  );
+                })
               )}
-            </div>
-
-            {/* Footer Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-3">
-              <button
-                type="button"
-                onClick={() => toast.info("Activity log refreshed")}
-                className="h-10 px-5 text-[14px] font-medium text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-200/50 rounded-[10px] transition-colors border-0 bg-transparent cursor-pointer"
-              >
-                Refresh
-              </button>
-              <button
-                type="button"
-                onClick={() => toast.success("Activity log exported")}
-                className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
-              >
-                Export log
-              </button>
             </div>
           </div>
         )}
@@ -815,28 +737,26 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
       <InviteMemberModal
         isOpen={isInviteOpen}
         onClose={() => setIsInviteOpen(false)}
-        onSendInvite={(newMember) => {
-          saveMembersList([...members, newMember]);
-          setIsInviteOpen(false);
-          toast.success(`Invitation sent to ${newMember.email}`);
+        onSendInvite={(memberData: TeamMember) => {
+          saveMembersList([...members, memberData]);
         }}
       />
 
       {/* Edit Member Modal */}
       {editingMember && (
         <EditMemberModal
-          isOpen={Boolean(editingMember)}
-          onClose={() => setEditingMember(null)}
+          isOpen={!!editingMember}
           member={editingMember}
+          onClose={() => setEditingMember(null)}
           onUpdateMember={handleMemberSave}
         />
       )}
 
       {/* Change UKVI Role Modal */}
       <ChangeUkviRoleModal
-        open={Boolean(editingUkviRole)}
-        onOpenChange={(open) => !open && setEditingUkviRole(null)}
-        roleData={editingUkviRole}
+        open={!!activeRoleModal}
+        onOpenChange={(open) => !open && setActiveRoleModal(null)}
+        roleData={activeRoleModal}
         onSave={handleRoleSave}
         availableMembers={members.map((m) => ({ name: m.name, email: m.email }))}
       />
