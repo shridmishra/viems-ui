@@ -31,7 +31,7 @@ interface ChangeUkviRoleModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   roleData: UkviRoleAssignment | null;
-  onSave: (roleCode: "AO" | "KC" | "L1" | "L2", updatedMembers: string[]) => void;
+  onSave: (roleCode: "AO" | "KC" | "L1" | "L2", updatedMembers: string[], meta?: { effectiveDate: string; notes?: string }) => void;
   availableMembers: { name: string; email: string }[];
 }
 
@@ -43,14 +43,16 @@ export function ChangeUkviRoleModal({
   availableMembers,
 }: ChangeUkviRoleModalProps) {
   const [selectedMember, setSelectedMember] = React.useState("");
-  const [effectiveDate, setEffectiveDate] = React.useState("2026-08-25");
+  const [effectiveDate, setEffectiveDate] = React.useState(() => new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = React.useState("");
 
   React.useEffect(() => {
-    if (roleData) {
-      setSelectedMember(roleData.assignedMembers[0] || availableMembers[0]?.name || "");
+    if (open && roleData) {
+      setSelectedMember(roleData.assignedMembers[0] || (availableMembers[0]?.name ?? ""));
+      setEffectiveDate(new Date().toISOString().split("T")[0]);
+      setNotes("");
     }
-  }, [roleData, availableMembers]);
+  }, [open, roleData]);
 
   if (!roleData) return null;
 
@@ -73,7 +75,7 @@ export function ChangeUkviRoleModal({
       newMembers = [selectedMember];
     }
 
-    onSave(roleData.roleCode, newMembers);
+    onSave(roleData.roleCode, newMembers, { effectiveDate, notes: notes.trim() });
     toast.success(`Updated ${roleData.roleTitle} assignment`);
     onOpenChange(false);
   };

@@ -22,18 +22,8 @@ import { toast } from "sonner";
 import {
   UploadDocumentModal,
   UploadedDocument,
+  CompanyDocumentItem,
 } from "./modals/upload-document-modal";
-
-export interface CompanyDocumentItem {
-  id: string;
-  title: string;
-  subtitle: string;
-  category: "Compliance" | "Licence" | "Insurance" | "Legal" | "HR";
-  date: string;
-  status: "CURRENT" | "ARCHIVED";
-  fileName?: string;
-  fileSize?: string;
-}
 
 const DEFAULT_DOCUMENTS: CompanyDocumentItem[] = [
   {
@@ -78,43 +68,43 @@ const DEFAULT_DOCUMENTS: CompanyDocumentItem[] = [
   },
   {
     id: "doc-5",
-    title: "Employer liability insurance",
-    subtitle: "employer_liability_2025.pdf · 420 KB",
+    title: "Employers liability insurance",
+    subtitle: "insurance_policy_2026.pdf · 2.1 MB",
     category: "Insurance",
-    date: "3 Jan 2026",
+    date: "10 Jan 2026",
     status: "CURRENT",
-    fileName: "employer_liability_2025.pdf",
-    fileSize: "420 KB",
-  },
-  {
-    id: "doc-6",
-    title: "Companies House registration",
-    subtitle: "Verification of legal right to work in the UK",
-    category: "Legal",
-    date: "1 Mar 2018",
-    status: "CURRENT",
-    fileName: "companies_house_reg.pdf",
-    fileSize: "890 KB",
-  },
-  {
-    id: "doc-7",
-    title: "HMRC PAYE registration",
-    subtitle: "AX_Studios_Contract_TJ.pdf · 2.1 MB",
-    category: "Legal",
-    date: "12 Apr 2018",
-    status: "CURRENT",
-    fileName: "AX_Studios_Contract_TJ.pdf",
+    fileName: "insurance_policy_2026.pdf",
     fileSize: "2.1 MB",
   },
   {
-    id: "doc-8",
-    title: "Data protection policy",
-    subtitle: "Right to work verification code issued by UKVI",
+    id: "doc-6",
+    title: "Articles of association",
+    subtitle: "articles_of_association.pdf · 4.5 MB",
     category: "Legal",
-    date: "9 Mar 2023",
+    date: "12 May 2018",
     status: "CURRENT",
-    fileName: "data_protection_policy.pdf",
-    fileSize: "740 KB",
+    fileName: "articles_of_association.pdf",
+    fileSize: "4.5 MB",
+  },
+  {
+    id: "doc-7",
+    title: "Certificate of incorporation",
+    subtitle: "cert_incorporation.pdf · 1.8 MB",
+    category: "Legal",
+    date: "10 May 2018",
+    status: "CURRENT",
+    fileName: "cert_incorporation.pdf",
+    fileSize: "1.8 MB",
+  },
+  {
+    id: "doc-8",
+    title: "Staff handbook 2025/2026",
+    subtitle: "Right to work verification code issued by UKVI",
+    category: "HR",
+    date: "15 Dec 2025",
+    status: "CURRENT",
+    fileName: "staff_handbook_2526.pdf",
+    fileSize: "6.2 MB",
   },
   {
     id: "doc-9",
@@ -139,7 +129,10 @@ export function DocumentsTab() {
     try {
       const saved = localStorage.getItem("viems_org_documents");
       if (saved) {
-        setDocuments(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setDocuments(parsed);
+        }
       }
     } catch {
       // ignore
@@ -167,6 +160,11 @@ export function DocumentsTab() {
   const sortedDocuments = React.useMemo(() => {
     if (!sortField) return documents;
     return [...documents].sort((a, b) => {
+      if (sortField === "date") {
+        const timeA = new Date(a.date).getTime() || 0;
+        const timeB = new Date(b.date).getTime() || 0;
+        return sortDirection === "asc" ? timeA - timeB : timeB - timeA;
+      }
       const valA = String(a[sortField] || "").toLowerCase();
       const valB = String(b[sortField] || "").toLowerCase();
       if (valA < valB) return sortDirection === "asc" ? -1 : 1;
@@ -176,62 +174,94 @@ export function DocumentsTab() {
   }, [documents, sortField, sortDirection]);
 
   const handleUploadNewDoc = (newDoc: UploadedDocument) => {
-    const formatted: CompanyDocumentItem = {
-      id: newDoc.id,
-      title: newDoc.title,
-      subtitle: `${newDoc.fileName} · ${newDoc.fileSize}`,
-      category: newDoc.category,
-      date: newDoc.date,
-      status: "CURRENT",
-      fileName: newDoc.fileName,
-      fileSize: newDoc.fileSize,
-    };
-    const updated = [formatted, ...documents];
+    const updated = [newDoc, ...documents];
     saveDocs(updated);
   };
 
   const handleToggleStatus = (id: string) => {
-    const updated: CompanyDocumentItem[] = documents.map((d) => {
-      if (d.id === id) {
-        const nextStatus: "CURRENT" | "ARCHIVED" = d.status === "CURRENT" ? "ARCHIVED" : "CURRENT";
-        toast.success(`Document marked as ${nextStatus.toLowerCase()}`);
-        return { ...d, status: nextStatus };
-      }
-      return d;
-    });
+    const updated = documents.map((d) =>
+      d.id === id
+        ? { ...d, status: (d.status === "CURRENT" ? "ARCHIVED" : "CURRENT") as "CURRENT" | "ARCHIVED" }
+        : d
+    );
     saveDocs(updated);
+    toast.success("Document status updated");
   };
 
-  const handleDelete = (id: string) => {
+  const handleDeleteDoc = (id: string) => {
+    const target = documents.find((d) => d.id === id);
     const updated = documents.filter((d) => d.id !== id);
     saveDocs(updated);
-    toast.success("Document removed");
+    toast.success(`Removed "${target?.title || "Document"}"`);
+  };
+
+  const handleDownloadDoc = (doc: CompanyDocumentItem) => {
+    toast.success(`Downloaded ${doc.fileName || doc.title}`);
+  };
+
+  const handleViewDoc = (doc: CompanyDocumentItem) => {
+    toast.info(`Viewing ${doc.title} (${doc.category})`);
+  };
+
+  const getStatusBadge = (status: "CURRENT" | "ARCHIVED") => {
+    if (status === "CURRENT") {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#E8F8F0] text-[#12B76A]">
+          CURRENT
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#F5F5F5] text-[#737373]">
+        ARCHIVED
+      </span>
+    );
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-[40px] items-start w-full">
-      {/* Left Sub-Menu Column (Sticky & styled matching Figma plain text navigation) */}
-      <nav
-        className="sticky top-[152px] self-start flex flex-col gap-3 pt-1 shrink-0 w-full"
-        aria-label="Documents navigation"
-      >
-        <span className="text-[12px] font-semibold uppercase tracking-wider text-[#171717] px-0 mb-1">
-          DOCUMENTS
-        </span>
-
-        <div className="flex flex-col gap-[14px]">
-          <button
-            type="button"
-            className="text-left text-[14px] leading-[20px] font-medium text-[#171717] border-0 bg-transparent p-0 cursor-pointer outline-none"
-          >
-            Documents
-          </button>
+    <div className="flex flex-col gap-6 w-full">
+      {/* 4 Stat Cards matching Figma EXACTLY */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-[16px] p-6 shadow-x-small border border-[#EBEBEB] flex flex-col justify-between h-[104px]">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-[#737373]">
+            TOTAL DOCUMENTS
+          </span>
+          <p className="font-aeonik-medium text-[32px] leading-[40px] font-medium text-[#171717]">
+            24
+          </p>
         </div>
-      </nav>
 
-      {/* Right Content Area */}
-      <div className="flex-1 min-w-0 flex flex-col gap-4">
-        {/* Header Row */}
+        <div className="bg-white rounded-[16px] p-6 shadow-x-small border border-[#EBEBEB] flex flex-col justify-between h-[104px]">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-[#737373]">
+            EXPIRING SOON
+          </span>
+          <p className="font-aeonik-medium text-[32px] leading-[40px] font-medium text-[#171717]">
+            3
+          </p>
+        </div>
+
+        <div className="bg-white rounded-[16px] p-6 shadow-x-small border border-[#EBEBEB] flex flex-col justify-between h-[104px]">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-[#737373]">
+            MISSING REQUIRED
+          </span>
+          <p className="font-aeonik-medium text-[32px] leading-[40px] font-medium text-[#171717]">
+            1
+          </p>
+        </div>
+
+        <div className="bg-white rounded-[16px] p-6 shadow-x-small border border-[#EBEBEB] flex flex-col justify-between h-[104px]">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-[#737373]">
+            COMPLIANCE SCORE
+          </span>
+          <p className="font-aeonik-medium text-[32px] leading-[40px] font-medium text-[#171717]">
+            92%
+          </p>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex flex-col gap-4">
+        {/* Title and Upload Button Row */}
         <div className="flex items-center justify-between">
           <h2 className="font-aeonik-medium text-[20px] leading-[28px] font-medium text-[#171717]">
             Company documents
@@ -248,36 +278,44 @@ export function DocumentsTab() {
 
         {/* Column Header Row matching Figma */}
         <div className="grid grid-cols-12 gap-4 px-4 py-2 text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider select-none">
-          <div
-            className="col-span-12 sm:col-span-5 flex items-center gap-1 cursor-pointer hover:text-[#171717] transition-colors"
+          <button
+            type="button"
+            className="col-span-12 sm:col-span-5 flex items-center gap-1 cursor-pointer hover:text-[#171717] transition-colors border-0 bg-transparent p-0 text-left text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider outline-none"
             onClick={() => handleSort("title")}
+            aria-sort={sortField === "title" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
           >
             <span>DOCUMENT</span>
             <RiArrowUpDownLine className="size-3.5 text-[#8C8C8C]" />
-          </div>
-          <div
-            className="hidden sm:flex sm:col-span-2 items-center gap-1 cursor-pointer hover:text-[#171717] transition-colors"
+          </button>
+          <button
+            type="button"
+            className="hidden sm:flex sm:col-span-2 items-center gap-1 cursor-pointer hover:text-[#171717] transition-colors border-0 bg-transparent p-0 text-left text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider outline-none"
             onClick={() => handleSort("category")}
+            aria-sort={sortField === "category" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
           >
             <span>CATEGORY</span>
             <RiArrowUpDownLine className="size-3.5 text-[#8C8C8C]" />
-          </div>
-          <div
-            className="hidden sm:flex sm:col-span-3 items-center gap-1 cursor-pointer hover:text-[#171717] transition-colors"
+          </button>
+          <button
+            type="button"
+            className="hidden sm:flex sm:col-span-3 items-center gap-1 cursor-pointer hover:text-[#171717] transition-colors border-0 bg-transparent p-0 text-left text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider outline-none"
             onClick={() => handleSort("date")}
+            aria-sort={sortField === "date" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
           >
             <span>DATE</span>
             <RiArrowUpDownLine className="size-3.5 text-[#8C8C8C]" />
-          </div>
-          <div
-            className="hidden sm:flex sm:col-span-2 items-center justify-between cursor-pointer hover:text-[#171717] transition-colors"
+          </button>
+          <button
+            type="button"
+            className="hidden sm:flex sm:col-span-2 items-center justify-between cursor-pointer hover:text-[#171717] transition-colors border-0 bg-transparent p-0 text-left text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider outline-none"
             onClick={() => handleSort("status")}
+            aria-sort={sortField === "status" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
           >
             <div className="flex items-center gap-1">
               <span>STATUS</span>
               <RiArrowUpDownLine className="size-3.5 text-[#8C8C8C]" />
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Document Cards List matching Figma EXACTLY */}
@@ -303,63 +341,58 @@ export function DocumentsTab() {
               </div>
 
               {/* Category */}
-              <div className="hidden sm:block sm:col-span-2 text-[13px] text-[#5C5C5C]">
-                {doc.category}
+              <div className="hidden sm:block sm:col-span-2">
+                <span className="text-[14px] text-[#171717]">
+                  {doc.category}
+                </span>
               </div>
 
               {/* Date */}
-              <div className="hidden sm:block sm:col-span-3 text-[13px] text-[#5C5C5C]">
-                {doc.date}
+              <div className="hidden sm:block sm:col-span-3">
+                <span className="text-[14px] text-[#5C5C5C]">
+                  {doc.date}
+                </span>
               </div>
 
               {/* Status & Actions */}
               <div className="col-span-12 sm:col-span-2 flex items-center justify-between">
                 <div>
-                  {doc.status === "CURRENT" ? (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#E8F8F0] text-[#12B76A]">
-                      CURRENT
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#F5F5F5] text-[#737373]">
-                      ARCHIVED
-                    </span>
-                  )}
+                  {getStatusBadge(doc.status)}
                 </div>
 
-                {/* Dropdown Menu */}
                 <DropdownMenu>
-                  <DropdownMenuTrigger className="size-8 rounded-[8px] text-[#8C8C8C] hover:text-[#171717] hover:bg-neutral-100 flex items-center justify-center cursor-pointer border-0 bg-transparent transition-colors outline-none">
+                  <DropdownMenuTrigger className="size-8 rounded-[8px] hover:bg-neutral-200/50 flex items-center justify-center text-[#737373] transition-colors border-0 bg-transparent cursor-pointer">
                     <RiMore2Line className="size-4.5" />
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-44 rounded-[12px] bg-white border border-[#EBEBEB] shadow-card-large p-1">
+                  <DropdownMenuContent align="end" className="w-44 rounded-card">
                     <DropdownMenuItem
-                      onClick={() => toast.info(`Viewing preview of ${doc.title}`)}
-                      className="gap-2 cursor-pointer text-[13px] px-3 py-2 text-[#171717] hover:bg-neutral-50 rounded-[6px]"
+                      onClick={() => handleViewDoc(doc)}
+                      className="cursor-pointer gap-2 text-label-sm"
                     >
-                      <RiEyeLine className="size-4 text-[#737373]" />
-                      Preview
+                      <RiEyeLine className="size-4 text-muted-foreground" />
+                      View document
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => toast.success(`Downloading ${doc.fileName || doc.title}`)}
-                      className="gap-2 cursor-pointer text-[13px] px-3 py-2 text-[#171717] hover:bg-neutral-50 rounded-[6px]"
+                      onClick={() => handleDownloadDoc(doc)}
+                      className="cursor-pointer gap-2 text-label-sm"
                     >
-                      <RiDownload2Line className="size-4 text-[#737373]" />
-                      Download
+                      <RiDownload2Line className="size-4 text-muted-foreground" />
+                      Download file
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => handleToggleStatus(doc.id)}
-                      className="gap-2 cursor-pointer text-[13px] px-3 py-2 text-[#171717] hover:bg-neutral-50 rounded-[6px]"
+                      className="cursor-pointer gap-2 text-label-sm"
                     >
-                      <RiArchiveLine className="size-4 text-[#737373]" />
-                      {doc.status === "CURRENT" ? "Archive" : "Set Active"}
+                      <RiArchiveLine className="size-4 text-muted-foreground" />
+                      {doc.status === "CURRENT" ? "Archive document" : "Restore to current"}
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator className="my-1 border-t border-[#EBEBEB]" />
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      onClick={() => handleDelete(doc.id)}
-                      className="gap-2 cursor-pointer text-[#FB3748] hover:bg-red-50 text-[13px] px-3 py-2 rounded-[6px]"
+                      onClick={() => handleDeleteDoc(doc.id)}
+                      className="cursor-pointer gap-2 text-label-sm text-destructive focus:text-destructive"
                     >
                       <RiDeleteBinLine className="size-4" />
-                      Delete document
+                      Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -368,29 +401,25 @@ export function DocumentsTab() {
           ))}
         </div>
 
-        {/* Footer Buttons matching Figma */}
+        {/* Footer Action Buttons */}
         <div className="flex items-center justify-end gap-3 pt-3">
           <button
             type="button"
-            onClick={() => toast.info("No unsaved changes")}
+            onClick={() => toast.info("Document repository refreshed")}
             className="h-10 px-5 text-[14px] font-medium text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-200/50 rounded-[10px] transition-colors border-0 bg-transparent cursor-pointer"
           >
-            Cancel
+            Refresh
           </button>
           <button
             type="button"
-            onClick={() => {
-              saveDocs(documents);
-              toast.success("Documents saved successfully");
-            }}
+            onClick={() => toast.success("Compliance pack downloaded")}
             className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
           >
-            Save changes
+            Download pack
           </button>
         </div>
       </div>
 
-      {/* Upload Document Modal */}
       <UploadDocumentModal
         open={isUploadOpen}
         onOpenChange={setIsUploadOpen}
