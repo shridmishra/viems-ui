@@ -30,6 +30,8 @@ import {
   RiArrowRightSLine,
   RiSettings2Line,
   RiLayoutRightLine,
+  RiBuildingLine,
+  RiBuildingFill,
 } from "@remixicon/react";
 import { UserProfileDropdown } from "@/components/UserProfileDropdown";
 import { LogoIcon } from "@/components/Logo";
@@ -109,6 +111,12 @@ export default function Sidebar({ userInfo, isOpen = true, onToggle }: SidebarPr
       href: "/compliance",
       iconActive: RiShieldFill,
       iconInactive: RiShieldLine,
+    },
+    {
+      name: "Organisation",
+      href: "/organisation",
+      iconActive: RiBuildingFill,
+      iconInactive: RiBuildingLine,
     },
     {
       name: "Migrants",
