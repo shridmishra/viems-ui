@@ -1173,8 +1173,8 @@ export default function CasesPage() {
       </div>
 
       <div className="px-6 md:px-[64px] py-[32px] flex flex-col gap-[32px] flex-1">
-        <div className="flex flex-wrap items-center gap-[12px] h-[32px]">
-          <div className="relative w-full max-w-[348px] h-[32px] flex items-center bg-white shadow-x-small rounded-[8px] border border-neutral-200/40 focus-within:border-[#7D52F4]">
+        <div className="flex items-center gap-[10px] min-h-[32px] flex-wrap">
+          <div className="relative w-[260px] h-[32px] flex items-center bg-white shadow-x-small rounded-[8px] border border-neutral-200/40 focus-within:border-[#7D52F4]">
             <RiSearchLine className="absolute left-2.5 top-1/2 -translate-y-1/2 size-5 text-[#A4A4A4] z-10 pointer-events-none" />
             {selectedGroup && (
               <div className="ml-8 my-1 mr-1 pl-2 pr-1 py-0.5 bg-[#F5F5F5] text-[#171717] rounded-[6px] text-[12px] font-medium flex items-center gap-1 shrink-0 border border-[#EBEBEB]">
