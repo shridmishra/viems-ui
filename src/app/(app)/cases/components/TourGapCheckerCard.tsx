@@ -103,7 +103,7 @@ export function TourGapCheckerCard({
                   14-Day Tour Gap Compliance
                 </h4>
                 <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider ${
                     analysis.isCompliant
                       ? "bg-[#E3F7EC] text-[#0B4627]"
                       : "bg-[#FFEBEC] text-[#FB3748]"
@@ -215,7 +215,7 @@ export function TourGapCheckerCard({
               <RiCheckboxCircleLine className="size-4 shrink-0 text-[#1FC16B]" />
               <span>All engagements comply with 14-day continuous tour limits.</span>
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#0B4627] bg-white px-2 py-0.5 rounded-full shadow-2xs shrink-0">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-[#0B4627] bg-white px-2 py-0.5 rounded-full shadow-2xs shrink-0">
               PASSED
             </span>
           </div>
@@ -225,7 +225,7 @@ export function TourGapCheckerCard({
               <RiAlertLine className="size-4 shrink-0 text-[#FB3748]" />
               <span>Tour gap exceeds 14-day limit. Review schedule.</span>
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#FB3748] bg-white px-2 py-0.5 rounded-full shadow-2xs shrink-0">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-[#FB3748] bg-white px-2 py-0.5 rounded-full shadow-2xs shrink-0">
               AT RISK
             </span>
           </div>

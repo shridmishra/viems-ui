@@ -219,7 +219,7 @@ export function TourGapScheduleModal({
                   14-Day Tour Gap Compliance Checker
                 </DialogTitle>
                 <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider ${
                     analysis.isCompliant
                       ? "bg-[#E3F7EC] text-[#0B4627]"
                       : "bg-[#FFEBEC] text-[#FB3748]"
@@ -418,14 +418,14 @@ export function TourGapScheduleModal({
                                 <span className="font-aeonik-medium text-[14px] text-[#171717] truncate">
                                   {ev.title}
                                 </span>
-                                <span className="text-[10px] font-bold uppercase tracking-wider bg-neutral-200/70 text-neutral-700 px-2 py-0.5 rounded-full">
+                                <span className="text-[10px] font-medium uppercase tracking-wider bg-neutral-200/70 text-neutral-700 px-2 py-0.5 rounded-full">
                                   {ev.engagementType || "Performance"}
                                 </span>
                               </div>
 
                               <div className="flex items-center gap-2 shrink-0">
                                 {ev.fee && (
-                                  <span className="text-[11px] font-semibold text-[#0B4627] bg-[#E3F7EC] px-2 py-0.5 rounded-full">
+                                  <span className="text-[11px] font-medium text-[#0B4627] bg-[#E3F7EC] px-2 py-0.5 rounded-full">
                                     {ev.fee}
                                   </span>
                                 )}
@@ -472,9 +472,9 @@ export function TourGapScheduleModal({
                             </div>
                             <div className="flex-1">
                               <div
-                                className={`w-fit px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1.5 transition-all shadow-2xs ${
+                                className={`w-fit px-3 py-1 rounded-full text-[11px] font-medium flex items-center gap-1.5 transition-all shadow-2xs ${
                                   followingGap.isBreach
-                                    ? "bg-[#FFEBEC] text-[#FB3748] border border-[#FECDCA] font-bold"
+                                    ? "bg-[#FFEBEC] text-[#FB3748] border border-[#FECDCA]"
                                     : followingGap.isWarning
                                     ? "bg-[#FFFAEB] text-[#B45309] border border-[#FDE8D3]"
                                     : "bg-[#E3F7EC] text-[#0B4627] border border-[#D0F2DF]"
