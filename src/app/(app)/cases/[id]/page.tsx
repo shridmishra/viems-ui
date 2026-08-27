@@ -58,6 +58,7 @@ import { TasksTab } from "./components/TasksTab";
 import { TimelineTab } from "./components/TimelineTab";
 import { ComplianceTab } from "./components/ComplianceTab";
 import { CaseStageStepper } from "./components/CaseStageStepper";
+import { HighRiskAlertBanner } from "../components/HighRiskAlertBanner";
 
 // -- CasesIcon (same as sidebar) --
 const CasesIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -625,6 +626,15 @@ export default function MigrantOverviewPage() {
 
       {/* ====== CONTENT AREA ====== */}
       <div className="flex-1 px-[32px] py-2xl max-w-full overflow-x-hidden">
+        {/* Real-time Pre-Tour High-Risk Alert Banner */}
+        <div className="mb-4">
+          <HighRiskAlertBanner
+            caseData={migrant}
+            migrantName={migrant.name}
+            onNavigateToSchedule={() => setActiveTab("Compliance")}
+          />
+        </div>
+
         {activeTab === "Overview" ? (
           <div className="flex flex-col w-full">
             {/* Sponsorship Pipeline Stepper (Current Stage & Immediate Required Action) */}
