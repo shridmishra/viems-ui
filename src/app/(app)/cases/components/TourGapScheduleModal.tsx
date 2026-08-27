@@ -10,11 +10,12 @@ import {
   RiDeleteBinLine,
   RiMapPinLine,
   RiTimeLine,
-  RiFileTextLine,
-  RiArrowRightLine,
-  RiCloseLine,
   RiFileLine,
-  RiDownloadLine,
+  RiCheckboxCircleLine,
+  RiCloseLine,
+  RiTimer2Line,
+  RiRouteLine,
+  RiShieldCheckLine,
 } from "@remixicon/react";
 import {
   Dialog,
@@ -194,15 +195,15 @@ export function TourGapScheduleModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[760px] w-[95vw] !p-0 !gap-0 !overflow-hidden rounded-card bg-card border-border shadow-card-large font-sans flex flex-col h-[680px] max-h-[90vh]">
+      <DialogContent className="max-w-[760px] w-[95vw] !p-0 !gap-0 !overflow-hidden rounded-[20px] bg-white border border-[#F5F5F5] shadow-2xl font-sans flex flex-col h-[680px] max-h-[90vh]">
         {/* Header */}
-        <DialogHeader className="px-xl py-lg border-b border-border bg-card flex flex-row items-center justify-between space-y-0 text-left shrink-0">
-          <div className="flex items-center gap-md">
+        <DialogHeader className="px-6 py-4.5 border-b border-[#F5F5F5] bg-white flex flex-row items-center justify-between space-y-0 text-left shrink-0">
+          <div className="flex items-center gap-3">
             <div
-              className={`size-9 rounded-compact flex items-center justify-center shrink-0 ${
+              className={`size-9 rounded-full flex items-center justify-center shrink-0 ${
                 analysis.isCompliant
-                  ? "bg-success-light text-success-dark"
-                  : "bg-error-light text-error-dark"
+                  ? "bg-[#E3F7EC] text-[#0B4627]"
+                  : "bg-[#FFEBEC] text-[#FB3748]"
               }`}
             >
               {analysis.isCompliant ? (
@@ -212,118 +213,141 @@ export function TourGapScheduleModal({
               )}
             </div>
             <div>
-              <DialogTitle className="font-aeonik-medium text-label-lg text-foreground tracking-[-0.006em]">
+              <DialogTitle className="font-aeonik-medium text-[17px] text-[#171717] leading-[22px]">
                 14-Day Tour Gap Compliance Checker
               </DialogTitle>
-              <p className="text-paragraph-xs text-muted-foreground mt-xxs">
-                {migrantName ? `Itinerary validation for ${migrantName}` : "UKVI Appendix Creative Worker tour schedule rules"}
+              <p className="text-[12px] text-[#7B7B7B] mt-0.5">
+                {migrantName ? `Itinerary validation for ${migrantName}` : "UKVI Appendix Creative Worker & Temporary Work rules"}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-xs">
+          <div className="flex items-center gap-2">
             <span
-              className={`text-label-compact px-sm py-xxs rounded-compact font-medium ${
+              className={`px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${
                 analysis.isCompliant
-                  ? "bg-success-light text-success-dark"
-                  : "bg-error-light text-error-dark"
+                  ? "bg-[#E3F7EC] text-[#0B4627]"
+                  : "bg-[#FFEBEC] text-[#FB3748]"
               }`}
             >
               {analysis.isCompliant
-                ? "100% Compliant (All gaps ≤ 14 days)"
+                ? "100% Compliant"
                 : `${analysis.breachCount} Tour Gap Breach${analysis.breachCount === 1 ? "" : "es"}`}
             </span>
           </div>
         </DialogHeader>
 
-        {/* Tab Navigation */}
-        <div className="px-xl flex items-center gap-lg border-b border-border bg-neutral-50 h-[44px] shrink-0">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setActiveTab("schedule")}
-            className={`h-full text-label-sm font-medium border-b-2 rounded-none px-0 cursor-pointer ${
-              activeTab === "schedule"
-                ? "border-foreground text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <RiCalendarEventLine className="size-4 mr-1.5" />
-            Schedule Timeline ({events.length})
-          </Button>
+        {/* Tab Navigation Segmented Pill */}
+        <div className="px-6 py-2.5 bg-white border-b border-[#F5F5F5] flex items-center justify-between shrink-0">
+          <div className="flex p-1 bg-[#F5F5F5] rounded-full text-[12px] font-medium">
+            <button
+              type="button"
+              onClick={() => setActiveTab("schedule")}
+              className={`px-3.5 py-1 rounded-full transition-all cursor-pointer border-0 flex items-center gap-1.5 ${
+                activeTab === "schedule"
+                  ? "bg-white text-[#171717] shadow-2xs font-semibold"
+                  : "text-[#7B7B7B] hover:text-[#171717]"
+              }`}
+            >
+              <RiCalendarEventLine className="size-3.5" />
+              <span>Timeline ({events.length})</span>
+            </button>
 
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setActiveTab("add")}
-            className={`h-full text-label-sm font-medium border-b-2 rounded-none px-0 cursor-pointer ${
-              activeTab === "add"
-                ? "border-foreground text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <RiAddLine className="size-4 mr-1.5" />
-            Add Engagement
-          </Button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("add")}
+              className={`px-3.5 py-1 rounded-full transition-all cursor-pointer border-0 flex items-center gap-1.5 ${
+                activeTab === "add"
+                  ? "bg-white text-[#171717] shadow-2xs font-semibold"
+                  : "text-[#7B7B7B] hover:text-[#171717]"
+              }`}
+            >
+              <RiAddLine className="size-3.5" />
+              <span>Add Engagement</span>
+            </button>
 
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setActiveTab("upload")}
-            className={`h-full text-label-sm font-medium border-b-2 rounded-none px-0 cursor-pointer ${
-              activeTab === "upload"
-                ? "border-foreground text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <RiUpload2Line className="size-4 mr-1.5" />
-            Upload CSV / Spreadsheet
-          </Button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("upload")}
+              className={`px-3.5 py-1 rounded-full transition-all cursor-pointer border-0 flex items-center gap-1.5 ${
+                activeTab === "upload"
+                  ? "bg-white text-[#171717] shadow-2xs font-semibold"
+                  : "text-[#7B7B7B] hover:text-[#171717]"
+              }`}
+            >
+              <RiUpload2Line className="size-3.5" />
+              <span>Upload CSV / Sheet</span>
+            </button>
+          </div>
         </div>
 
         {/* Content Body */}
-        <div className="p-xl flex-1 overflow-y-auto flex flex-col gap-lg bg-card">
-          {/* Top Metrics Cards */}
-          <div className="grid grid-cols-4 gap-md shrink-0">
-            <div className="p-md rounded-input bg-neutral-50 border border-border flex flex-col">
-              <span className="text-subheading-2xs text-muted-foreground uppercase">Engagements</span>
-              <span className="text-h6-title font-medium text-foreground mt-xxs">{analysis.totalEvents}</span>
+        <div className="p-6 flex-1 overflow-y-auto flex flex-col gap-4 bg-white">
+          {/* Top Metrics Cards (Sleek borderless background cards) */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 shrink-0">
+            <div className="p-3 rounded-[12px] bg-[#F9F9F9] flex flex-col justify-between h-[74px] relative">
+              <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B]">Engagements</span>
+              <RiCalendarEventLine className="size-4 text-[#A4A4A4] absolute top-3 right-3" />
+              <div className="flex items-baseline gap-1">
+                <span className="font-aeonik-medium text-[20px] font-medium text-[#171717]">{analysis.totalEvents}</span>
+                <span className="text-[12px] text-[#7B7B7B]">stops</span>
+              </div>
             </div>
-            <div className="p-md rounded-input bg-neutral-50 border border-border flex flex-col">
-              <span className="text-subheading-2xs text-muted-foreground uppercase">Tour Duration</span>
-              <span className="text-h6-title font-medium text-foreground mt-xxs">{analysis.totalTourDays} days</span>
+
+            <div className="p-3 rounded-[12px] bg-[#F9F9F9] flex flex-col justify-between h-[74px] relative">
+              <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B]">Tour Duration</span>
+              <RiRouteLine className="size-4 text-[#A4A4A4] absolute top-3 right-3" />
+              <div className="flex items-baseline gap-1">
+                <span className="font-aeonik-medium text-[20px] font-medium text-[#171717]">{analysis.totalTourDays}</span>
+                <span className="text-[12px] text-[#7B7B7B]">days</span>
+              </div>
             </div>
-            <div className="p-md rounded-input bg-neutral-50 border border-border flex flex-col">
-              <span className="text-subheading-2xs text-muted-foreground uppercase">Max Gap Found</span>
+
+            <div className="p-3 rounded-[12px] bg-[#F9F9F9] flex flex-col justify-between h-[74px] relative">
+              <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B]">Max Gap Found</span>
+              <RiTimer2Line
+                className={`size-4 absolute top-3 right-3 ${
+                  analysis.maxGapDays > MAX_ALLOWED_GAP_DAYS ? "text-[#FB3748]" : "text-[#A4A4A4]"
+                }`}
+              />
+              <div className="flex items-baseline gap-1">
+                <span
+                  className={`font-aeonik-medium text-[20px] font-medium ${
+                    analysis.maxGapDays > MAX_ALLOWED_GAP_DAYS ? "text-[#FB3748]" : "text-[#171717]"
+                  }`}
+                >
+                  {analysis.maxGapDays}
+                </span>
+                <span className="text-[12px] text-[#7B7B7B]">days</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-[12px] bg-[#F9F9F9] flex flex-col justify-between h-[74px] relative">
+              <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B]">14-Day Limit</span>
+              <RiShieldCheckLine
+                className={`size-4 absolute top-3 right-3 ${
+                  analysis.isCompliant ? "text-[#1FC16B]" : "text-[#FB3748]"
+                }`}
+              />
               <span
-                className={`text-h6-title font-medium mt-xxs ${
-                  analysis.maxGapDays > MAX_ALLOWED_GAP_DAYS ? "text-error-dark" : "text-foreground"
+                className={`font-aeonik-medium text-[14px] font-semibold mt-auto ${
+                  analysis.isCompliant ? "text-[#0B4627]" : "text-[#FB3748]"
                 }`}
               >
-                {analysis.maxGapDays} days
-              </span>
-            </div>
-            <div className="p-md rounded-input bg-neutral-50 border border-border flex flex-col">
-              <span className="text-subheading-2xs text-muted-foreground uppercase">14-Day Status</span>
-              <span
-                className={`text-label-md font-medium mt-xxs ${
-                  analysis.isCompliant ? "text-success-dark" : "text-error-dark"
-                }`}
-              >
-                {analysis.isCompliant ? "Passed" : "Breach (Action Req)"}
+                {analysis.isCompliant ? "Passed (≤ 14d)" : "Breach (Action Req)"}
               </span>
             </div>
           </div>
 
           {/* Compliance Warning Banner if Breach */}
           {!analysis.isCompliant && (
-            <div className="p-md rounded-input bg-error-light border border-error-dark/30 flex items-start gap-md text-paragraph-xs">
-              <RiAlertLine className="size-5 text-error-dark shrink-0 mt-0.5" />
+            <div className="p-3.5 rounded-[12px] bg-[#FFEBEC] flex items-start gap-3 text-[12px]">
+              <RiAlertLine className="size-4.5 text-[#FB3748] shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="font-semibold text-error-dark">
-                  UKVI 14-Day Tour Gap Limit Breach Detected ({analysis.breachCount} break{analysis.breachCount === 1 ? "" : "s"} &gt; 14 days)
+                <p className="font-semibold text-[#681219]">
+                  UKVI 14-Day Tour Gap Limit Breach ({analysis.breachCount} gap{analysis.breachCount === 1 ? "" : "s"} &gt; 14 days)
                 </p>
-                <p className="text-foreground/80 mt-xxs">
+                <p className="text-[#681219]/80 mt-0.5 leading-[16px]">
                   Under Home Office Appendix Creative Worker rules, gaps between engagements cannot exceed 14 consecutive calendar days. Please insert intermediate rehearsal/filming dates or split this itinerary into separate CoS applications.
                 </p>
               </div>
@@ -332,12 +356,12 @@ export function TourGapScheduleModal({
 
           {/* TAB 1: SCHEDULE TIMELINE */}
           {activeTab === "schedule" && (
-            <div className="flex flex-col gap-sm">
+            <div className="flex flex-col gap-2">
               {events.length === 0 ? (
-                <div className="py-12 flex flex-col items-center justify-center text-center gap-sm border border-dashed border-border rounded-card">
-                  <RiCalendarEventLine className="size-8 text-neutral-400" />
-                  <p className="text-label-md font-medium text-foreground">No engagements on schedule</p>
-                  <p className="text-paragraph-xs text-muted-foreground">
+                <div className="py-12 flex flex-col items-center justify-center text-center gap-2 bg-[#F9F9F9] rounded-[16px] p-6">
+                  <RiCalendarEventLine className="size-8 text-[#A4A4A4]" />
+                  <p className="text-[15px] font-aeonik-medium text-[#171717]">No engagements on schedule</p>
+                  <p className="text-[12px] text-[#7B7B7B]">
                     Add engagements manually or upload an itinerary CSV/Spreadsheet.
                   </p>
                   <Button
@@ -345,47 +369,47 @@ export function TourGapScheduleModal({
                     variant="outline"
                     size="sm"
                     onClick={() => setActiveTab("add")}
-                    className="mt-xs text-xs"
+                    className="mt-2 text-xs h-8 rounded-full"
                   >
                     <RiAddLine className="size-4 mr-1" />
                     Add First Engagement
                   </Button>
                 </div>
               ) : (
-                <div className="flex flex-col gap-md">
+                <div className="flex flex-col gap-2.5">
                   {analysis.events.map((ev, idx) => {
                     const followingGap = analysis.gaps[idx];
 
                     return (
                       <React.Fragment key={ev.id}>
                         {/* Event Card */}
-                        <div className="p-lg rounded-card bg-neutral-50 border border-border flex items-center justify-between gap-md">
-                          <div className="flex items-start gap-md min-w-0 flex-1">
-                            <div className="size-8 rounded-compact bg-brand-light text-brand-dark flex items-center justify-center shrink-0 mt-0.5 text-xs font-semibold">
-                              #{idx + 1}
+                        <div className="p-3.5 rounded-[12px] bg-[#F9F9F9] hover:bg-[#F5F5F5] transition-colors flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className="size-7 rounded-full bg-white shadow-2xs text-[#171717] flex items-center justify-center shrink-0 text-[11px] font-semibold">
+                              {idx + 1}
                             </div>
                             <div className="flex flex-col min-w-0 flex-1">
-                              <div className="flex items-center gap-xs flex-wrap">
-                                <span className="text-label-sm font-medium text-foreground truncate">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-aeonik-medium text-[14px] text-[#171717] truncate">
                                   {ev.title}
                                 </span>
-                                <span className="text-[11px] font-medium bg-neutral-200 text-neutral-700 px-xs py-0.5 rounded-compact">
+                                <span className="text-[10px] font-bold uppercase tracking-wider bg-neutral-200/70 text-neutral-700 px-2 py-0.5 rounded-full">
                                   {ev.engagementType || "Performance"}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-md text-paragraph-xs text-muted-foreground mt-xxs flex-wrap">
-                                <span className="flex items-center gap-xs">
-                                  <RiTimeLine className="size-3.5" />
+                              <div className="flex items-center gap-3 text-[12px] text-[#7B7B7B] mt-0.5 flex-wrap">
+                                <span className="flex items-center gap-1">
+                                  <RiTimeLine className="size-3.5 text-[#A4A4A4]" />
                                   {ev.startDate} {ev.endDate && ev.endDate !== ev.startDate ? `to ${ev.endDate}` : ""}
                                 </span>
                                 {ev.venue && (
-                                  <span className="flex items-center gap-xs truncate">
-                                    <RiMapPinLine className="size-3.5" />
+                                  <span className="flex items-center gap-1 truncate">
+                                    <RiMapPinLine className="size-3.5 text-[#A4A4A4]" />
                                     {ev.venue}, {ev.city || "UK"}
                                   </span>
                                 )}
                                 {ev.fee && (
-                                  <span className="text-foreground font-medium">
+                                  <span className="text-[#171717] font-medium">
                                     Fee: {ev.fee}
                                   </span>
                                 )}
@@ -399,7 +423,7 @@ export function TourGapScheduleModal({
                             size="icon-xs"
                             aria-label={`Remove ${ev.title}`}
                             onClick={() => handleDeleteEvent(ev.id)}
-                            className="size-7 text-neutral-400 hover:text-error-dark hover:bg-error-light rounded-compact transition-colors p-0 cursor-pointer"
+                            className="size-7 text-[#A4A4A4] hover:text-[#FB3748] hover:bg-[#FFEBEC] rounded-full transition-colors p-0 cursor-pointer"
                           >
                             <RiDeleteBinLine className="size-4" />
                           </Button>
@@ -407,14 +431,14 @@ export function TourGapScheduleModal({
 
                         {/* Connector / Gap Node */}
                         {followingGap && (
-                          <div className="flex items-center justify-center my-xxs">
+                          <div className="flex items-center justify-center my-0.5">
                             <div
-                              className={`px-md py-xs rounded-full border text-[11px] font-medium flex items-center gap-xs transition-all ${
+                              className={`px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1.5 transition-all ${
                                 followingGap.isBreach
-                                  ? "bg-error-light border-error-dark text-error-dark font-bold shadow-sm animate-pulse"
+                                  ? "bg-[#FFEBEC] text-[#FB3748] shadow-2xs font-bold animate-pulse"
                                   : followingGap.isWarning
-                                  ? "bg-warning-light border-warning-dark text-warning-dark"
-                                  : "bg-success-light/60 border-success-dark/30 text-success-dark"
+                                  ? "bg-[#FFFAEB] text-[#B45309]"
+                                  : "bg-[#E3F7EC] text-[#0B4627]"
                               }`}
                             >
                               {followingGap.isBreach ? (
@@ -424,10 +448,10 @@ export function TourGapScheduleModal({
                               )}
                               <span>
                                 {followingGap.gapDays === 0
-                                  ? "Continuous / Next Day (0 days gap)"
-                                  : `${followingGap.gapDays} day${followingGap.gapDays === 1 ? "" : "s"} gap ${
+                                  ? "Continuous / Next Day (0d gap)"
+                                  : `${followingGap.gapDays} day${followingGap.gapDays === 1 ? "" : "s"} break ${
                                       followingGap.isBreach
-                                        ? `— BREACH (> ${MAX_ALLOWED_GAP_DAYS} days max)`
+                                        ? `— BREACH (> ${MAX_ALLOWED_GAP_DAYS}d max)`
                                         : followingGap.isWarning
                                         ? "(Approaching 14-day limit)"
                                         : "(Compliant)"
@@ -446,94 +470,102 @@ export function TourGapScheduleModal({
 
           {/* TAB 2: ADD ENGAGEMENT FORM */}
           {activeTab === "add" && (
-            <form onSubmit={handleAddEvent} className="flex flex-col gap-md">
-              <div className="grid grid-cols-2 gap-md">
-                <div className="space-y-xxs">
-                  <Label htmlFor="ev-title" className="text-label-sm">Engagement Title *</Label>
+            <form onSubmit={handleAddEvent} className="flex flex-col gap-3.5 bg-[#F9F9F9] rounded-[16px] p-5">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="ev-title" className="text-[12px] font-medium text-[#171717]">Engagement Title *</Label>
                   <Input
                     id="ev-title"
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
                     placeholder="e.g. Manchester Arena Concert"
                     required
+                    className="bg-white border-0 shadow-2xs rounded-[10px] h-9 text-[13px]"
                   />
                 </div>
-                <div className="space-y-xxs">
-                  <Label htmlFor="ev-type" className="text-label-sm">Engagement Type</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="ev-type" className="text-[12px] font-medium text-[#171717]">Engagement Type</Label>
                   <Input
                     id="ev-type"
                     value={newType}
                     onChange={(e) => setNewType(e.target.value as any)}
                     placeholder="Performance / Rehearsal / Filming"
+                    className="bg-white border-0 shadow-2xs rounded-[10px] h-9 text-[13px]"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-md">
-                <div className="space-y-xxs">
-                  <Label htmlFor="ev-start" className="text-label-sm">Start Date *</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="ev-start" className="text-[12px] font-medium text-[#171717]">Start Date *</Label>
                   <Input
                     id="ev-start"
                     type="date"
                     value={newStartDate}
                     onChange={(e) => setNewStartDate(e.target.value)}
                     required
+                    className="bg-white border-0 shadow-2xs rounded-[10px] h-9 text-[13px]"
                   />
                 </div>
-                <div className="space-y-xxs">
-                  <Label htmlFor="ev-end" className="text-label-sm">End Date</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="ev-end" className="text-[12px] font-medium text-[#171717]">End Date</Label>
                   <Input
                     id="ev-end"
                     type="date"
                     value={newEndDate}
                     onChange={(e) => setNewEndDate(e.target.value)}
+                    className="bg-white border-0 shadow-2xs rounded-[10px] h-9 text-[13px]"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-md">
-                <div className="space-y-xxs">
-                  <Label htmlFor="ev-venue" className="text-label-sm">Venue / Studio</Label>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="ev-venue" className="text-[12px] font-medium text-[#171717]">Venue / Studio</Label>
                   <Input
                     id="ev-venue"
                     value={newVenue}
                     onChange={(e) => setNewVenue(e.target.value)}
                     placeholder="e.g. AO Arena"
+                    className="bg-white border-0 shadow-2xs rounded-[10px] h-9 text-[13px]"
                   />
                 </div>
-                <div className="space-y-xxs">
-                  <Label htmlFor="ev-city" className="text-label-sm">City</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="ev-city" className="text-[12px] font-medium text-[#171717]">City</Label>
                   <Input
                     id="ev-city"
                     value={newCity}
                     onChange={(e) => setNewCity(e.target.value)}
                     placeholder="e.g. Manchester"
+                    className="bg-white border-0 shadow-2xs rounded-[10px] h-9 text-[13px]"
                   />
                 </div>
-                <div className="space-y-xxs">
-                  <Label htmlFor="ev-fee" className="text-label-sm">Fee / Pay</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="ev-fee" className="text-[12px] font-medium text-[#171717]">Fee / Pay</Label>
                   <Input
                     id="ev-fee"
                     value={newFee}
                     onChange={(e) => setNewFee(e.target.value)}
                     placeholder="e.g. £2,500"
+                    className="bg-white border-0 shadow-2xs rounded-[10px] h-9 text-[13px]"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-md mt-sm">
+              <div className="flex justify-end gap-2.5 mt-2">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={() => setActiveTab("schedule")}
+                  className="rounded-full text-[13px]"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   size="sm"
-                  className="bg-brand-medium hover:bg-brand-dark text-white gap-xs"
+                  className="bg-brand-medium hover:bg-brand-dark text-white gap-1.5 rounded-full text-[13px]"
                 >
                   <RiAddLine className="size-4" />
                   Add &amp; Recalculate Gaps
@@ -544,18 +576,18 @@ export function TourGapScheduleModal({
 
           {/* TAB 3: UPLOAD CSV / SPREADSHEET */}
           {activeTab === "upload" && (
-            <div className="flex flex-col gap-md">
-              <div className="p-xl border-2 border-dashed border-neutral-300 rounded-card flex flex-col items-center justify-center text-center gap-sm bg-neutral-50/50 hover:bg-neutral-50 transition-colors">
+            <div className="flex flex-col gap-4">
+              <div className="p-8 bg-[#F9F9F9] rounded-[16px] flex flex-col items-center justify-center text-center gap-2">
                 <RiUpload2Line className="size-8 text-brand-medium" />
                 <div>
-                  <p className="text-label-md font-medium text-foreground">
+                  <p className="font-aeonik-medium text-[15px] text-[#171717]">
                     Upload Production Itinerary / Tour Schedule
                   </p>
-                  <p className="text-paragraph-xs text-muted-foreground mt-xxs">
-                    Upload an ENT IMM schedule, tour CSV, or Excel export to automatically detect tour gap limits.
+                  <p className="text-[12px] text-[#7B7B7B] mt-0.5">
+                    Upload an ENT IMM schedule, tour CSV, or spreadsheet export to automatically detect tour gaps.
                   </p>
                 </div>
-                <div className="flex flex-col items-center gap-sm">
+                <div className="flex flex-col items-center gap-2 mt-2">
                   <Input
                     type="file"
                     ref={fileInputRef}
@@ -568,27 +600,27 @@ export function TourGapScheduleModal({
                     variant="outline"
                     size="sm"
                     onClick={() => fileInputRef.current?.click()}
-                    className="gap-xs bg-white cursor-pointer"
+                    className="gap-1.5 bg-white cursor-pointer rounded-full h-8 text-[12px] shadow-2xs"
                   >
-                    <RiFileLine className="size-4" />
+                    <RiFileLine className="size-3.5" />
                     Select Schedule File (.csv)
                   </Button>
                 </div>
               </div>
 
-              <div className="space-y-xs">
-                <Label className="text-label-sm">Or Paste CSV Schedule Data</Label>
+              <div className="space-y-1.5 bg-[#F9F9F9] rounded-[16px] p-4">
+                <Label className="text-[12px] font-medium text-[#171717]">Or Paste CSV Schedule Data</Label>
                 <Textarea
                   value={csvInput}
                   onChange={(e) => setCsvInput(e.target.value)}
                   placeholder={`Title,Start Date,End Date,Venue,City,Type,Fee\nLondon Show,2026-09-01,2026-09-03,O2 Arena,London,Performance,£2500\nManchester Show,2026-09-12,2026-09-14,AO Arena,Manchester,Performance,£2200`}
-                  className="w-full h-[120px] p-md rounded-input border border-border bg-card text-paragraph-xs font-mono resize-none focus:outline-none focus:border-brand-medium"
+                  className="w-full h-[100px] p-3 rounded-[10px] bg-white border-0 shadow-2xs text-[12px] font-mono resize-none focus:outline-none"
                 />
                 <Button
                   type="button"
                   size="sm"
                   onClick={handleCsvImport}
-                  className="w-full bg-brand-medium hover:bg-brand-dark text-white gap-xs"
+                  className="w-full bg-brand-medium hover:bg-brand-dark text-white gap-1.5 rounded-full text-[13px] h-8.5 mt-1"
                 >
                   <RiCheckLine className="size-4" />
                   Parse &amp; Validate Tour Gaps
@@ -599,19 +631,19 @@ export function TourGapScheduleModal({
         </div>
 
         {/* Footer */}
-        <div className="px-xl py-lg border-t border-border bg-neutral-50 flex flex-row items-center justify-between w-full shrink-0">
-          <div className="text-paragraph-xs text-muted-foreground flex items-center gap-xs">
-            <span>UKVI Appendix Creative Worker continuous tour limit:</span>
-            <span className="font-semibold text-foreground">14 calendar days maximum</span>
+        <div className="px-6 py-3.5 border-t border-[#F5F5F5] bg-[#FAFAFA] flex flex-row items-center justify-between w-full shrink-0">
+          <div className="text-[12px] text-[#7B7B7B] flex items-center gap-1.5">
+            <span>UKVI Appendix Creative Worker tour limit:</span>
+            <span className="font-semibold text-[#171717]">14 calendar days maximum</span>
           </div>
 
-          <div className="flex items-center gap-md">
+          <div className="flex items-center gap-2.5">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={() => onOpenChange(false)}
-              className="h-9 px-lg rounded-button text-[13px] font-medium border-neutral-300"
+              className="h-8.5 px-4 rounded-full text-[13px] font-medium text-[#5C5C5C] hover:text-[#171717]"
             >
               Close
             </Button>
@@ -619,10 +651,10 @@ export function TourGapScheduleModal({
               type="button"
               size="sm"
               onClick={handleSaveAndApply}
-              className={`h-9 px-lg rounded-button text-[13px] font-medium gap-xs ${
+              className={`h-8.5 px-4.5 rounded-full text-[13px] font-medium gap-1.5 ${
                 analysis.isCompliant
                   ? "bg-brand-medium hover:bg-brand-dark text-white"
-                  : "bg-error-dark hover:bg-error-dark/90 text-white"
+                  : "bg-[#FB3748] hover:bg-[#FB3748]/90 text-white"
               }`}
             >
               <RiCheckLine className="size-4" />
