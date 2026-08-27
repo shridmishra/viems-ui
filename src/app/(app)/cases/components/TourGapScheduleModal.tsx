@@ -217,22 +217,20 @@ export function TourGapScheduleModal({
                 14-Day Tour Gap Compliance Checker
               </DialogTitle>
               <p className="text-[12px] text-[#7B7B7B] mt-0.5">
-                {migrantName ? `Itinerary validation for ${migrantName}` : "UKVI Appendix Creative Worker & Temporary Work rules"}
+                {migrantName ? `Itinerary validation for ${migrantName}` : "Creative Worker concession · Max 14-day gap"}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <span
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${
+              className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                 analysis.isCompliant
                   ? "bg-[#E3F7EC] text-[#0B4627]"
                   : "bg-[#FFEBEC] text-[#FB3748]"
               }`}
             >
-              {analysis.isCompliant
-                ? "100% Compliant"
-                : `${analysis.breachCount} Tour Gap Breach${analysis.breachCount === 1 ? "" : "es"}`}
+              {analysis.isCompliant ? "COMPLIANT" : "AT RISK"}
             </span>
           </div>
         </DialogHeader>
