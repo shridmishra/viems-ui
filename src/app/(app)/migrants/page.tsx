@@ -30,6 +30,7 @@ import { MarkVisaRefusedModal } from "../cases/components/MarkVisaRefusedModal";
 import { ArchiveCaseModal } from "../cases/components/ArchiveCaseModal";
 import { DeleteCaseModal } from "../cases/components/DeleteCaseModal";
 import { CaseActionModal } from "../cases/components/CaseActionModal";
+import { HighRiskBadge } from "../cases/components/HighRiskBadge";
 import { ImportMigrantsModal } from "../dashboard/components/ImportMigrantsModal";
 import {
   DropdownMenu,
@@ -662,9 +663,12 @@ export default function MigrantsPage() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col gap-[2px] min-w-0">
-                        <span className="text-[14px] font-medium leading-[20px] tracking-[-0.006em] text-[#171717] truncate font-sans">
-                          {migrant.name}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                          <span className="text-[14px] font-medium leading-[20px] tracking-[-0.006em] text-[#171717] truncate font-sans">
+                            {migrant.name}
+                          </span>
+                          <HighRiskBadge caseData={migrant} migrantName={migrant.name} />
+                        </div>
                         <span className="text-[12px] font-normal leading-[16px] text-[#5C5C5C] truncate font-sans">
                           {migrant.group}
                         </span>
