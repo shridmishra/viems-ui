@@ -54,7 +54,7 @@ export function CaseRiskModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[620px] w-[95vw] !p-0 !gap-0 !overflow-hidden rounded-[20px] bg-white border border-[#F5F5F5] shadow-2xl font-sans flex flex-col max-h-[85vh]">
+      <DialogContent className="max-w-[640px] w-[95vw] !p-0 !gap-0 !overflow-hidden rounded-[20px] bg-white border border-[#F5F5F5] shadow-2xl font-sans flex flex-col max-h-[85vh]">
         {/* Header */}
         <DialogHeader className="px-6 py-4.5 pr-14 border-b border-[#F5F5F5] bg-white flex flex-row items-center justify-between space-y-0 text-left shrink-0">
           <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -93,7 +93,7 @@ export function CaseRiskModal({
                 </span>
               </div>
               <p className="text-[12px] text-[#7B7B7B] mt-0.5">
-                Evaluation for {name} &bull; Home Office compliance rules
+                Evaluation for {name} · UKVI Home Office compliance rules
               </p>
             </div>
           </div>
@@ -113,7 +113,7 @@ export function CaseRiskModal({
           >
             <RiInformationLine className="size-5 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="font-semibold">
+              <p className="font-semibold text-[13px]">
                 {assessment.isHighRisk
                   ? "High-Risk Case Detected: Immediate Action Required Prior to Production"
                   : assessment.isMediumRisk
@@ -150,18 +150,20 @@ export function CaseRiskModal({
                   return (
                     <div
                       key={factor.id}
-                      className="p-4 rounded-[14px] bg-[#F9F9F9] border border-neutral-200/50 flex flex-col gap-2 transition-all hover:bg-[#F5F5F5]"
+                      className="p-4 rounded-[14px] bg-[#F9F9F9] border border-neutral-200/50 flex flex-col gap-2.5 transition-all hover:bg-[#F5F5F5]"
                     >
                       {/* Factor Header */}
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
-                          {factor.code === "PASSPORT_EXPIRY" ? (
-                            <RiPassportLine className="size-4 text-[#FB3748] shrink-0" />
-                          ) : factor.code === "IMMINENT_COS_START" ? (
-                            <RiCalendarEventLine className="size-4 text-[#FB3748] shrink-0" />
-                          ) : (
-                            <RiAlertLine className="size-4 text-[#FB3748] shrink-0" />
-                          )}
+                          <div className="size-7 rounded-full bg-white text-[#FB3748] shadow-2xs flex items-center justify-center shrink-0">
+                            {factor.code === "PASSPORT_EXPIRY" ? (
+                              <RiPassportLine className="size-4" />
+                            ) : factor.code === "IMMINENT_COS_START" ? (
+                              <RiCalendarEventLine className="size-4" />
+                            ) : (
+                              <RiAlertLine className="size-4" />
+                            )}
+                          </div>
                           <span className="font-aeonik-medium text-[14px] text-[#171717] truncate">
                             {factor.title}
                           </span>
@@ -183,37 +185,35 @@ export function CaseRiskModal({
                         {factor.description}
                       </p>
 
-                      {/* Recommended Remediation */}
-                      <div className="bg-white rounded-[10px] p-2.5 text-[11px] text-[#171717] border border-neutral-200/50 flex items-start justify-between gap-2 mt-0.5">
-                        <div className="flex items-start gap-1.5 flex-1">
+                      {/* Recommended Remediation Action Box */}
+                      <div className="bg-white rounded-[10px] p-3 text-[12px] text-[#171717] border border-neutral-200/50 flex items-center justify-between gap-3 shadow-2xs">
+                        <div className="flex items-start gap-1.5 flex-1 min-w-0">
                           <span className="font-semibold text-brand-dark shrink-0">Action:</span>
-                          <span>{factor.recommendation}</span>
+                          <span className="text-[#171717]">{factor.recommendation}</span>
                         </div>
                         {factor.code === "PASSPORT_EXPIRY" && (
                           <Button
                             type="button"
-                            variant="ghost"
                             size="sm"
                             onClick={() => handleSendReminder(factor)}
-                            className="h-6 px-2 text-[11px] font-medium text-brand-medium hover:bg-brand-light rounded-full shrink-0 gap-1"
+                            className="h-7 px-3 text-[12px] font-medium bg-brand-medium hover:bg-brand-dark text-white rounded-full shrink-0 gap-1 shadow-2xs cursor-pointer"
                           >
-                            <RiMailSendLine className="size-3" />
-                            <span>Remind</span>
+                            <RiMailSendLine className="size-3.5" />
+                            <span>Remind Migrant</span>
                           </Button>
                         )}
                         {factor.code === "TOUR_GAP_BREACH" && onNavigateToSchedule && (
                           <Button
                             type="button"
-                            variant="ghost"
                             size="sm"
                             onClick={() => {
                               onOpenChange(false);
                               onNavigateToSchedule();
                             }}
-                            className="h-6 px-2 text-[11px] font-medium text-brand-medium hover:bg-brand-light rounded-full shrink-0 gap-1"
+                            className="h-7 px-3 text-[12px] font-medium bg-brand-medium hover:bg-brand-dark text-white rounded-full shrink-0 gap-1 shadow-2xs cursor-pointer"
                           >
-                            <span>Inspect</span>
-                            <RiArrowRightLine className="size-3" />
+                            <span>Inspect Schedule</span>
+                            <RiArrowRightLine className="size-3.5" />
                           </Button>
                         )}
                       </div>
@@ -227,7 +227,7 @@ export function CaseRiskModal({
 
         {/* Footer */}
         <div className="px-6 py-3.5 border-t border-[#F5F5F5] bg-[#FAFAFA] flex items-center justify-between shrink-0">
-          <span className="text-[11px] text-[#7B7B7B]">
+          <span className="text-[12px] text-[#7B7B7B]">
             Automated UKVI compliance heuristic check
           </span>
           <Button
