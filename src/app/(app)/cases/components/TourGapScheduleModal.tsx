@@ -197,8 +197,8 @@ export function TourGapScheduleModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[760px] w-[95vw] !p-0 !gap-0 !overflow-hidden rounded-[20px] bg-white border border-[#F5F5F5] shadow-2xl font-sans flex flex-col h-[680px] max-h-[90vh]">
         {/* Header */}
-        <DialogHeader className="px-6 py-4.5 border-b border-[#F5F5F5] bg-white flex flex-row items-center justify-between space-y-0 text-left shrink-0">
-          <div className="flex items-center gap-3">
+        <DialogHeader className="px-6 py-4.5 pr-14 border-b border-[#F5F5F5] bg-white flex flex-row items-center justify-between space-y-0 text-left shrink-0">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             <div
               className={`size-9 rounded-full flex items-center justify-center shrink-0 ${
                 analysis.isCompliant
@@ -212,26 +212,25 @@ export function TourGapScheduleModal({
                 <RiAlertLine className="size-5" />
               )}
             </div>
-            <div>
-              <DialogTitle className="font-aeonik-medium text-[17px] text-[#171717] leading-[22px]">
-                14-Day Tour Gap Compliance Checker
-              </DialogTitle>
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <DialogTitle className="font-aeonik-medium text-[17px] text-[#171717] leading-[22px]">
+                  14-Day Tour Gap Compliance Checker
+                </DialogTitle>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                    analysis.isCompliant
+                      ? "bg-[#E3F7EC] text-[#0B4627]"
+                      : "bg-[#FFEBEC] text-[#FB3748]"
+                  }`}
+                >
+                  {analysis.isCompliant ? "COMPLIANT" : "AT RISK"}
+                </span>
+              </div>
               <p className="text-[12px] text-[#7B7B7B] mt-0.5">
                 {migrantName ? `Itinerary validation for ${migrantName}` : "Creative Worker concession · Max 14-day gap"}
               </p>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span
-              className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                analysis.isCompliant
-                  ? "bg-[#E3F7EC] text-[#0B4627]"
-                  : "bg-[#FFEBEC] text-[#FB3748]"
-              }`}
-            >
-              {analysis.isCompliant ? "COMPLIANT" : "AT RISK"}
-            </span>
           </div>
         </DialogHeader>
 
