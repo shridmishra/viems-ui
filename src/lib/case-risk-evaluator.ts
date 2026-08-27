@@ -174,6 +174,18 @@ export function evaluateCaseRisk(caseOrMigrantData: any): CaseRiskAssessment {
     } catch (e) {}
   }
 
+  // ─── RULE 4: Missing Mandatory Passport / Appendix D Documents ───────────
+  if ((caseOrMigrantData?.action === "Upload passport" || (caseOrMigrantData?.missingDocsCount && caseOrMigrantData?.missingDocsCount > 0)) && !isClosedOrRefused) {
+    factors.push({
+      id: "rf-missing-passport",
+      code: "MISSING_DOCUMENTS",
+      severity: "HIGH",
+      title: "Passport Record Missing",
+      description: "Passport scan has not been verified in VIEMS. Mandatory pre-CoS record requirement unfulfilled.",
+      recommendation: "Request migrant to upload photo/scan of passport biodata page immediately.",
+    });
+  }
+
   // ─── Compute Overall Risk Score & Classification ──────────────────────────
   const highCount = factors.filter((f) => f.severity === "HIGH").length;
   const mediumCount = factors.filter((f) => f.severity === "MEDIUM").length;
