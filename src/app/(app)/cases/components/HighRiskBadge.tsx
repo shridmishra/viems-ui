@@ -51,20 +51,11 @@ export function HighRiskBadge({
         } ${className}`}
       >
         {assessment.isHighRisk ? (
-          <>
-            <span className="text-[10px]">▲</span>
-            <span>HIGH RISK</span>
-          </>
+          <span>HIGH RISK</span>
         ) : assessment.isMediumRisk ? (
-          <>
-            <span className="text-[10px]">▲</span>
-            <span>MED RISK</span>
-          </>
+          <span>MED RISK</span>
         ) : (
-          <>
-            <RiShieldCheckLine className="size-3 text-[#1FC16B]" />
-            <span>LOW RISK</span>
-          </>
+          <span>LOW RISK</span>
         )}
       </button>
 

@@ -513,7 +513,7 @@ export function ComplianceTab({
                 </span>
               </div>
               <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                className={`px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider ${
                   highCount > 0
                     ? "bg-[#FFEBEC] text-[#FB3748]"
                     : medCount > 0
@@ -521,7 +521,7 @@ export function ComplianceTab({
                     : "bg-[#E3F7EC] text-[#0B4627]"
                 }`}
               >
-                {highCount > 0 ? "▲ HIGH" : medCount > 0 ? "▲ MEDIUM" : "LOW"}
+                {highCount > 0 ? "HIGH" : medCount > 0 ? "MEDIUM" : "LOW"}
               </span>
             </div>
 

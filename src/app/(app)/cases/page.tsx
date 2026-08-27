@@ -1217,16 +1217,16 @@ export default function CasesPage() {
                 <button
                   type="button"
                   onClick={() => setFilterPanelOpen(!filterPanelOpen)}
-                  className={`size-8 rounded-[8px] flex items-center justify-center transition-all border-0 shadow-x-small cursor-pointer ${
+                  className={`h-8 ${activeFilterCount > 0 ? "px-2.5 gap-1.5" : "w-8"} rounded-[8px] flex items-center justify-center transition-all border-0 shadow-x-small cursor-pointer ${
                     activeFilterCount > 0
                       ? "bg-[#171717] text-white"
                       : "bg-white text-[#5C5C5C] hover:bg-neutral-50"
                   }`}
                   title="Open filters"
                 >
-                  <RiFilter3Line className="size-5 shrink-0" />
+                  <RiFilter3Line className="size-4.5 shrink-0" />
                   {activeFilterCount > 0 && (
-                    <span className="w-4 h-4 rounded-full bg-white text-[#171717] text-[10px] font-bold flex items-center justify-center">
+                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-white/20 text-white text-[11px] font-medium flex items-center justify-center">
                       {activeFilterCount}
                     </span>
                   )}
@@ -1625,7 +1625,7 @@ export default function CasesPage() {
                     : "bg-white text-[#171717] hover:bg-neutral-50"
                 }`}
               >
-                ▲ High Risk
+                High Risk
               </Button>
             </>
           )}
