@@ -63,7 +63,7 @@ export function TourGapCheckerCard({
   // Format date window cleanly
   const formattedDateWindow = React.useMemo(() => {
     if (!analysis.overallStartDate || !analysis.overallEndDate) {
-      return "No dates filed";
+      return "No dates";
     }
     const d1 = new Date(analysis.overallStartDate);
     const d2 = new Date(analysis.overallEndDate);
@@ -78,7 +78,7 @@ export function TourGapCheckerCard({
   return (
     <>
       <div
-        className={`bg-white border border-[#F5F5F5] rounded-[16px] p-5 shadow-[0px_1px_2px_rgba(10,13,20,0.03)] flex flex-col gap-4 font-sans ${className}`}
+        className={`bg-white border border-[#F5F5F5] rounded-[16px] p-5 shadow-[0px_1px_2px_rgba(10,13,20,0.03)] flex flex-col gap-3.5 font-sans ${className}`}
       >
         {/* Top Header */}
         <div className="flex items-center justify-between gap-4">
@@ -109,11 +109,11 @@ export function TourGapCheckerCard({
                       : "bg-[#FFEBEC] text-[#FB3748]"
                   }`}
                 >
-                  {analysis.isCompliant ? "Compliant" : `${analysis.breachCount} Limit Breach`}
+                  {analysis.isCompliant ? "COMPLIANT" : "AT RISK"}
                 </span>
               </div>
               <span className="text-[12px] text-[#7B7B7B] leading-[16px] mt-0.5">
-                UKVI Appendix Creative Worker &bull; Maximum 14 days between continuous engagements
+                Creative Worker concession · Max 14-day gap
               </span>
             </div>
           </div>
@@ -132,22 +132,22 @@ export function TourGapCheckerCard({
         {/* 4-Stat Metric Cards Grid with Top-Right Icons */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {/* Stat 1: Total Engagements */}
-          <div className="bg-[#F9F9F9] rounded-[10px] p-3 flex flex-col justify-between h-[76px] relative">
-            <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B] leading-[12px]">
+          <div className="bg-[#F9F9F9] rounded-[10px] p-3 flex flex-col justify-between h-[72px] relative">
+            <span className="text-[10px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B] leading-[12px]">
               Engagements
             </span>
             <RiCalendarEventLine className="size-4 text-[#A4A4A4] absolute top-3 right-3" />
             <div className="flex items-baseline gap-1">
-              <span className="font-aeonik-medium text-[20px] font-medium text-[#171717] leading-[26px]">
+              <span className="font-aeonik-medium text-[18px] font-medium text-[#171717] leading-[24px]">
                 {analysis.totalEvents}
               </span>
-              <span className="text-[12px] text-[#7B7B7B] font-normal">stops</span>
+              <span className="text-[11px] text-[#7B7B7B]">stops</span>
             </div>
           </div>
 
           {/* Stat 2: Longest Break */}
-          <div className="bg-[#F9F9F9] rounded-[10px] p-3 flex flex-col justify-between h-[76px] relative">
-            <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B] leading-[12px]">
+          <div className="bg-[#F9F9F9] rounded-[10px] p-3 flex flex-col justify-between h-[72px] relative">
+            <span className="text-[10px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B] leading-[12px]">
               Longest Break
             </span>
             <RiTimer2Line
@@ -157,19 +157,19 @@ export function TourGapCheckerCard({
             />
             <div className="flex items-baseline gap-1">
               <span
-                className={`font-aeonik-medium text-[20px] font-medium leading-[26px] ${
+                className={`font-aeonik-medium text-[18px] font-medium leading-[24px] ${
                   analysis.maxGapDays > MAX_ALLOWED_GAP_DAYS ? "text-[#FB3748]" : "text-[#171717]"
                 }`}
               >
                 {analysis.maxGapDays}
               </span>
-              <span className="text-[12px] text-[#7B7B7B] font-normal">days max</span>
+              <span className="text-[11px] text-[#7B7B7B]">days</span>
             </div>
           </div>
 
           {/* Stat 3: Tour Window */}
-          <div className="bg-[#F9F9F9] rounded-[10px] p-3 flex flex-col justify-between h-[76px] relative">
-            <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B] leading-[12px]">
+          <div className="bg-[#F9F9F9] rounded-[10px] p-3 flex flex-col justify-between h-[72px] relative">
+            <span className="text-[10px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B] leading-[12px]">
               Tour Window
             </span>
             <RiRouteLine className="size-4 text-[#A4A4A4] absolute top-3 right-3" />
@@ -178,15 +178,15 @@ export function TourGapCheckerCard({
                 {formattedDateWindow}
               </span>
               <span className="text-[11px] text-[#7B7B7B]">
-                {analysis.totalTourDays > 0 ? `${analysis.totalTourDays} days duration` : "Not set"}
+                {analysis.totalTourDays > 0 ? `${analysis.totalTourDays}d total` : "No dates"}
               </span>
             </div>
           </div>
 
           {/* Stat 4: Concession Status */}
-          <div className="bg-[#F9F9F9] rounded-[10px] p-3 flex flex-col justify-between h-[76px] relative">
-            <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B] leading-[12px]">
-              14-Day Limit Rule
+          <div className="bg-[#F9F9F9] rounded-[10px] p-3 flex flex-col justify-between h-[72px] relative">
+            <span className="text-[10px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B] leading-[12px]">
+              14-Day Rule
             </span>
             <RiShieldCheckLine
               className={`size-4 absolute top-3 right-3 ${
@@ -199,10 +199,10 @@ export function TourGapCheckerCard({
                   analysis.isCompliant ? "text-[#0B4627]" : "text-[#FB3748]"
                 }`}
               >
-                {analysis.isCompliant ? "Single CoS Valid" : "Action Required"}
+                {analysis.isCompliant ? "Compliant" : "Breach"}
               </span>
               <span className="text-[11px] text-[#7B7B7B]">
-                {analysis.isCompliant ? "All breaks ≤ 14d" : "Gaps > 14 days"}
+                {analysis.isCompliant ? "Single CoS" : "Split required"}
               </span>
             </div>
           </div>
@@ -210,25 +210,23 @@ export function TourGapCheckerCard({
 
         {/* Polished Status Banner Pill */}
         {analysis.isCompliant ? (
-          <div className="bg-[#E3F7EC]/70 rounded-[10px] px-3.5 py-2.5 flex items-center justify-between gap-3">
+          <div className="bg-[#E3F7EC]/70 rounded-[10px] px-3.5 py-2 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-[12px] text-[#0B4627] font-medium">
               <RiCheckboxCircleLine className="size-4 shrink-0 text-[#1FC16B]" />
-              <span>All tour stops satisfy UKVI Creative Worker continuous engagement limits (no gaps &gt; 14 days).</span>
+              <span>All engagements comply with 14-day continuous tour limits.</span>
             </div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#0B4627] bg-white px-2 py-0.5 rounded-full shadow-2xs shrink-0">
-              Verified
+              PASSED
             </span>
           </div>
         ) : (
-          <div className="bg-[#FFEBEC] rounded-[10px] px-3.5 py-2.5 flex items-center justify-between gap-3">
+          <div className="bg-[#FFEBEC] rounded-[10px] px-3.5 py-2 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-[12px] text-[#681219] font-medium">
               <RiAlertLine className="size-4 shrink-0 text-[#FB3748]" />
-              <span>
-                {analysis.breaches[0]?.message || `${analysis.breachCount} gaps exceed the statutory 14-day limit.`}
-              </span>
+              <span>Tour gap exceeds 14-day limit. Review schedule.</span>
             </div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#FB3748] bg-white px-2 py-0.5 rounded-full shadow-2xs shrink-0">
-              Breach
+              AT RISK
             </span>
           </div>
         )}
