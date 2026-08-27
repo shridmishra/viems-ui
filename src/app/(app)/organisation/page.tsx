@@ -15,29 +15,12 @@ import {
 } from "@remixicon/react";
 import { toast } from "sonner";
 import { CompanyTab, CompanySubTab, COMPANY_SUB_TABS } from "./company-tab";
+import { DocumentsTab } from "./documents-tab";
+import { HistoryTab } from "./history-tab";
+import { TeamTab, TeamSubTab, TEAM_SUB_TABS } from "./team-tab";
 
 export const MAIN_TABS = ["company", "documents", "history", "team"] as const;
 export type MainTab = (typeof MAIN_TABS)[number];
-
-function TabPlaceholder({
-  title,
-  description,
-  icon: Icon,
-}: {
-  title: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}) {
-  return (
-    <div className="bg-white rounded-[16px] border border-[#EBEBEB] p-12 text-center shadow-card-large max-w-xl mx-auto my-8">
-      <div className="size-12 rounded-full bg-[#F5F5F5] flex items-center justify-center mx-auto mb-4 text-[#5C5C5C]">
-        <Icon className="size-6" />
-      </div>
-      <h3 className="font-aeonik-medium text-[18px] text-[#171717] mb-2">{title}</h3>
-      <p className="text-[14px] text-[#5C5C5C] leading-[20px]">{description}</p>
-    </div>
-  );
-}
 
 function OrganisationPageContent() {
   const router = useRouter();
@@ -55,15 +38,25 @@ function OrganisationPageContent() {
       ? (subParam as CompanySubTab)
       : "details";
 
+  const teamSubTab: TeamSubTab =
+    subParam && (TEAM_SUB_TABS as readonly string[]).includes(subParam)
+      ? (subParam as TeamSubTab)
+      : "members";
+
   const handleTabSelect = (tab: MainTab) => {
     let newSub = "";
     if (tab === "company") newSub = companySubTab;
+    if (tab === "team") newSub = teamSubTab;
     const url = newSub ? `/organisation?tab=${tab}&sub=${newSub}` : `/organisation?tab=${tab}`;
     router.replace(url, { scroll: false });
   };
 
   const handleCompanySubTabSelect = (sub: CompanySubTab) => {
     router.replace(`/organisation?tab=company&sub=${sub}`, { scroll: false });
+  };
+
+  const handleTeamSubTabSelect = (sub: TeamSubTab) => {
+    router.replace(`/organisation?tab=team&sub=${sub}`, { scroll: false });
   };
 
   const handleDownloadReport = () => {
@@ -175,25 +168,12 @@ function OrganisationPageContent() {
             onSubTabChange={handleCompanySubTabSelect}
           />
         )}
-        {activeTab === "documents" && (
-          <TabPlaceholder
-            title="Documents Management"
-            description="View, filter, and manage sponsor compliance documents and proof files."
-            icon={RiFileCopy2Line}
-          />
-        )}
-        {activeTab === "history" && (
-          <TabPlaceholder
-            title="Organisation Audit & History"
-            description="Track organisation events, changes, and UKVI compliance history."
-            icon={RiHistoryLine}
-          />
-        )}
+        {activeTab === "documents" && <DocumentsTab />}
+        {activeTab === "history" && <HistoryTab />}
         {activeTab === "team" && (
-          <TabPlaceholder
-            title="Team & UKVI Key Personnel"
-            description="Manage organisation staff, Key Contact, Authorising Officer, and Level 1/2 SMS users."
-            icon={RiTeamLine}
+          <TeamTab
+            activeSubTab={teamSubTab}
+            onSubTabChange={handleTeamSubTabSelect}
           />
         )}
       </div>
