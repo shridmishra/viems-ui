@@ -396,18 +396,14 @@ export default function CasesPage() {
       if (activeTab === "refusals") {
         return isRefused;
       } else if (activeTab === "cases" || selectedGroup) {
-        const normStage = stageFilter ? stageFilter.toUpperCase().replace(/_/g, " ").trim() : null;
-        if (statusFilter === "Visa Refused" || statusFilter === "refused" || normStage === "VISA") {
+        if (statusFilter === "Visa Refused" || statusFilter === "refused") {
           return true;
         }
-        if (statusFilter) {
-          return true;
-        }
-        return isCaseInProgress(item);
+        return !isRefused;
       }
       return true;
     });
-  }, [tabScopedCases, activeTab, selectedGroup, statusFilter, stageFilter]);
+  }, [tabScopedCases, activeTab, selectedGroup, statusFilter]);
 
   // Dynamically compute unique countries and statuses with their counts from tabScopedCases
   const uniqueCountries = React.useMemo(() => {
