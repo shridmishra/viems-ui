@@ -10,6 +10,17 @@
  *   3. Departure & re-entry documentation.
  */
 
+export const ENGAGEMENT_TYPES = [
+  "Performance",
+  "Rehearsal",
+  "Filming",
+  "Recording",
+  "Promotional",
+  "Other",
+] as const;
+
+export type EngagementType = (typeof ENGAGEMENT_TYPES)[number];
+
 export interface ScheduleEvent {
   id: string;
   title: string;
@@ -18,7 +29,7 @@ export interface ScheduleEvent {
   venue?: string;
   city?: string;
   country?: string;
-  engagementType?: "Performance" | "Rehearsal" | "Filming" | "Recording" | "Promotional" | "Other";
+  engagementType?: EngagementType;
   fee?: string | number;
   notes?: string;
 }
@@ -68,8 +79,8 @@ export function calculateGapDays(firstEndDate: string, secondStartDate: string):
   if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return 0;
   
   // Set to midnight UTC for pure date comparison
-  const utc1 = Date.UTC(d1.getFullYear(), d1.getMonth(), d1.getDate());
-  const utc2 = Date.UTC(d2.getFullYear(), d2.getMonth(), d2.getDate());
+  const utc1 = Date.UTC(d1.getUTCFullYear(), d1.getUTCMonth(), d1.getUTCDate());
+  const utc2 = Date.UTC(d2.getUTCFullYear(), d2.getUTCMonth(), d2.getUTCDate());
   
   const diffTime = utc2 - utc1;
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
@@ -114,12 +125,19 @@ export function analyzeTourGaps(rawEvents: ScheduleEvent[]): TourGapAnalysisResu
   let totalGapSum = 0;
   let maxGap = 0;
   let warningCount = 0;
+  let runningMaxEndDate = sortedEvents[0]?.endDate || sortedEvents[0]?.startDate || "";
 
   for (let i = 0; i < sortedEvents.length - 1; i++) {
     const current = sortedEvents[i];
     const next = sortedEvents[i + 1];
 
-    const gap = calculateGapDays(current.endDate || current.startDate, next.startDate);
+    const currentEnd = current.endDate || current.startDate;
+    if (new Date(currentEnd).getTime() > new Date(runningMaxEndDate).getTime()) {
+      runningMaxEndDate = currentEnd;
+    }
+
+    // Measure gap between the latest coverage end date so far and the next engagement start date
+    const gap = calculateGapDays(runningMaxEndDate, next.startDate);
     totalGapSum += gap;
     if (gap > maxGap) maxGap = gap;
 
@@ -136,7 +154,7 @@ export function analyzeTourGaps(rawEvents: ScheduleEvent[]): TourGapAnalysisResu
 
     if (isBreach) {
       message = `14-Day Limit Exceeded: ${gap} days gap between "${fromTitle}" and "${toTitle}"`;
-      recommendation = `Add intermediate rehearsal/promotional dates between ${current.endDate} and ${next.startDate} or split into separate CoS applications.`;
+      recommendation = `Add intermediate rehearsal/promotional dates between ${runningMaxEndDate} and ${next.startDate} or split into separate CoS applications.`;
     } else if (isWarning) {
       message = `Approaching Limit: ${gap} days gap between "${fromTitle}" and "${toTitle}" (Max 14)`;
       recommendation = `Ensure dates are finalized so gap does not expand past 14 days.`;
@@ -161,7 +179,12 @@ export function analyzeTourGaps(rawEvents: ScheduleEvent[]): TourGapAnalysisResu
   }
 
   const overallStartDate = sortedEvents[0]?.startDate || "";
-  const overallEndDate = sortedEvents[sortedEvents.length - 1]?.endDate || sortedEvents[sortedEvents.length - 1]?.startDate || "";
+  // Find the absolute latest end date across all events to properly support overlapping schedules
+  const overallEndDate = sortedEvents.reduce((latest, ev) => {
+    const endStr = ev.endDate || ev.startDate;
+    if (!latest) return endStr;
+    return new Date(endStr).getTime() > new Date(latest).getTime() ? endStr : latest;
+  }, sortedEvents[0]?.endDate || sortedEvents[0]?.startDate || "");
   
   let totalTourDays = 0;
   if (overallStartDate && overallEndDate) {
@@ -210,8 +233,38 @@ export function analyzeTourGaps(rawEvents: ScheduleEvent[]): TourGapAnalysisResu
 }
 
 /**
- * Parses a simple CSV text representation of a schedule.
- * Expects headers like: Title / Event, Start Date, End Date, Venue, City, Type, Fee
+ * Normalizes date string into YYYY-MM-DD format if valid
+ */
+function normalizeDateStr(raw: string): string | null {
+  if (!raw || !raw.trim()) return null;
+  const trimmed = raw.trim();
+
+  // If already ISO YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const d = new Date(trimmed);
+    return isNaN(d.getTime()) ? null : trimmed;
+  }
+
+  // If DD/MM/YYYY or MM/DD/YYYY
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(trimmed)) {
+    const [p1, p2, year] = trimmed.split("/");
+    // Assume DD/MM/YYYY first
+    const iso1 = `${year}-${p2.padStart(2, "0")}-${p1.padStart(2, "0")}`;
+    const d1 = new Date(iso1);
+    if (!isNaN(d1.getTime())) return iso1;
+  }
+
+  // Fallback Date parser
+  const parsed = new Date(trimmed);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString().split("T")[0];
+  }
+
+  return null;
+}
+
+/**
+ * Parses a CSV text representation of a schedule with whole-word header matching.
  */
 export function parseScheduleFromCsv(csvText: string): ScheduleEvent[] {
   if (!csvText || !csvText.trim()) return [];
@@ -221,13 +274,14 @@ export function parseScheduleFromCsv(csvText: string): ScheduleEvent[] {
 
   const header = lines[0].toLowerCase().split(",").map((h) => h.trim().replace(/^["']|["']$/g, ""));
   
-  const titleIdx = header.findIndex((h) => h.includes("title") || h.includes("event") || h.includes("name") || h.includes("engagement"));
-  const startIdx = header.findIndex((h) => h.includes("start") || h === "date" || h.includes("from"));
-  const endIdx = header.findIndex((h) => h.includes("end") || h.includes("to"));
-  const venueIdx = header.findIndex((h) => h.includes("venue") || h.includes("location") || h.includes("hall"));
-  const cityIdx = header.findIndex((h) => h.includes("city") || h.includes("town"));
-  const typeIdx = header.findIndex((h) => h.includes("type") || h.includes("category"));
-  const feeIdx = header.findIndex((h) => h.includes("fee") || h.includes("rate") || h.includes("salary"));
+  // Use whole-word/token matching
+  const titleIdx = header.findIndex((h) => /\b(title|event|name|engagement|production)\b/.test(h));
+  const startIdx = header.findIndex((h) => /\b(start|date|from_date|start_date)\b/.test(h) || h === "from" || h === "date");
+  const endIdx = header.findIndex((h) => /\b(end|to_date|end_date)\b/.test(h) || h === "to");
+  const venueIdx = header.findIndex((h) => /\b(venue|location|hall|theater|theatre|arena)\b/.test(h));
+  const cityIdx = header.findIndex((h) => /\b(city|town)\b/.test(h));
+  const typeIdx = header.findIndex((h) => /\b(type|category|role)\b/.test(h));
+  const feeIdx = header.findIndex((h) => /\b(fee|rate|salary|pay)\b/.test(h));
 
   const events: ScheduleEvent[] = [];
 
@@ -253,28 +307,18 @@ export function parseScheduleFromCsv(csvText: string): ScheduleEvent[] {
     cols.push(cur.trim().replace(/^["']|["']$/g, ""));
 
     const title = titleIdx !== -1 && cols[titleIdx] ? cols[titleIdx] : `Engagement #${i}`;
-    let startDate = startIdx !== -1 && cols[startIdx] ? cols[startIdx] : "";
-    let endDate = endIdx !== -1 && cols[endIdx] ? cols[endIdx] : startDate;
+    const rawStart = startIdx !== -1 && cols[startIdx] ? cols[startIdx] : "";
+    const rawEnd = endIdx !== -1 && cols[endIdx] ? cols[endIdx] : rawStart;
 
-    // Basic date standardisation (DD/MM/YYYY to YYYY-MM-DD)
-    if (startDate.includes("/")) {
-      const parts = startDate.split("/");
-      if (parts.length === 3) {
-        if (parts[2].length === 4) {
-          startDate = `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
-        }
-      }
-    }
-    if (endDate.includes("/")) {
-      const parts = endDate.split("/");
-      if (parts.length === 3) {
-        if (parts[2].length === 4) {
-          endDate = `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
-        }
-      }
-    }
+    const startDate = normalizeDateStr(rawStart);
+    const endDate = normalizeDateStr(rawEnd) || startDate;
 
     if (startDate) {
+      const rawType = typeIdx !== -1 && cols[typeIdx] ? cols[typeIdx].trim() : "";
+      const matchedType: EngagementType = ENGAGEMENT_TYPES.find(
+        (t) => t.toLowerCase() === rawType.toLowerCase()
+      ) || "Performance";
+
       events.push({
         id: `csv-row-${i}-${Date.now()}`,
         title,
@@ -283,7 +327,7 @@ export function parseScheduleFromCsv(csvText: string): ScheduleEvent[] {
         venue: venueIdx !== -1 ? cols[venueIdx] : undefined,
         city: cityIdx !== -1 ? cols[cityIdx] : "London",
         country: "United Kingdom",
-        engagementType: (typeIdx !== -1 && cols[typeIdx] ? cols[typeIdx] : "Performance") as any,
+        engagementType: matchedType,
         fee: feeIdx !== -1 ? cols[feeIdx] : undefined,
       });
     }

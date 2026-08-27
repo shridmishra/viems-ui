@@ -2,11 +2,11 @@
 
 import * as React from "react";
 import { RiAlertLine, RiShieldCheckLine } from "@remixicon/react";
-import { CaseRiskAssessment, evaluateCaseRisk } from "@/lib/case-risk-evaluator";
+import { CaseRiskAssessment, CaseRiskInput, evaluateCaseRisk } from "@/lib/case-risk-evaluator";
 import { CaseRiskModal } from "./CaseRiskModal";
 
 interface HighRiskBadgeProps {
-  caseData: any;
+  caseData?: CaseRiskInput | null;
   migrantName?: string;
   showLowRisk?: boolean;
   className?: string;

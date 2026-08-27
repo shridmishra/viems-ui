@@ -130,9 +130,8 @@ export function mapBackendCaseToRow(c: RawCaseRecord, completedActions?: Set<str
     visa: c.visa,
     case_status: c.case_status,
     migration_stage: c.migration_stage,
-    is_active: c.is_active,
-    passportExpiryDate: (c as any).passport_expiry_date || (c as any).passportExpiryDate || (c as any).expiry_date || (c as any).expiryDate || (c as any).passport?.expiryDate || (c as any).personal?.passportExpiry || ((String(c.id) === "114" || String(c.caseIdDisplay).includes("114")) ? "2025-03-29" : (String(c.id) === "113" || String(c.caseIdDisplay).includes("113")) ? "2026-10-15" : undefined),
-    cosStartDate: (c as any).cos_start_date || (c as any).cosStartDate || (c as any).work_start_date || (c as any).start_date || (c as any).employment?.startDate || ((String(c.id) === "112" || String(c.caseIdDisplay).includes("112")) ? "2026-09-05" : undefined),
+    passportExpiryDate: (c as any).passport_expiry_date || (c as any).passportExpiryDate || (c as any).expiry_date || (c as any).expiryDate || (c as any).passport?.expiryDate || (c as any).personal?.passportExpiry || undefined,
+    cosStartDate: (c as any).cos_start_date || (c as any).cosStartDate || (c as any).work_start_date || (c as any).start_date || (c as any).employment?.startDate || undefined,
     cosEndDate: (c as any).cos_end_date || (c as any).cosEndDate || (c as any).work_end_date || (c as any).end_date || (c as any).employment?.endDate || undefined,
     rawRecord: c,
   };

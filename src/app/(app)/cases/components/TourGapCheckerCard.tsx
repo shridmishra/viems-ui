@@ -33,24 +33,32 @@ export function TourGapCheckerCard({
   className = "",
 }: TourGapCheckerCardProps) {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
-  const [events, setEvents] = React.useState<ScheduleEvent[]>(() => {
-    return getSampleTourSchedule();
-  });
+  const [events, setEvents] = React.useState<ScheduleEvent[]>([]);
 
-  // Load from local storage if existing
+  // Load from local storage if existing and validate shape
   React.useEffect(() => {
     if (caseId && typeof window !== "undefined") {
       try {
         const stored = localStorage.getItem(`tour_schedule_${caseId}`);
         if (stored) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setEvents(parsed);
+          if (Array.isArray(parsed)) {
+            const valid = parsed.filter(
+              (item: any): item is ScheduleEvent =>
+                Boolean(item && typeof item.id === "string" && typeof item.title === "string" && typeof item.startDate === "string")
+            );
+            if (valid.length > 0) {
+              setEvents(valid);
+            }
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error("Failed to parse tour schedule from localStorage:", e);
+      }
     }
   }, [caseId]);
+
+  const hasEvents = events.length > 0;
 
   const analysis: TourGapAnalysisResult = React.useMemo(() => {
     return analyzeTourGaps(events);
@@ -60,7 +68,7 @@ export function TourGapCheckerCard({
     setEvents(newEvents);
   };
 
-  // Format date window cleanly
+  // Format date window cleanly with explicit UTC timezone
   const formattedDateWindow = React.useMemo(() => {
     if (!analysis.overallStartDate || !analysis.overallEndDate) {
       return "No dates";
@@ -70,8 +78,8 @@ export function TourGapCheckerCard({
     if (isNaN(d1.getTime()) || isNaN(d2.getTime())) {
       return `${analysis.overallStartDate} – ${analysis.overallEndDate}`;
     }
-    const s1 = d1.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-    const s2 = d2.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    const s1 = d1.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+    const s2 = d2.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
     return `${s1} – ${s2}`;
   }, [analysis.overallStartDate, analysis.overallEndDate]);
 
@@ -85,12 +93,16 @@ export function TourGapCheckerCard({
           <div className="flex items-center gap-3 min-w-0">
             <div
               className={`size-9 rounded-full flex items-center justify-center shrink-0 ${
-                analysis.isCompliant
+                !hasEvents
+                  ? "bg-[#F5F5F5] text-[#5C5C5C]"
+                  : analysis.isCompliant
                   ? "bg-[#E3F7EC] text-[#0B4627]"
                   : "bg-[#FFEBEC] text-[#FB3748]"
               }`}
             >
-              {analysis.isCompliant ? (
+              {!hasEvents ? (
+                <RiCalendarEventLine className="size-5" />
+              ) : analysis.isCompliant ? (
                 <RiCheckLine className="size-5" />
               ) : (
                 <RiAlertLine className="size-5" />
@@ -104,12 +116,14 @@ export function TourGapCheckerCard({
                 </h4>
                 <span
                   className={`px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider ${
-                    analysis.isCompliant
+                    !hasEvents
+                      ? "bg-[#F5F5F5] text-[#5C5C5C]"
+                      : analysis.isCompliant
                       ? "bg-[#E3F7EC] text-[#0B4627]"
                       : "bg-[#FFEBEC] text-[#FB3748]"
                   }`}
                 >
-                  {analysis.isCompliant ? "COMPLIANT" : "AT RISK"}
+                  {!hasEvents ? "NOT CONFIGURED" : analysis.isCompliant ? "COMPLIANT" : "AT RISK"}
                 </span>
               </div>
               <span className="text-[12px] text-[#7B7B7B] leading-[16px] mt-0.5">
@@ -124,7 +138,7 @@ export function TourGapCheckerCard({
             onClick={() => setIsModalOpen(true)}
             className="h-[32px] px-3.5 bg-[#F5F5F5] hover:bg-[#EBEBEB] text-[#171717] text-[13px] font-medium rounded-full flex items-center gap-1.5 transition-colors cursor-pointer border-0 shrink-0"
           >
-            <span>Inspect Schedule</span>
+            <span>{hasEvents ? "Inspect Schedule" : "Add Schedule"}</span>
             <RiArrowRightSLine className="size-4 text-[#7B7B7B]" />
           </Button>
         </div>
@@ -209,7 +223,17 @@ export function TourGapCheckerCard({
         </div>
 
         {/* Polished Status Banner Pill */}
-        {analysis.isCompliant ? (
+        {!hasEvents ? (
+          <div className="bg-[#F5F5F5] rounded-[10px] px-3.5 py-2 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-[12px] text-[#5C5C5C] font-medium">
+              <RiCalendarEventLine className="size-4 shrink-0 text-[#A4A4A4]" />
+              <span>No tour schedule attached. Add engagement dates to run 14-day gap validation.</span>
+            </div>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-[#5C5C5C] bg-white px-2 py-0.5 rounded-full shadow-2xs shrink-0">
+              PENDING
+            </span>
+          </div>
+        ) : analysis.isCompliant ? (
           <div className="bg-[#E3F7EC]/70 rounded-[10px] px-3.5 py-2 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-[12px] text-[#0B4627] font-medium">
               <RiCheckboxCircleLine className="size-4 shrink-0 text-[#1FC16B]" />

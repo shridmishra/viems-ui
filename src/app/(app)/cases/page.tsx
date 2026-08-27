@@ -630,7 +630,7 @@ export default function CasesPage() {
   // Reset current page when filters, sorting, tab, or grouping changes
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, countryFilter, statusFilter, migrationFilter, stageFilter, severityFilter, caseIdFilter, quickFilter, activeTab, selectedGroup, sortColumn, sortDirection, pageSize]);
+  }, [searchQuery, countryFilter, statusFilter, migrationFilter, stageFilter, severityFilter, caseIdFilter, quickFilter, highRiskOnly, needsActionOnly, activeTab, selectedGroup, sortColumn, sortDirection, pageSize]);
 
   const isGroupSummaryView = activeTab === "groups" && !selectedGroup;
   const totalCount = isGroupSummaryView ? sortedGroupedData.length : sortedFilteredCases.length;

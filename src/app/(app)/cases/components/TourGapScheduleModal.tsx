@@ -29,6 +29,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   ScheduleEvent,
@@ -37,6 +44,8 @@ import {
   parseScheduleFromCsv,
   getSampleTourSchedule,
   MAX_ALLOWED_GAP_DAYS,
+  ENGAGEMENT_TYPES,
+  EngagementType,
 } from "@/lib/tour-gap-checker";
 
 interface TourGapScheduleModalProps {
@@ -58,7 +67,7 @@ export function TourGapScheduleModal({
 }: TourGapScheduleModalProps) {
   const [events, setEvents] = React.useState<ScheduleEvent[]>(() => {
     if (initialEvents && initialEvents.length > 0) return initialEvents;
-    return getSampleTourSchedule();
+    return [];
   });
 
   const [activeTab, setActiveTab] = React.useState<"schedule" | "upload" | "add">("schedule");
@@ -71,7 +80,7 @@ export function TourGapScheduleModal({
   const [newEndDate, setNewEndDate] = React.useState("");
   const [newVenue, setNewVenue] = React.useState("");
   const [newCity, setNewCity] = React.useState("");
-  const [newType, setNewType] = React.useState<ScheduleEvent["engagementType"]>("Performance");
+  const [newType, setNewType] = React.useState<EngagementType>("Performance");
   const [newFee, setNewFee] = React.useState("");
 
   // Re-sync initial events or local storage when modal opens
@@ -87,7 +96,9 @@ export function TourGapScheduleModal({
               return;
             }
           }
-        } catch (e) {}
+        } catch (e) {
+          console.error("Failed to read tour_schedule from localStorage:", e);
+        }
       }
       if (initialEvents && initialEvents.length > 0) {
         setEvents(initialEvents);
@@ -157,7 +168,15 @@ export function TourGapScheduleModal({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size exceeds 5MB limit. Please upload a smaller CSV file.");
+      return;
+    }
+
     const reader = new FileReader();
+    reader.onerror = () => {
+      toast.error("Failed to read file from disk.");
+    };
     reader.onload = (evt) => {
       const text = evt.target?.result as string;
       if (text) {
@@ -542,13 +561,21 @@ export function TourGapScheduleModal({
                     <Label htmlFor="ev-type" className="text-[11px] font-medium text-[#5C5C5C]">
                       Engagement Type
                     </Label>
-                    <Input
-                      id="ev-type"
+                    <Select
                       value={newType}
-                      onChange={(e) => setNewType(e.target.value as any)}
-                      placeholder="Performance / Rehearsal"
-                      className="bg-white border border-neutral-200/80 rounded-[10px] h-9.5 text-[13px] shadow-2xs focus:border-brand-medium"
-                    />
+                      onValueChange={(val) => setNewType(val as EngagementType)}
+                    >
+                      <SelectTrigger id="ev-type" className="bg-white border border-neutral-200/80 rounded-[10px] h-9.5 text-[13px] shadow-2xs focus:border-brand-medium">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white rounded-[12px] border border-neutral-200 shadow-card-large z-50">
+                        {ENGAGEMENT_TYPES.map((type) => (
+                          <SelectItem key={type} value={type} className="text-[13px] cursor-pointer">
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -647,8 +674,16 @@ export function TourGapScheduleModal({
             <div className="flex flex-col gap-4">
               {/* Styled Dropzone */}
               <div
+                role="button"
+                tabIndex={0}
                 onClick={() => fileInputRef.current?.click()}
-                className="p-7 border-2 border-dashed border-[#7D52F4]/30 hover:border-[#7D52F4] bg-[#FAF8FF] hover:bg-[#F6F2FF] rounded-[18px] transition-all flex flex-col items-center justify-center text-center gap-2 cursor-pointer group"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
+                className="p-7 border-2 border-dashed border-[#7D52F4]/30 hover:border-[#7D52F4] focus:border-[#7D52F4] outline-none bg-[#FAF8FF] hover:bg-[#F6F2FF] rounded-[18px] transition-all flex flex-col items-center justify-center text-center gap-2 cursor-pointer group"
               >
                 <div className="size-11 rounded-full bg-[#EFEBFF] text-[#7D52F4] group-hover:scale-105 transition-transform flex items-center justify-center mb-0.5 shadow-2xs">
                   <RiUpload2Line className="size-6" />
@@ -669,15 +704,10 @@ export function TourGapScheduleModal({
                     onChange={handleFileUpload}
                     className="hidden"
                   />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5 bg-white pointer-events-none rounded-full h-8 text-[12px] shadow-2xs border-neutral-200"
-                  >
+                  <div className="inline-flex items-center gap-1.5 bg-white rounded-full h-8 px-3.5 text-[12px] font-medium shadow-2xs border border-neutral-200 text-[#171717]">
                     <RiFileLine className="size-3.5 text-[#7D52F4]" />
-                    Browse Schedule File (.csv)
-                  </Button>
+                    <span>Browse Schedule File (.csv)</span>
+                  </div>
                 </div>
               </div>
 

@@ -23,11 +23,17 @@ import { apiClient } from "@/lib/api-client";
 import { ENDPOINTS } from "@/lib/api-endpoints";
 import { toast } from "sonner";
 
+export interface StatusChangeReasonData {
+  reasonCode?: string;
+  reasonLabel?: string;
+  notes?: string;
+}
+
 interface ChangeCaseStatusModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentStatus: string;
-  onApply: (newStatus: string) => void;
+  onApply: (newStatus: string, reasonData?: StatusChangeReasonData) => void | Promise<void>;
   caseId?: string | number;
   migrantId?: string | number;
   migrantName?: string;
@@ -126,12 +132,17 @@ export function ChangeCaseStatusModal({
     notes?: string;
   }) => {
     try {
-      await onApply(payload.newStatus);
+      await onApply(payload.newStatus, {
+        reasonCode: payload.reasonCode,
+        reasonLabel: payload.reasonLabel,
+        notes: payload.notes,
+      });
       toast.success(
         `Status updated to "${payload.reasonLabel ? pendingReasonStatusLabel : payload.newStatus}" (Reason: ${payload.reasonLabel})`
       );
     } catch (e) {
       console.error("Failed to apply status with reason:", e);
+      throw e;
     }
   };
 

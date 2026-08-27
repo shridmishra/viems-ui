@@ -37,7 +37,68 @@ const SIX_MONTHS_DAYS = 183;
 const IMMINENT_START_HIGH_DAYS = 14;
 const IMMINENT_START_MED_DAYS = 30;
 
-export function evaluateCaseRisk(caseOrMigrantData: any): CaseRiskAssessment {
+export interface CaseRiskInput {
+  id?: string | number | null;
+  caseId?: string | number | null;
+  name?: string | null;
+  status?: string | null;
+  case_status?: string | null;
+  caseStatus?: string | null;
+  cosStatusValue?: string | null;
+  action?: string | null;
+  passportExpiryDate?: string | null;
+  passport_expiry_date?: string | null;
+  cosStartDate?: string | null;
+  cos_start_date?: string | null;
+  cosEndDate?: string | null;
+  cos_end_date?: string | null;
+  workStartDate?: string | null;
+  workEndDate?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  visaExpiryDate?: string | null;
+  visa_end_date?: string | null;
+  missingDocsCount?: number | null;
+  hasPassport?: boolean | null;
+  passport?: {
+    expiryDate?: string;
+    number?: string;
+    [key: string]: any;
+  } | null;
+  employment?: {
+    startDate?: string;
+    endDate?: string;
+    [key: string]: any;
+  } | null;
+  visa?: number | string | {
+    endDate?: string;
+    totalDays?: number;
+    daysLeft?: number;
+    [key: string]: any;
+  } | null;
+  personal?: {
+    passportExpiry?: string;
+    [key: string]: any;
+  } | null;
+  [key: string]: any;
+}
+
+export function evaluateCaseRisk(caseOrMigrantData?: CaseRiskInput | null): CaseRiskAssessment {
+  if (!caseOrMigrantData) {
+    return {
+      overallRisk: "LOW",
+      riskScore: 0,
+      isHighRisk: false,
+      isMediumRisk: false,
+      factors: [],
+      highCount: 0,
+      mediumCount: 0,
+      lowCount: 0,
+      primaryReason: "No case data loaded",
+      actionRequired: false,
+    };
+  }
+
   const factors: RiskFactor[] = [];
   const now = new Date();
 
@@ -74,6 +135,12 @@ export function evaluateCaseRisk(caseOrMigrantData: any): CaseRiskAssessment {
     caseOrMigrantData?.employment?.endDate ||
     caseOrMigrantData?.endDate;
 
+  const visaEndDateStr =
+    caseOrMigrantData?.visaExpiryDate ||
+    caseOrMigrantData?.visa_end_date ||
+    (caseOrMigrantData?.visa && typeof caseOrMigrantData.visa === "object" ? caseOrMigrantData.visa.endDate : undefined) ||
+    caseOrMigrantData?.decision?.granted?.visaEndDate;
+
   const isVisaGranted =
     status.includes("approved") ||
     status.includes("granted") ||
@@ -109,7 +176,7 @@ export function evaluateCaseRisk(caseOrMigrantData: any): CaseRiskAssessment {
         factors.push({
           id: "rf-passport-expiring",
           code: "PASSPORT_EXPIRY",
-          severity: diffDays <= 90 ? "HIGH" : "HIGH",
+          severity: "HIGH",
           title: `Passport Expires in ${monthsLeft} Month${monthsLeft === 1 ? "" : "s"}`,
           description: `Passport expires on ${passportExp.toLocaleDateString("en-GB")} (${diffDays} days). UKVI and airlines require at least 6 months validity.`,
           recommendation: "Urgent: Prompt migrant to renew passport immediately before biometric VFS appointment.",
@@ -153,7 +220,24 @@ export function evaluateCaseRisk(caseOrMigrantData: any): CaseRiskAssessment {
     }
   }
 
-  // ─── RULE 3: Check Local Tour Gap Breaches if Saved in Session/Local ─────
+  // ─── RULE 3: Visa Expiry Precedes Engagement / CoS End Date ───────────────
+  if (visaEndDateStr && cosEndDateStr && !isClosedOrRefused) {
+    const visaEnd = new Date(visaEndDateStr);
+    const cosEnd = new Date(cosEndDateStr);
+    if (!isNaN(visaEnd.getTime()) && !isNaN(cosEnd.getTime()) && visaEnd < cosEnd) {
+      factors.push({
+        id: "rf-visa-expiry-short",
+        code: "VISA_EXPIRING_SOON",
+        severity: "HIGH",
+        title: "Visa Expires Before Engagement End Date",
+        description: `Current visa expires on ${visaEnd.toLocaleDateString("en-GB")} while engagement runs until ${cosEnd.toLocaleDateString("en-GB")}.`,
+        recommendation: "File extension or sponsorship variation before current permission expires.",
+        triggerDate: visaEndDateStr,
+      });
+    }
+  }
+
+  // ─── RULE 4: Check Local Tour Gap Breaches if Saved in Session/Local ─────
   const caseId = caseOrMigrantData?.id || caseOrMigrantData?.caseId;
   if (caseId && typeof window !== "undefined") {
     try {
@@ -171,11 +255,13 @@ export function evaluateCaseRisk(caseOrMigrantData: any): CaseRiskAssessment {
           });
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("Failed to parse tour_schedule_analysis from localStorage:", e);
+    }
   }
 
-  // ─── RULE 4: Missing Mandatory Passport / Appendix D Documents ───────────
-  if ((caseOrMigrantData?.action === "Upload passport" || (caseOrMigrantData?.missingDocsCount && caseOrMigrantData?.missingDocsCount > 0)) && !isClosedOrRefused) {
+  // ─── RULE 5: Missing Mandatory Passport Record ───────────────────────────
+  if (caseOrMigrantData?.action === "Upload passport" && !isClosedOrRefused) {
     factors.push({
       id: "rf-missing-passport",
       code: "MISSING_DOCUMENTS",
@@ -192,7 +278,7 @@ export function evaluateCaseRisk(caseOrMigrantData: any): CaseRiskAssessment {
   const lowCount = factors.filter((f) => f.severity === "LOW").length;
 
   let overallRisk: "HIGH" | "MEDIUM" | "LOW" = "LOW";
-  let riskScore = 15; // baseline low risk
+  let riskScore = 10; // baseline
 
   if (highCount > 0) {
     overallRisk = "HIGH";

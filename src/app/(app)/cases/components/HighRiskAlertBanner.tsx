@@ -3,11 +3,11 @@
 import * as React from "react";
 import { RiAlertLine, RiArrowRightSLine, RiShieldCheckLine } from "@remixicon/react";
 import { Button } from "@/components/ui/button";
-import { evaluateCaseRisk, CaseRiskAssessment } from "@/lib/case-risk-evaluator";
+import { evaluateCaseRisk, CaseRiskAssessment, CaseRiskInput } from "@/lib/case-risk-evaluator";
 import { CaseRiskModal } from "./CaseRiskModal";
 
 interface HighRiskAlertBannerProps {
-  caseData: any;
+  caseData?: CaseRiskInput | null;
   migrantName?: string;
   className?: string;
   onNavigateToSchedule?: () => void;

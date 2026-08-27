@@ -24,15 +24,17 @@ import { toast } from "sonner";
 import {
   RiskFactor,
   CaseRiskAssessment,
+  CaseRiskInput,
   evaluateCaseRisk,
 } from "@/lib/case-risk-evaluator";
 
 interface CaseRiskModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  caseData?: any;
+  caseData?: CaseRiskInput | null;
   migrantName?: string;
   onNavigateToSchedule?: () => void;
+  onSendReminder?: (factor: RiskFactor) => Promise<void> | void;
 }
 
 export function CaseRiskModal({
@@ -41,6 +43,7 @@ export function CaseRiskModal({
   caseData,
   migrantName,
   onNavigateToSchedule,
+  onSendReminder,
 }: CaseRiskModalProps) {
   const assessment: CaseRiskAssessment = React.useMemo(() => {
     return evaluateCaseRisk(caseData);
@@ -48,8 +51,16 @@ export function CaseRiskModal({
 
   const name = migrantName || caseData?.name || "Migrant";
 
-  const handleSendReminder = (factor: RiskFactor) => {
-    toast.success(`Sent passport renewal & compliance alert for ${name}`);
+  const handleSendReminder = async (factor: RiskFactor) => {
+    try {
+      if (onSendReminder) {
+        await onSendReminder(factor);
+      }
+      toast.success(`Sent compliance reminder for ${factor.title} to ${name}`);
+    } catch (err) {
+      console.error("Failed to send compliance reminder:", err);
+      toast.error("Failed to send compliance reminder. Please try again.");
+    }
   };
 
   return (

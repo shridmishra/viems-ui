@@ -59,6 +59,10 @@ interface MigrantRow {
   migrationColor: "outside" | "pending" | "active" | "pre" | "withdrawn" | "archived" | "unknown";
   action: string;
   actionColor: "blue" | "red" | "yellow" | "gray";
+  passportExpiryDate?: string;
+  cosStartDate?: string;
+  cosEndDate?: string;
+  rawRecord?: any;
 }
 
 function getErrorStatusCode(error: unknown): number | undefined {
@@ -218,6 +222,31 @@ export default function MigrantsPage() {
             actionColor = "red";
           }
 
+          const passportExpiryDate =
+            c.passport_expiry_date ||
+            c.passportExpiryDate ||
+            c.expiry_date ||
+            c.expiryDate ||
+            c.passport?.expiryDate ||
+            c.personal?.passportExpiry ||
+            undefined;
+
+          const cosStartDate =
+            c.cos_start_date ||
+            c.cosStartDate ||
+            c.work_start_date ||
+            c.start_date ||
+            c.employment?.startDate ||
+            undefined;
+
+          const cosEndDate =
+            c.cos_end_date ||
+            c.cosEndDate ||
+            c.work_end_date ||
+            c.end_date ||
+            c.employment?.endDate ||
+            undefined;
+
           return {
             id: c.id ?? i + 1,
             caseId,
@@ -234,6 +263,10 @@ export default function MigrantsPage() {
             migrationColor,
             action,
             actionColor,
+            passportExpiryDate,
+            cosStartDate,
+            cosEndDate,
+            rawRecord: c,
           };
         });
         setMigrants(mapped);

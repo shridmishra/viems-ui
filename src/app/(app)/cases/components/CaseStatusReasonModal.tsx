@@ -58,21 +58,29 @@ export function CaseStatusReasonModal({
   caseInfo,
   onConfirm,
 }: CaseStatusReasonModalProps) {
-  const [selectedReason, setSelectedReason] = React.useState<StatusReasonOption | null>(null);
-  const [customNotes, setCustomNotes] = React.useState("");
-  const [submitting, setSubmitting] = React.useState(false);
-
   const reasonOptions = React.useMemo(() => {
     return getReasonOptionsForStatus(targetStatus);
   }, [targetStatus]);
 
+  const [selectedReason, setSelectedReason] = React.useState<StatusReasonOption | null>(() => reasonOptions[0] || null);
+  const [customNotes, setCustomNotes] = React.useState("");
+  const [submitting, setSubmitting] = React.useState(false);
+
+  // Sync default selection if target status options change
   React.useEffect(() => {
-    if (open) {
+    if (!selectedReason && reasonOptions.length > 0) {
+      setSelectedReason(reasonOptions[0]);
+    }
+  }, [reasonOptions, selectedReason]);
+
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen) {
       setSelectedReason(reasonOptions[0] || null);
       setCustomNotes("");
       setSubmitting(false);
     }
-  }, [open, reasonOptions]);
+    onOpenChange(newOpen);
+  };
 
   const norm = (targetStatus || "").toLowerCase();
   const isWithdrawal = norm.includes("withdrawn");
@@ -112,7 +120,7 @@ export function CaseStatusReasonModal({
   if (!caseInfo) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-[520px] w-[95vw] !p-0 !gap-0 !overflow-hidden rounded-[20px] bg-white border border-[#F5F5F5] shadow-2xl font-sans flex flex-col max-h-[85vh]">
         {/* Header */}
         <DialogHeader className="px-6 py-4.5 pr-14 border-b border-[#F5F5F5] bg-white flex flex-row items-center justify-between space-y-0 text-left shrink-0">
