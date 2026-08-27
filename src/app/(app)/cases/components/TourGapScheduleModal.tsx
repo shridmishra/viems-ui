@@ -16,6 +16,7 @@ import {
   RiTimer2Line,
   RiRouteLine,
   RiShieldCheckLine,
+  RiMoneyCnyCircleLine,
 } from "@remixicon/react";
 import {
   Dialog,
@@ -195,7 +196,7 @@ export function TourGapScheduleModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[760px] w-[95vw] !p-0 !gap-0 !overflow-hidden rounded-[20px] bg-white border border-[#F5F5F5] shadow-2xl font-sans flex flex-col h-[680px] max-h-[90vh]">
+      <DialogContent className="max-w-[760px] w-[95vw] !p-0 !gap-0 !overflow-hidden rounded-[20px] bg-white border border-[#F5F5F5] shadow-2xl font-sans flex flex-col h-[700px] max-h-[92vh]">
         {/* Header */}
         <DialogHeader className="px-6 py-4.5 pr-14 border-b border-[#F5F5F5] bg-white flex flex-row items-center justify-between space-y-0 text-left shrink-0">
           <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -280,28 +281,38 @@ export function TourGapScheduleModal({
 
         {/* Content Body */}
         <div className="p-6 flex-1 overflow-y-auto flex flex-col gap-4 bg-white">
-          {/* Top Metrics Cards (Sleek borderless background cards) */}
+          {/* Top Metrics Cards (Sleek uniform cards with top-right icons) */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 shrink-0">
             <div className="p-3 rounded-[12px] bg-[#F9F9F9] flex flex-col justify-between h-[74px] relative">
-              <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B]">Engagements</span>
+              <span className="text-[10px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B] leading-[12px]">
+                Engagements
+              </span>
               <RiCalendarEventLine className="size-4 text-[#A4A4A4] absolute top-3 right-3" />
               <div className="flex items-baseline gap-1">
-                <span className="font-aeonik-medium text-[20px] font-medium text-[#171717]">{analysis.totalEvents}</span>
-                <span className="text-[12px] text-[#7B7B7B]">stops</span>
+                <span className="font-aeonik-medium text-[20px] font-medium text-[#171717]">
+                  {analysis.totalEvents}
+                </span>
+                <span className="text-[11px] text-[#7B7B7B]">stops</span>
               </div>
             </div>
 
             <div className="p-3 rounded-[12px] bg-[#F9F9F9] flex flex-col justify-between h-[74px] relative">
-              <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B]">Tour Duration</span>
+              <span className="text-[10px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B] leading-[12px]">
+                Tour Duration
+              </span>
               <RiRouteLine className="size-4 text-[#A4A4A4] absolute top-3 right-3" />
               <div className="flex items-baseline gap-1">
-                <span className="font-aeonik-medium text-[20px] font-medium text-[#171717]">{analysis.totalTourDays}</span>
-                <span className="text-[12px] text-[#7B7B7B]">days</span>
+                <span className="font-aeonik-medium text-[20px] font-medium text-[#171717]">
+                  {analysis.totalTourDays}
+                </span>
+                <span className="text-[11px] text-[#7B7B7B]">days</span>
               </div>
             </div>
 
             <div className="p-3 rounded-[12px] bg-[#F9F9F9] flex flex-col justify-between h-[74px] relative">
-              <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B]">Max Gap Found</span>
+              <span className="text-[10px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B] leading-[12px]">
+                Longest Break
+              </span>
               <RiTimer2Line
                 className={`size-4 absolute top-3 right-3 ${
                   analysis.maxGapDays > MAX_ALLOWED_GAP_DAYS ? "text-[#FB3748]" : "text-[#A4A4A4]"
@@ -315,24 +326,31 @@ export function TourGapScheduleModal({
                 >
                   {analysis.maxGapDays}
                 </span>
-                <span className="text-[12px] text-[#7B7B7B]">days</span>
+                <span className="text-[11px] text-[#7B7B7B]">days max</span>
               </div>
             </div>
 
             <div className="p-3 rounded-[12px] bg-[#F9F9F9] flex flex-col justify-between h-[74px] relative">
-              <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B]">14-Day Limit</span>
+              <span className="text-[10px] font-medium uppercase tracking-[0.02em] text-[#7B7B7B] leading-[12px]">
+                14-Day Limit
+              </span>
               <RiShieldCheckLine
                 className={`size-4 absolute top-3 right-3 ${
                   analysis.isCompliant ? "text-[#1FC16B]" : "text-[#FB3748]"
                 }`}
               />
-              <span
-                className={`font-aeonik-medium text-[14px] font-semibold mt-auto ${
-                  analysis.isCompliant ? "text-[#0B4627]" : "text-[#FB3748]"
-                }`}
-              >
-                {analysis.isCompliant ? "Passed (≤ 14d)" : "Breach (Action Req)"}
-              </span>
+              <div className="flex flex-col">
+                <span
+                  className={`font-aeonik-medium text-[13px] font-semibold leading-[18px] ${
+                    analysis.isCompliant ? "text-[#0B4627]" : "text-[#FB3748]"
+                  }`}
+                >
+                  {analysis.isCompliant ? "Single CoS Valid" : "Action Required"}
+                </span>
+                <span className="text-[10px] text-[#7B7B7B]">
+                  {analysis.isCompliant ? "All breaks ≤ 14d" : "Gaps > 14 days"}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -353,7 +371,7 @@ export function TourGapScheduleModal({
 
           {/* TAB 1: SCHEDULE TIMELINE */}
           {activeTab === "schedule" && (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col">
               {events.length === 0 ? (
                 <div className="py-12 flex flex-col items-center justify-center text-center gap-2 bg-[#F9F9F9] rounded-[16px] p-6">
                   <RiCalendarEventLine className="size-8 text-[#A4A4A4]" />
@@ -373,20 +391,30 @@ export function TourGapScheduleModal({
                   </Button>
                 </div>
               ) : (
-                <div className="flex flex-col gap-2.5">
+                <div className="flex flex-col">
                   {analysis.events.map((ev, idx) => {
                     const followingGap = analysis.gaps[idx];
+                    const isLast = idx === analysis.events.length - 1;
 
                     return (
-                      <React.Fragment key={ev.id}>
-                        {/* Event Card */}
-                        <div className="p-3.5 rounded-[12px] bg-[#F9F9F9] hover:bg-[#F5F5F5] transition-colors flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div className="size-7 rounded-full bg-white shadow-2xs text-[#171717] flex items-center justify-center shrink-0 text-[11px] font-semibold">
+                      <div key={ev.id} className="flex flex-col">
+                        {/* Event Row with Left Stepper Node */}
+                        <div className="flex items-stretch gap-3.5">
+                          {/* Left Stepper Column */}
+                          <div className="flex flex-col items-center shrink-0 w-8">
+                            <div className="size-7 rounded-full bg-white border border-neutral-200 shadow-2xs text-[#171717] flex items-center justify-center text-[11px] font-semibold">
                               {idx + 1}
                             </div>
-                            <div className="flex flex-col min-w-0 flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
+                            {!isLast && (
+                              <div className="w-0.5 bg-neutral-200/80 flex-1 my-1 min-h-[40px]" />
+                            )}
+                          </div>
+
+                          {/* Right Event Card */}
+                          <div className="flex-1 mb-2 bg-[#F9F9F9] hover:bg-[#F5F5F5] rounded-[14px] p-3.5 transition-all flex flex-col gap-1.5">
+                            {/* Card Top: Title, Type Badge, Fee, Actions */}
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 flex-wrap min-w-0">
                                 <span className="font-aeonik-medium text-[14px] text-[#171717] truncate">
                                   {ev.title}
                                 </span>
@@ -394,70 +422,85 @@ export function TourGapScheduleModal({
                                   {ev.engagementType || "Performance"}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-3 text-[12px] text-[#7B7B7B] mt-0.5 flex-wrap">
-                                <span className="flex items-center gap-1">
-                                  <RiTimeLine className="size-3.5 text-[#A4A4A4]" />
-                                  {ev.startDate} {ev.endDate && ev.endDate !== ev.startDate ? `to ${ev.endDate}` : ""}
-                                </span>
-                                {ev.venue && (
-                                  <span className="flex items-center gap-1 truncate">
-                                    <RiMapPinLine className="size-3.5 text-[#A4A4A4]" />
-                                    {ev.venue}, {ev.city || "UK"}
-                                  </span>
-                                )}
+
+                              <div className="flex items-center gap-2 shrink-0">
                                 {ev.fee && (
-                                  <span className="text-[#171717] font-medium">
-                                    Fee: {ev.fee}
+                                  <span className="text-[11px] font-semibold text-[#0B4627] bg-[#E3F7EC] px-2 py-0.5 rounded-full">
+                                    {ev.fee}
                                   </span>
                                 )}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-xs"
+                                  aria-label={`Remove ${ev.title}`}
+                                  onClick={() => handleDeleteEvent(ev.id)}
+                                  className="size-6 text-[#A4A4A4] hover:text-[#FB3748] hover:bg-[#FFEBEC] rounded-full transition-colors p-0 cursor-pointer"
+                                >
+                                  <RiDeleteBinLine className="size-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Card Subtitle: Dates & Location */}
+                            <div className="flex items-center gap-4 text-[12px] text-[#7B7B7B] flex-wrap">
+                              <span className="flex items-center gap-1">
+                                <RiCalendarEventLine className="size-3.5 text-[#A4A4A4]" />
+                                {ev.startDate} {ev.endDate && ev.endDate !== ev.startDate ? `– ${ev.endDate}` : ""}
+                              </span>
+                              {ev.venue && (
+                                <span className="flex items-center gap-1 truncate">
+                                  <RiMapPinLine className="size-3.5 text-[#A4A4A4]" />
+                                  {ev.venue}, {ev.city || "UK"}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Gap Connector Node positioned along timeline stem */}
+                        {followingGap && (
+                          <div className="flex items-center gap-3.5 my-1">
+                            <div className="flex flex-col items-center shrink-0 w-8">
+                              <div
+                                className={`size-2 rounded-full ${
+                                  followingGap.isBreach
+                                    ? "bg-[#FB3748] ring-4 ring-[#FFEBEC]"
+                                    : "bg-[#10B981] ring-4 ring-[#E3F7EC]"
+                                }`}
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <div
+                                className={`w-fit px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1.5 transition-all shadow-2xs ${
+                                  followingGap.isBreach
+                                    ? "bg-[#FFEBEC] text-[#FB3748] border border-[#FECDCA] font-bold"
+                                    : followingGap.isWarning
+                                    ? "bg-[#FFFAEB] text-[#B45309] border border-[#FDE8D3]"
+                                    : "bg-[#E3F7EC] text-[#0B4627] border border-[#D0F2DF]"
+                                }`}
+                              >
+                                {followingGap.isBreach ? (
+                                  <RiAlertLine className="size-3.5" />
+                                ) : (
+                                  <RiCheckLine className="size-3.5" />
+                                )}
+                                <span>
+                                  {followingGap.gapDays === 0
+                                    ? "Next Day (0d gap)"
+                                    : `${followingGap.gapDays}-day break ${
+                                        followingGap.isBreach
+                                          ? `· Limit Breach (> ${MAX_ALLOWED_GAP_DAYS}d max)`
+                                          : followingGap.isWarning
+                                          ? "· Approaching Limit"
+                                          : "· Compliant"
+                                      }`}
+                                </span>
                               </div>
                             </div>
                           </div>
-
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-xs"
-                            aria-label={`Remove ${ev.title}`}
-                            onClick={() => handleDeleteEvent(ev.id)}
-                            className="size-7 text-[#A4A4A4] hover:text-[#FB3748] hover:bg-[#FFEBEC] rounded-full transition-colors p-0 cursor-pointer"
-                          >
-                            <RiDeleteBinLine className="size-4" />
-                          </Button>
-                        </div>
-
-                        {/* Connector / Gap Node */}
-                        {followingGap && (
-                          <div className="flex items-center justify-center my-0.5">
-                            <div
-                              className={`px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1.5 transition-all ${
-                                followingGap.isBreach
-                                  ? "bg-[#FFEBEC] text-[#FB3748] shadow-2xs font-bold animate-pulse"
-                                  : followingGap.isWarning
-                                  ? "bg-[#FFFAEB] text-[#B45309]"
-                                  : "bg-[#E3F7EC] text-[#0B4627]"
-                              }`}
-                            >
-                              {followingGap.isBreach ? (
-                                <RiAlertLine className="size-3.5" />
-                              ) : (
-                                <RiCheckLine className="size-3.5" />
-                              )}
-                              <span>
-                                {followingGap.gapDays === 0
-                                  ? "Continuous / Next Day (0d gap)"
-                                  : `${followingGap.gapDays} day${followingGap.gapDays === 1 ? "" : "s"} break ${
-                                      followingGap.isBreach
-                                        ? `— BREACH (> ${MAX_ALLOWED_GAP_DAYS}d max)`
-                                        : followingGap.isWarning
-                                        ? "(Approaching 14-day limit)"
-                                        : "(Compliant)"
-                                    }`}
-                              </span>
-                            </div>
-                          </div>
                         )}
-                      </React.Fragment>
+                      </div>
                     );
                   })}
                 </div>
@@ -477,7 +520,7 @@ export function TourGapScheduleModal({
                     onChange={(e) => setNewTitle(e.target.value)}
                     placeholder="e.g. Manchester Arena Concert"
                     required
-                    className="bg-white border-0 shadow-2xs rounded-[10px] h-9 text-[13px]"
+                    className="bg-white border border-neutral-200/60 shadow-2xs rounded-[10px] h-9 text-[13px]"
                   />
                 </div>
                 <div className="space-y-1">
@@ -487,7 +530,7 @@ export function TourGapScheduleModal({
                     value={newType}
                     onChange={(e) => setNewType(e.target.value as any)}
                     placeholder="Performance / Rehearsal / Filming"
-                    className="bg-white border-0 shadow-2xs rounded-[10px] h-9 text-[13px]"
+                    className="bg-white border border-neutral-200/60 shadow-2xs rounded-[10px] h-9 text-[13px]"
                   />
                 </div>
               </div>
@@ -501,7 +544,7 @@ export function TourGapScheduleModal({
                     value={newStartDate}
                     onChange={(e) => setNewStartDate(e.target.value)}
                     required
-                    className="bg-white border-0 shadow-2xs rounded-[10px] h-9 text-[13px]"
+                    className="bg-white border border-neutral-200/60 shadow-2xs rounded-[10px] h-9 text-[13px]"
                   />
                 </div>
                 <div className="space-y-1">
@@ -511,7 +554,7 @@ export function TourGapScheduleModal({
                     type="date"
                     value={newEndDate}
                     onChange={(e) => setNewEndDate(e.target.value)}
-                    className="bg-white border-0 shadow-2xs rounded-[10px] h-9 text-[13px]"
+                    className="bg-white border border-neutral-200/60 shadow-2xs rounded-[10px] h-9 text-[13px]"
                   />
                 </div>
               </div>
@@ -524,7 +567,7 @@ export function TourGapScheduleModal({
                     value={newVenue}
                     onChange={(e) => setNewVenue(e.target.value)}
                     placeholder="e.g. AO Arena"
-                    className="bg-white border-0 shadow-2xs rounded-[10px] h-9 text-[13px]"
+                    className="bg-white border border-neutral-200/60 shadow-2xs rounded-[10px] h-9 text-[13px]"
                   />
                 </div>
                 <div className="space-y-1">
@@ -534,7 +577,7 @@ export function TourGapScheduleModal({
                     value={newCity}
                     onChange={(e) => setNewCity(e.target.value)}
                     placeholder="e.g. Manchester"
-                    className="bg-white border-0 shadow-2xs rounded-[10px] h-9 text-[13px]"
+                    className="bg-white border border-neutral-200/60 shadow-2xs rounded-[10px] h-9 text-[13px]"
                   />
                 </div>
                 <div className="space-y-1">
@@ -544,7 +587,7 @@ export function TourGapScheduleModal({
                     value={newFee}
                     onChange={(e) => setNewFee(e.target.value)}
                     placeholder="e.g. £2,500"
-                    className="bg-white border-0 shadow-2xs rounded-[10px] h-9 text-[13px]"
+                    className="bg-white border border-neutral-200/60 shadow-2xs rounded-[10px] h-9 text-[13px]"
                   />
                 </div>
               </div>
@@ -611,7 +654,7 @@ export function TourGapScheduleModal({
                   value={csvInput}
                   onChange={(e) => setCsvInput(e.target.value)}
                   placeholder={`Title,Start Date,End Date,Venue,City,Type,Fee\nLondon Show,2026-09-01,2026-09-03,O2 Arena,London,Performance,£2500\nManchester Show,2026-09-12,2026-09-14,AO Arena,Manchester,Performance,£2200`}
-                  className="w-full h-[100px] p-3 rounded-[10px] bg-white border-0 shadow-2xs text-[12px] font-mono resize-none focus:outline-none"
+                  className="w-full h-[100px] p-3 rounded-[10px] bg-white border border-neutral-200/60 shadow-2xs text-[12px] font-mono resize-none focus:outline-none"
                 />
                 <Button
                   type="button"
@@ -628,10 +671,10 @@ export function TourGapScheduleModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 border-t border-[#F5F5F5] bg-[#FAFAFA] flex flex-row items-center justify-between w-full shrink-0">
+        <div className="px-6 py-3.5 border-t border-[#F5F5F5] bg-white flex flex-row items-center justify-between w-full shrink-0">
           <div className="text-[12px] text-[#7B7B7B] flex items-center gap-1.5">
-            <span>UKVI Appendix Creative Worker tour limit:</span>
-            <span className="font-semibold text-[#171717]">14 calendar days maximum</span>
+            <span>UKVI Appendix Creative Worker:</span>
+            <span className="font-semibold text-[#171717]">Max 14 calendar days limit</span>
           </div>
 
           <div className="flex items-center gap-2.5">
@@ -640,7 +683,7 @@ export function TourGapScheduleModal({
               variant="ghost"
               size="sm"
               onClick={() => onOpenChange(false)}
-              className="h-8.5 px-4 rounded-full text-[13px] font-medium text-[#5C5C5C] hover:text-[#171717]"
+              className="h-8.5 px-4 rounded-full text-[13px] font-medium text-[#5C5C5C] hover:text-[#171717] bg-[#F5F5F5] hover:bg-[#EBEBEB]"
             >
               Close
             </Button>
