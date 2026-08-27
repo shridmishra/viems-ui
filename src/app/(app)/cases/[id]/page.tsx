@@ -355,6 +355,11 @@ function mapBackendCaseToDetail(c: any) {
       secondWorkAddressLine2: localWork?.secondWorkAddressLine2 || localWork?.secondWorkAddress2 || c.personal?.secondWorkAddress2 || c.personal?.secondWorkAddressLine2 || "",
       addressesList: localWork?.addressesList || [],
     },
+    roleId: c.role || c.roleId || c.category?.id || (c.category ? (typeof c.category === "object" ? c.category.id : c.category) : 1) || 1,
+    relatedYear: c.relatedYear || c.year || new Date().getFullYear(),
+    outcome: c.decision?.id || c.outcome || null,
+    cosStatusValue: c.cosStatus?.id || c.cosStatusValue || null,
+    rawCase: c,
   };
 }
 
@@ -994,16 +999,33 @@ export default function MigrantOverviewPage() {
               const matching = CASE_STATUSES.find((s) => isMatchingStatus(newStatus, s));
               const statusLabel = matching ? matching.label : newStatus;
               const formData = new FormData();
+
+              const roleId = typeof migrant.roleId === "number"
+                ? migrant.roleId
+                : parseInt(String(migrant.roleId || migrant.rawCase?.role || 1), 10) || 1;
+
+              formData.append("category", JSON.stringify({ id: roleId }));
+
+              const yearVal = migrant.relatedYear || migrant.rawCase?.relatedYear || new Date().getFullYear();
+              formData.append("relatedYear", String(yearVal));
               formData.append("status", statusLabel);
+
               if (newStatus.toLowerCase().includes("approved") || newStatus === "visa_approved") {
                 formData.append("decision", JSON.stringify({ id: "Granted" }));
               } else if (newStatus.toLowerCase().includes("refused") || newStatus === "visa_refused") {
                 formData.append("decision", JSON.stringify({ id: "Refused" }));
+              } else if (migrant.outcome) {
+                formData.append("decision", JSON.stringify({ id: migrant.outcome }));
               }
+
+              if (migrant.cosStatusValue) {
+                formData.append("cosStatus", JSON.stringify({ id: migrant.cosStatusValue }));
+              }
+
               await apiClient.patch(ENDPOINTS.cases.byId(id), {
                 body: formData,
               });
-              toast.success("Case status updated");
+              toast.success(`Case status updated to "${statusLabel}"`);
               loadCaseDetail();
             }
           } catch (err) {
