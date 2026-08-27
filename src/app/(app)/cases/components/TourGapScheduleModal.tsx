@@ -17,6 +17,7 @@ import {
   RiRouteLine,
   RiShieldCheckLine,
   RiMoneyCnyCircleLine,
+  RiFileExcel2Line,
 } from "@remixicon/react";
 import {
   Dialog,
@@ -508,126 +509,159 @@ export function TourGapScheduleModal({
             </div>
           )}
 
-          {/* TAB 2: ADD ENGAGEMENT FORM */}
+          {/* TAB 2: ADD ENGAGEMENT FORM (High-Fidelity Grouped Design) */}
           {activeTab === "add" && (
-            <form onSubmit={handleAddEvent} className="flex flex-col gap-3.5 bg-[#F9F9F9] rounded-[16px] p-5">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="ev-title" className="text-[12px] font-medium text-[#171717]">Engagement Title *</Label>
-                  <Input
-                    id="ev-title"
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    placeholder="e.g. Manchester Arena Concert"
-                    required
-                    className="bg-white border border-neutral-200/60 shadow-2xs rounded-[10px] h-9 text-[13px]"
-                  />
+            <form onSubmit={handleAddEvent} className="flex flex-col gap-3.5">
+              {/* Card Group 1: Engagement Basics */}
+              <div className="bg-[#F9F9F9] rounded-[16px] p-4.5 flex flex-col gap-3 border border-neutral-200/50">
+                <div className="flex items-center gap-2">
+                  <div className="size-6 rounded-full bg-[#EFEBFF] text-[#7D52F4] flex items-center justify-center">
+                    <RiCalendarEventLine className="size-3.5" />
+                  </div>
+                  <span className="font-aeonik-medium text-[14px] text-[#171717]">
+                    Engagement Details
+                  </span>
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="ev-type" className="text-[12px] font-medium text-[#171717]">Engagement Type</Label>
-                  <Input
-                    id="ev-type"
-                    value={newType}
-                    onChange={(e) => setNewType(e.target.value as any)}
-                    placeholder="Performance / Rehearsal / Filming"
-                    className="bg-white border border-neutral-200/60 shadow-2xs rounded-[10px] h-9 text-[13px]"
-                  />
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label htmlFor="ev-title" className="text-[11px] font-medium text-[#5C5C5C]">
+                      Title / Performance Name *
+                    </Label>
+                    <Input
+                      id="ev-title"
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      placeholder="e.g. Manchester Arena Concert"
+                      required
+                      className="bg-white border border-neutral-200/80 rounded-[10px] h-9.5 text-[13px] shadow-2xs focus:border-brand-medium"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="ev-type" className="text-[11px] font-medium text-[#5C5C5C]">
+                      Engagement Type
+                    </Label>
+                    <Input
+                      id="ev-type"
+                      value={newType}
+                      onChange={(e) => setNewType(e.target.value as any)}
+                      placeholder="Performance / Rehearsal"
+                      className="bg-white border border-neutral-200/80 rounded-[10px] h-9.5 text-[13px] shadow-2xs focus:border-brand-medium"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="ev-start" className="text-[12px] font-medium text-[#171717]">Start Date *</Label>
-                  <Input
-                    id="ev-start"
-                    type="date"
-                    value={newStartDate}
-                    onChange={(e) => setNewStartDate(e.target.value)}
-                    required
-                    className="bg-white border border-neutral-200/60 shadow-2xs rounded-[10px] h-9 text-[13px]"
-                  />
+              {/* Card Group 2: Timeframe & Location */}
+              <div className="bg-[#F9F9F9] rounded-[16px] p-4.5 flex flex-col gap-3 border border-neutral-200/50">
+                <div className="flex items-center gap-2">
+                  <div className="size-6 rounded-full bg-[#EFEBFF] text-[#7D52F4] flex items-center justify-center">
+                    <RiMapPinLine className="size-3.5" />
+                  </div>
+                  <span className="font-aeonik-medium text-[14px] text-[#171717]">
+                    Timeframe &amp; Location
+                  </span>
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="ev-end" className="text-[12px] font-medium text-[#171717]">End Date</Label>
-                  <Input
-                    id="ev-end"
-                    type="date"
-                    value={newEndDate}
-                    onChange={(e) => setNewEndDate(e.target.value)}
-                    className="bg-white border border-neutral-200/60 shadow-2xs rounded-[10px] h-9 text-[13px]"
-                  />
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="ev-start" className="text-[11px] font-medium text-[#5C5C5C]">
+                      Start Date *
+                    </Label>
+                    <Input
+                      id="ev-start"
+                      type="date"
+                      value={newStartDate}
+                      onChange={(e) => setNewStartDate(e.target.value)}
+                      required
+                      className="bg-white border border-neutral-200/80 rounded-[10px] h-9.5 text-[13px] shadow-2xs focus:border-brand-medium"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="ev-end" className="text-[11px] font-medium text-[#5C5C5C]">
+                      End Date
+                    </Label>
+                    <Input
+                      id="ev-end"
+                      type="date"
+                      value={newEndDate}
+                      onChange={(e) => setNewEndDate(e.target.value)}
+                      className="bg-white border border-neutral-200/80 rounded-[10px] h-9.5 text-[13px] shadow-2xs focus:border-brand-medium"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="ev-venue" className="text-[11px] font-medium text-[#5C5C5C]">
+                      Venue / Studio
+                    </Label>
+                    <Input
+                      id="ev-venue"
+                      value={newVenue}
+                      onChange={(e) => setNewVenue(e.target.value)}
+                      placeholder="e.g. AO Arena"
+                      className="bg-white border border-neutral-200/80 rounded-[10px] h-9.5 text-[13px] shadow-2xs focus:border-brand-medium"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="ev-fee" className="text-[11px] font-medium text-[#5C5C5C]">
+                      Agreed Fee / Pay
+                    </Label>
+                    <Input
+                      id="ev-fee"
+                      value={newFee}
+                      onChange={(e) => setNewFee(e.target.value)}
+                      placeholder="e.g. £2,500"
+                      className="bg-white border border-neutral-200/80 rounded-[10px] h-9.5 text-[13px] shadow-2xs focus:border-brand-medium"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="ev-venue" className="text-[12px] font-medium text-[#171717]">Venue / Studio</Label>
-                  <Input
-                    id="ev-venue"
-                    value={newVenue}
-                    onChange={(e) => setNewVenue(e.target.value)}
-                    placeholder="e.g. AO Arena"
-                    className="bg-white border border-neutral-200/60 shadow-2xs rounded-[10px] h-9 text-[13px]"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="ev-city" className="text-[12px] font-medium text-[#171717]">City</Label>
-                  <Input
-                    id="ev-city"
-                    value={newCity}
-                    onChange={(e) => setNewCity(e.target.value)}
-                    placeholder="e.g. Manchester"
-                    className="bg-white border border-neutral-200/60 shadow-2xs rounded-[10px] h-9 text-[13px]"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="ev-fee" className="text-[12px] font-medium text-[#171717]">Fee / Pay</Label>
-                  <Input
-                    id="ev-fee"
-                    value={newFee}
-                    onChange={(e) => setNewFee(e.target.value)}
-                    placeholder="e.g. £2,500"
-                    className="bg-white border border-neutral-200/60 shadow-2xs rounded-[10px] h-9 text-[13px]"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2.5 mt-2">
+              <div className="flex items-center justify-end gap-2.5 pt-1">
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   onClick={() => setActiveTab("schedule")}
-                  className="rounded-full text-[13px]"
+                  className="rounded-full text-[13px] h-9 px-4 text-[#5C5C5C] hover:text-[#171717] bg-[#F5F5F5] hover:bg-[#EBEBEB]"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   size="sm"
-                  className="bg-brand-medium hover:bg-brand-dark text-white gap-1.5 rounded-full text-[13px]"
+                  className="bg-brand-medium hover:bg-brand-dark text-white gap-1.5 rounded-full text-[13px] h-9 px-5 shadow-sm"
                 >
                   <RiAddLine className="size-4" />
-                  Add &amp; Recalculate Gaps
+                  Add Engagement to Itinerary
                 </Button>
               </div>
             </form>
           )}
 
-          {/* TAB 3: UPLOAD CSV / SPREADSHEET */}
+          {/* TAB 3: UPLOAD CSV / SPREADSHEET (Modern Styled Dropzone & Syntax Box) */}
           {activeTab === "upload" && (
             <div className="flex flex-col gap-4">
-              <div className="p-8 bg-[#F9F9F9] rounded-[16px] flex flex-col items-center justify-center text-center gap-2">
-                <RiUpload2Line className="size-8 text-brand-medium" />
+              {/* Styled Dropzone */}
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="p-7 border-2 border-dashed border-[#7D52F4]/30 hover:border-[#7D52F4] bg-[#FAF8FF] hover:bg-[#F6F2FF] rounded-[18px] transition-all flex flex-col items-center justify-center text-center gap-2 cursor-pointer group"
+              >
+                <div className="size-11 rounded-full bg-[#EFEBFF] text-[#7D52F4] group-hover:scale-105 transition-transform flex items-center justify-center mb-0.5 shadow-2xs">
+                  <RiUpload2Line className="size-6" />
+                </div>
                 <div>
                   <p className="font-aeonik-medium text-[15px] text-[#171717]">
                     Upload Production Itinerary / Tour Schedule
                   </p>
                   <p className="text-[12px] text-[#7B7B7B] mt-0.5">
-                    Upload an ENT IMM schedule, tour CSV, or spreadsheet export to automatically detect tour gaps.
+                    Drag and drop an ENT IMM schedule, tour CSV, or Excel spreadsheet (.csv, .txt)
                   </p>
                 </div>
-                <div className="flex flex-col items-center gap-2 mt-2">
+                <div className="flex items-center gap-2 mt-1">
                   <Input
                     type="file"
                     ref={fileInputRef}
@@ -639,32 +673,43 @@ export function TourGapScheduleModal({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="gap-1.5 bg-white cursor-pointer rounded-full h-8 text-[12px] shadow-2xs"
+                    className="gap-1.5 bg-white pointer-events-none rounded-full h-8 text-[12px] shadow-2xs border-neutral-200"
                   >
-                    <RiFileLine className="size-3.5" />
-                    Select Schedule File (.csv)
+                    <RiFileLine className="size-3.5 text-[#7D52F4]" />
+                    Browse Schedule File (.csv)
                   </Button>
                 </div>
               </div>
 
-              <div className="space-y-1.5 bg-[#F9F9F9] rounded-[16px] p-4">
-                <Label className="text-[12px] font-medium text-[#171717]">Or Paste CSV Schedule Data</Label>
+              {/* Paste CSV Data Box */}
+              <div className="bg-[#F9F9F9] rounded-[18px] p-4.5 flex flex-col gap-3 border border-neutral-200/50">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="font-aeonik-medium text-[13px] text-[#171717]">
+                    Or Paste CSV Schedule Data
+                  </span>
+                  <span className="text-[10px] font-mono text-neutral-500 bg-neutral-200/60 px-2 py-0.5 rounded-full">
+                    Format: Title, Start Date, End Date, Venue, City, Type, Fee
+                  </span>
+                </div>
+
                 <Textarea
                   value={csvInput}
                   onChange={(e) => setCsvInput(e.target.value)}
                   placeholder={`Title,Start Date,End Date,Venue,City,Type,Fee\nLondon Show,2026-09-01,2026-09-03,O2 Arena,London,Performance,£2500\nManchester Show,2026-09-12,2026-09-14,AO Arena,Manchester,Performance,£2200`}
-                  className="w-full h-[100px] p-3 rounded-[10px] bg-white border border-neutral-200/60 shadow-2xs text-[12px] font-mono resize-none focus:outline-none"
+                  className="w-full h-[100px] p-3 rounded-[12px] bg-white border border-neutral-200/80 shadow-2xs text-[12px] font-mono leading-relaxed text-[#171717] resize-none focus:border-brand-medium focus:outline-none"
                 />
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleCsvImport}
-                  className="w-full bg-brand-medium hover:bg-brand-dark text-white gap-1.5 rounded-full text-[13px] h-8.5 mt-1"
-                >
-                  <RiCheckLine className="size-4" />
-                  Parse &amp; Validate Tour Gaps
-                </Button>
+
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleCsvImport}
+                    className="bg-brand-medium hover:bg-brand-dark text-white gap-1.5 rounded-full text-[13px] h-8.5 px-5 shadow-sm"
+                  >
+                    <RiCheckLine className="size-4" />
+                    Parse &amp; Validate Tour Gaps
+                  </Button>
+                </div>
               </div>
             </div>
           )}
