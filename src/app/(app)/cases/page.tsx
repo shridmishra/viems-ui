@@ -56,6 +56,8 @@ import { getCountryInfo } from "@/lib/country";
 import { Flag } from "@/components/ui/flag";
 import { SortIcon } from "@/components/ui/sort-icon";
 import { ImportMigrantsModal } from "../dashboard/components/ImportMigrantsModal";
+import { HighRiskBadge } from "./components/HighRiskBadge";
+import { evaluateCaseRisk } from "@/lib/case-risk-evaluator";
 import { toast } from "sonner";
 
 const CasesIcon = ({ active, ...props }: { active?: boolean } & React.SVGProps<SVGSVGElement>) => (
@@ -111,6 +113,7 @@ export default function CasesPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [currentPage, setCurrentPage] = React.useState(1);
   const [needsActionOnly, setNeedsActionOnly] = React.useState(initialNeedsActionParam);
+  const [highRiskOnly, setHighRiskOnly] = React.useState(false);
 
   // Filter states initialized from URL searchParams
   const [countryFilter, setCountryFilter] = React.useState<string | null>(initialCountryParam);
@@ -165,6 +168,7 @@ export default function CasesPage() {
     setCaseIdFilter(null);
     setQuickFilter(null);
     setNeedsActionOnly(false);
+    setHighRiskOnly(false);
     setSelectedGroup(null);
     setFilterPanelOpen(false);
   };
@@ -392,18 +396,14 @@ export default function CasesPage() {
       if (activeTab === "refusals") {
         return isRefused;
       } else if (activeTab === "cases" || selectedGroup) {
-        const normStage = stageFilter ? stageFilter.toUpperCase().replace(/_/g, " ").trim() : null;
-        if (statusFilter === "Visa Refused" || statusFilter === "refused" || normStage === "VISA") {
+        if (statusFilter === "Visa Refused" || statusFilter === "refused") {
           return true;
         }
-        if (statusFilter) {
-          return true;
-        }
-        return isCaseInProgress(item);
+        return !isRefused;
       }
       return true;
     });
-  }, [tabScopedCases, activeTab, selectedGroup, statusFilter, stageFilter]);
+  }, [tabScopedCases, activeTab, selectedGroup, statusFilter]);
 
   // Dynamically compute unique countries and statuses with their counts from tabScopedCases
   const uniqueCountries = React.useMemo(() => {
@@ -525,12 +525,16 @@ export default function CasesPage() {
       );
 
       if (needsActionOnly) {
-        return matchesSearch && matchesCountry && matchesStatus && matchesMigration && matchesStage && matchesSeverity && matchesCaseId && matchesQuick && item.actionColor !== "gray" && item.action !== "No action required";
+        if (item.actionColor === "gray" || item.action === "No action required") return false;
+      }
+      if (highRiskOnly) {
+        const assessment = evaluateCaseRisk(item);
+        if (!assessment.isHighRisk && !assessment.isMediumRisk) return false;
       }
       return matchesSearch && matchesCountry && matchesStatus && matchesMigration && matchesStage && matchesSeverity && matchesCaseId && matchesQuick;
     });
     return result;
-  }, [tabCases, searchQuery, needsActionOnly, countryFilter, statusFilter, migrationFilter, stageFilter, severityFilter, caseIdFilter, quickFilter]);
+  }, [tabCases, searchQuery, needsActionOnly, highRiskOnly, countryFilter, statusFilter, migrationFilter, stageFilter, severityFilter, caseIdFilter, quickFilter]);
 
   // Compute Group Summary data for the "Groups" tab
   const groupedData = React.useMemo(() => {
@@ -626,7 +630,7 @@ export default function CasesPage() {
   // Reset current page when filters, sorting, tab, or grouping changes
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, countryFilter, statusFilter, migrationFilter, stageFilter, severityFilter, caseIdFilter, quickFilter, activeTab, selectedGroup, sortColumn, sortDirection, pageSize]);
+  }, [searchQuery, countryFilter, statusFilter, migrationFilter, stageFilter, severityFilter, caseIdFilter, quickFilter, highRiskOnly, needsActionOnly, activeTab, selectedGroup, sortColumn, sortDirection, pageSize]);
 
   const isGroupSummaryView = activeTab === "groups" && !selectedGroup;
   const totalCount = isGroupSummaryView ? sortedGroupedData.length : sortedFilteredCases.length;
@@ -1165,8 +1169,8 @@ export default function CasesPage() {
       </div>
 
       <div className="px-6 md:px-[64px] py-[32px] flex flex-col gap-[32px] flex-1">
-        <div className="flex flex-wrap items-center gap-[12px] h-[32px]">
-          <div className="relative w-full max-w-[348px] h-[32px] flex items-center bg-white shadow-x-small rounded-[8px] border border-neutral-200/40 focus-within:border-[#7D52F4]">
+        <div className="flex items-center gap-[10px] min-h-[32px] flex-wrap">
+          <div className="relative w-[260px] h-[32px] flex items-center bg-white shadow-x-small rounded-[8px] border border-neutral-200/40 focus-within:border-[#7D52F4]">
             <RiSearchLine className="absolute left-2.5 top-1/2 -translate-y-1/2 size-5 text-[#A4A4A4] z-10 pointer-events-none" />
             {selectedGroup && (
               <div className="ml-8 my-1 mr-1 pl-2 pr-1 py-0.5 bg-[#F5F5F5] text-[#171717] rounded-[6px] text-[12px] font-medium flex items-center gap-1 shrink-0 border border-[#EBEBEB]">
@@ -1204,21 +1208,21 @@ export default function CasesPage() {
 
           <div className="relative">
             {(() => {
-              const activeFilterCount = (countryFilter ? 1 : 0) + (statusFilter ? 1 : 0) + (migrationFilter ? 1 : 0) + (severityFilter ? 1 : 0) + (caseIdFilter ? 1 : 0) + (quickFilter ? 1 : 0) + (needsActionOnly ? 1 : 0);
+              const activeFilterCount = (countryFilter ? 1 : 0) + (statusFilter ? 1 : 0) + (migrationFilter ? 1 : 0) + (severityFilter ? 1 : 0) + (caseIdFilter ? 1 : 0) + (quickFilter ? 1 : 0) + (needsActionOnly ? 1 : 0) + (highRiskOnly ? 1 : 0);
               return (
                 <button
                   type="button"
                   onClick={() => setFilterPanelOpen(!filterPanelOpen)}
-                  className={`size-8 rounded-[8px] flex items-center justify-center transition-all border-0 shadow-x-small cursor-pointer ${
+                  className={`h-8 ${activeFilterCount > 0 ? "px-2.5 gap-1.5" : "w-8"} rounded-[8px] flex items-center justify-center transition-all border-0 shadow-x-small cursor-pointer ${
                     activeFilterCount > 0
                       ? "bg-[#171717] text-white"
                       : "bg-white text-[#5C5C5C] hover:bg-neutral-50"
                   }`}
                   title="Open filters"
                 >
-                  <RiFilter3Line className="size-5 shrink-0" />
+                  <RiFilter3Line className="size-4.5 shrink-0" />
                   {activeFilterCount > 0 && (
-                    <span className="w-4 h-4 rounded-full bg-white text-[#171717] text-[10px] font-bold flex items-center justify-center">
+                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-white/20 text-white text-[11px] font-medium flex items-center justify-center">
                       {activeFilterCount}
                     </span>
                   )}
@@ -1604,6 +1608,20 @@ export default function CasesPage() {
                 }`}
               >
                 Needs action
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setHighRiskOnly(!highRiskOnly)}
+                className={`h-8 px-3 text-[14px] font-medium justify-center rounded-[8px] border-0 shadow-x-small cursor-pointer transition-colors ${
+                  highRiskOnly
+                    ? "bg-[#FFEBEC] text-[#FB3748] hover:bg-[#FFEBEC]"
+                    : "bg-white text-[#171717] hover:bg-neutral-50"
+                }`}
+              >
+                High Risk
               </Button>
             </>
           )}
@@ -2051,9 +2069,12 @@ export default function CasesPage() {
                             </div>
                           )}
                           <div className="flex flex-col justify-center min-w-0 gap-0.5 flex-1">
-                            <span className="font-medium text-[#171717] truncate leading-5 text-[14px] tracking-[-0.006em]">
-                              {row.name}
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                              <span className="font-medium text-[#171717] truncate leading-5 text-[14px] tracking-[-0.006em]">
+                                {row.name}
+                              </span>
+                              <HighRiskBadge caseData={row} migrantName={row.name} />
+                            </div>
                             <span className="text-[12px] leading-4 text-[#5C5C5C] truncate font-normal">
                               {row.group || "No group"}
                             </span>

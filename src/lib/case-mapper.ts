@@ -29,6 +29,10 @@ export interface CaseRow {
   case_status?: string;
   migration_stage?: string;
   is_active?: boolean;
+  passportExpiryDate?: string;
+  cosStartDate?: string;
+  cosEndDate?: string;
+  rawRecord?: any;
 }
 
 export function getStatusDetails(rawStatus?: string): { label: string; color: "success" | "warning" | "error" | "info" | "gray" } {
@@ -126,7 +130,10 @@ export function mapBackendCaseToRow(c: RawCaseRecord, completedActions?: Set<str
     visa: c.visa,
     case_status: c.case_status,
     migration_stage: c.migration_stage,
-    is_active: c.is_active,
+    passportExpiryDate: (c as any).passport_expiry_date || (c as any).passportExpiryDate || (c as any).expiry_date || (c as any).expiryDate || (c as any).passport?.expiryDate || (c as any).personal?.passportExpiry || undefined,
+    cosStartDate: (c as any).cos_start_date || (c as any).cosStartDate || (c as any).work_start_date || (c as any).start_date || (c as any).employment?.startDate || undefined,
+    cosEndDate: (c as any).cos_end_date || (c as any).cosEndDate || (c as any).work_end_date || (c as any).end_date || (c as any).employment?.endDate || undefined,
+    rawRecord: c,
   };
 }
 
