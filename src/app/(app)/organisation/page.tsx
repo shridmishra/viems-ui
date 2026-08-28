@@ -65,9 +65,10 @@ function OrganisationPageContent() {
     router.replace(`/organisation?tab=team&sub=${sub}`, { scroll: false });
   };
 
-  const handleDownloadReport = () => {
+  const handleDownloadReport = async () => {
     try {
       setDownloadingReport(true);
+      await new Promise((resolve) => setTimeout(resolve, 50));
       const doc = generateOrganisationComplianceReport({
         companyName: "ENT Imm",
         sponsorLicence: "ENT1234567",

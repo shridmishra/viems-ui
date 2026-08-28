@@ -104,28 +104,31 @@ export function ComplianceTab({
   const [error, setError] = React.useState<string | null>(null);
   const [exportingDossier, setExportingDossier] = React.useState(false);
 
-  const handleExportDossier = () => {
+  const handleExportDossier = async () => {
     try {
       setExportingDossier(true);
+      await new Promise((resolve) => setTimeout(resolve, 50));
       const migrantName =
         caseData?.name ||
         caseData?.migrant?.name ||
         formatFullName(caseData?.first_name, caseData?.last_name) ||
-        "Alex Marin";
+        "—";
+      const initials = migrantName
+        .split(" ")
+        .filter(Boolean)
+        .map((w: string) => w[0]?.toUpperCase() || "")
+        .join("") || "M";
       const doc = generateCaseDossierReport({
         migrantName,
         jobTitle:
           caseData?.role ||
           caseData?.job_title ||
           caseData?.employment?.jobTitle ||
-          "Creative Director",
+          "—",
         sponsorName: caseData?.sponsor_name || caseData?.employer || "ENT Imm",
-        caseNumber: String(caseData?.caseIdDisplay || caseData?.caseNumber || id || "431/2026"),
-        cosReference: caseData?.cosNumber || caseData?.cos_number || "C5K8M2P7Q",
-        refNumber: `CMD-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${migrantName
-          .split(" ")
-          .map((w: string) => w[0])
-          .join("")}-FULL`,
+        caseNumber: String(caseData?.caseIdDisplay || caseData?.caseNumber || id || "—"),
+        cosReference: caseData?.cosNumber || caseData?.cos_number || "—",
+        refNumber: `CMD-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${initials}-FULL`,
         generatedDate: `${new Date().toLocaleDateString("en-GB", {
           day: "numeric",
           month: "short",
@@ -134,22 +137,23 @@ export function ComplianceTab({
         statusComplete: true,
         personalDetails: {
           fullName: migrantName,
-          dob: caseData?.dob || caseData?.date_of_birth || caseData?.personal?.dob || "18 Feb 1988",
-          nationality: caseData?.nationality_value || caseData?.country || "Indian",
-          jobTitle: caseData?.role || caseData?.job_title || "Creative Director",
-          projectAssignment: caseData?.project || caseData?.group || "Northstar Festival & Film Campaign",
+          dob: caseData?.dob || caseData?.date_of_birth || caseData?.personal?.dob || "—",
+          nationality: caseData?.nationality_value || caseData?.country || "—",
+          jobTitle: caseData?.role || caseData?.job_title || caseData?.employment?.jobTitle || "—",
+          projectAssignment: caseData?.project || caseData?.group || "—",
           sponsor: caseData?.sponsor_name || caseData?.employer || "ENT Imm",
         },
         immigrationDetails: {
-          passportNumber: caseData?.passport_number || caseData?.passportNumber || "P1234567",
-          sharecode: caseData?.share_code || caseData?.sharecode || "W9A-4BC-72D",
-          visaValidFrom: caseData?.visa_start_date || caseData?.cosStartDate || "15 Jul 2026",
-          visaValidTo: caseData?.visa_end_date || caseData?.cosEndDate || "31 Mar 2027",
-          rtwCompletedDate: "12 Jul 2026",
-          cosReference: caseData?.cosNumber || caseData?.cos_number || "C5K8M2P7Q",
+          passportNumber: caseData?.passport_number || caseData?.passportNumber || "—",
+          sharecode: caseData?.share_code || caseData?.sharecode || "—",
+          visaValidFrom: caseData?.visa_start_date || caseData?.cosStartDate || "—",
+          visaValidTo: caseData?.visa_end_date || caseData?.cosEndDate || "—",
+          rtwCompletedDate: caseData?.rtw_completed_date || caseData?.rtwCompletedDate || "—",
+          cosReference: caseData?.cosNumber || caseData?.cos_number || "—",
         },
       });
-      downloadPdf(doc, `Viems_Case_Dossier_${migrantName.replace(/\s+/g, "_")}.pdf`);
+      const safeFileName = migrantName.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_") || "Migrant";
+      downloadPdf(doc, `Viems_Case_Dossier_${safeFileName}.pdf`);
       toast.success(`Comprehensive Case Dossier for ${migrantName} downloaded.`);
     } catch (err) {
       console.error("Failed to generate case dossier:", err);
@@ -570,8 +574,8 @@ export function ComplianceTab({
               variant="outline"
               size="sm"
               onClick={handleExportDossier}
-              disabled={exportingDossier}
-              className="h-8 px-3 rounded-[8px] bg-white hover:bg-[#F5F5F5] text-[#171717] text-[12px] font-medium flex items-center gap-1.5 border border-[#EBEBEB] shadow-x-small cursor-pointer shrink-0"
+              disabled={exportingDossier || loading || !caseData}
+              className="h-8 px-3 rounded-[8px] bg-white hover:bg-[#F5F5F5] text-[#171717] text-[12px] font-medium flex items-center gap-1.5 border border-[#EBEBEB] shadow-x-small cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RiDownload2Line className="size-3.5 text-[#5C5C5C]" />
               <span>{exportingDossier ? "Exporting..." : "Export Dossier (PDF)"}</span>

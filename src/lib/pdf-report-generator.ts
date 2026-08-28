@@ -221,25 +221,44 @@ function drawTable(
   y: number,
   w: number,
   cols: { header: string; width: number; align?: "left" | "right" | "center" }[],
-  rows: (string | { text: string; badge?: "success" | "warning" | "error" | "info" | "purple" })[][]
-) {
+  rows: (string | { text: string; badge?: "success" | "warning" | "error" | "info" | "purple" })[][],
+  options?: { pageNum?: number; totalPages?: number; refCode?: string }
+): number {
   const rowH = 7;
-  // Header row
-  doc.setFillColor(245, 245, 245);
-  doc.rect(x, y, w, rowH, "F");
+  const pageBottomLimit = 275;
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(92, 92, 92);
+  const renderTableHeader = (headerY: number) => {
+    doc.setFillColor(245, 245, 245);
+    doc.rect(x, headerY, w, rowH, "F");
 
-  let curX = x + 3;
-  cols.forEach((c) => {
-    doc.text(c.header.toUpperCase(), curX, y + 4.5);
-    curX += c.width;
-  });
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(92, 92, 92);
+
+    let curX = x + 3;
+    cols.forEach((c) => {
+      doc.text(c.header.toUpperCase(), curX, headerY + 4.5);
+      curX += c.width;
+    });
+  };
+
+  renderTableHeader(y);
 
   let curY = y + rowH;
   rows.forEach((row, rIdx) => {
+    if (curY + rowH > pageBottomLimit) {
+      doc.addPage();
+      if (options?.pageNum && options?.totalPages) {
+        drawHeader(doc, options.pageNum, options.totalPages);
+        if (options.refCode) {
+          drawFooter(doc, options.refCode, options.pageNum, options.totalPages);
+        }
+      }
+      curY = 35;
+      renderTableHeader(curY);
+      curY += rowH;
+    }
+
     if (rIdx % 2 === 1) {
       doc.setFillColor(250, 250, 250);
       doc.rect(x, curY, w, rowH, "F");
@@ -247,7 +266,7 @@ function drawTable(
     doc.setDrawColor(240, 240, 240);
     doc.line(x, curY + rowH, x + w, curY + rowH);
 
-    curX = x + 3;
+    let curX = x + 3;
     row.forEach((cell, cIdx) => {
       const colWidth = cols[cIdx]?.width || 30;
       if (typeof cell === "object" && cell.badge) {
@@ -256,7 +275,7 @@ function drawTable(
         doc.setFont("helvetica", "normal");
         doc.setFontSize(7.5);
         doc.setTextColor(23, 23, 23);
-        const cellText = typeof cell === "object" ? cell.text : String(cell);
+        const cellText = typeof cell === "object" ? cell.text : String(cell ?? "—");
         doc.text(cellText, curX, curY + 4.8);
       }
       curX += colWidth;
@@ -297,8 +316,8 @@ function drawEvidenceCard(
   );
 
   // Key-Value Grid (2 columns)
-  let fX1 = x + 6;
-  let fX2 = x + w / 2 + 2;
+  const fX1 = x + 6;
+  const fX2 = x + w / 2 + 2;
   let fY = y + 16;
 
   for (let i = 0; i < fields.length; i += 2) {
@@ -441,7 +460,106 @@ export function generateOrganisationComplianceReport(
   const refCode = data?.refNumber || "OCR-20260803-ENTIMM-FULL";
   const genDate = data?.generatedDate || "3 Aug 2026 - 13:31";
   const isComplete = data?.statusComplete ?? true;
-  const totalPages = 7;
+
+  const defaultOrgEvidence = [
+    // Page 5: Sponsor Licence & CoS Allocation Letter
+    {
+      title: "Sponsor licence",
+      isAttached: true,
+      fields: [
+        { label: "Organisation", value: company },
+        { label: "Licence Number", value: licence },
+        { label: "Routes", value: "Worker / Temporary Worker" },
+        { label: "Status", value: "Active" },
+        { label: "Authorising Officer", value: "Alex Marin" },
+        { label: "Expiry / Review", value: "30 Jun 2027" },
+      ],
+      notes: "Sponsor licence record and authorised organisation details.",
+      fileName: "sponsor_licence.pdf",
+      reviewed: "3 Aug 2026 by Alex Marin",
+    },
+    {
+      title: "CoS allocation letter",
+      isAttached: true,
+      fields: [
+        { label: "Allocation Year", value: "2026/27" },
+        { label: "Route", value: "Creative Worker" },
+        { label: "Requested", value: "12" },
+        { label: "Allocated", value: "10" },
+        { label: "Decision Date", value: "1 Jul 2026" },
+        { label: "Reference", value: "ALLOC-ENT-260701" },
+      ],
+      notes: "Allocation decision reconciled to the internal CoS ledger.",
+      fileName: "cos_allocation_letter.pdf",
+      reviewed: "3 Aug 2026 by Alex Marin",
+    },
+    // Page 6: CoS Ledger Extract & SOP Manual
+    {
+      title: "CoS ledger extract",
+      isAttached: true,
+      fields: [
+        { label: "Ledger Period", value: "Jul-Aug 2026" },
+        { label: "Allocated", value: "10" },
+        { label: "Assigned", value: "6" },
+        { label: "Used", value: "5" },
+        { label: "Withdrawn", value: "1" },
+        { label: "Cancelled", value: "0" },
+      ],
+      notes: "Detailed ledger includes worker, project, assignment and status references.",
+      fileName: "cos_ledger_extract.pdf",
+      reviewed: "3 Aug 2026 by Alex Marin",
+    },
+    {
+      title: "SOP manual",
+      isAttached: true,
+      fields: [
+        { label: "Document", value: "Sponsor compliance SOP" },
+        { label: "Version", value: "2.1" },
+        { label: "Owner", value: "Alex Marin" },
+        { label: "Approved", value: "1 Jul 2026" },
+        { label: "Next Review", value: "1 Jan 2027" },
+        { label: "Controls", value: "RTW, records, reporting" },
+      ],
+      notes: "Policy covers identity checks, record retention, attendance and the 10-day reporting window.",
+      fileName: "ENT_Imm_Sponsor_Compliance_SOP.pdf",
+      reviewed: "3 Aug 2026 by Alex Marin",
+    },
+    // Page 7: SMS Access Register & UKVI Audit Correspondence
+    {
+      title: "SMS access register",
+      isAttached: true,
+      fields: [
+        { label: "System", value: "Sponsor Management System" },
+        { label: "Level 1 Users", value: "2" },
+        { label: "Primary User", value: "Alex Marin" },
+        { label: "Secondary User", value: "Priya Shah" },
+        { label: "Last Review", value: "3 Aug 2026" },
+        { label: "Next Review", value: "3 Nov 2026" },
+      ],
+      notes: "Access reviewed against current responsibilities; leaver and privilege checks recorded.",
+      fileName: "ENT_Imm_SMS_access_register.pdf",
+      reviewed: "3 Aug 2026 by Alex Marin",
+    },
+    {
+      title: "UKVI audit correspondence",
+      isAttached: true,
+      fields: [
+        { label: "Audit Date", value: "14 May 2026" },
+        { label: "Reference", value: "UKVI-AUD-ENT-140526" },
+        { label: "Reviewer", value: "UKVI Compliance Team" },
+        { label: "Outcome", value: "No action required" },
+        { label: "Actions Raised", value: "0" },
+        { label: "Closed", value: "14 May 2026" },
+      ],
+      notes: "Audit correspondence retained with findings and action closure evidence.",
+      fileName: "ukvi_audit_correspondence.pdf",
+      reviewed: "3 Aug 2026 by Alex Marin",
+    },
+  ];
+
+  const evidenceList = data?.evidenceRecords && data.evidenceRecords.length > 0 ? data.evidenceRecords : defaultOrgEvidence;
+  const evidencePagesCount = Math.max(1, Math.ceil(evidenceList.length / 2));
+  const totalPages = 4 + evidencePagesCount;
 
   // ----------------------------------------------------
   // PAGE 1: COVER
@@ -786,107 +904,9 @@ export function generateOrganisationComplianceReport(
   drawFooter(doc, refCode, 4, totalPages);
 
   // ----------------------------------------------------
-  // PAGES 5, 6, 7: ORGANISATION EVIDENCE REGISTER
+  // PAGES 5+: ORGANISATION EVIDENCE REGISTER
   // ----------------------------------------------------
-  const defaultOrgEvidence = [
-    // Page 5: Sponsor Licence & CoS Allocation Letter
-    {
-      title: "Sponsor licence",
-      isAttached: true,
-      fields: [
-        { label: "Organisation", value: company },
-        { label: "Licence Number", value: licence },
-        { label: "Routes", value: "Worker / Temporary Worker" },
-        { label: "Status", value: "Active" },
-        { label: "Authorising Officer", value: "Alex Marin" },
-        { label: "Expiry / Review", value: "30 Jun 2027" },
-      ],
-      notes: "Sponsor licence record and authorised organisation details.",
-      fileName: "sponsor_licence.pdf",
-      reviewed: "3 Aug 2026 by Alex Marin",
-    },
-    {
-      title: "CoS allocation letter",
-      isAttached: true,
-      fields: [
-        { label: "Allocation Year", value: "2026/27" },
-        { label: "Route", value: "Creative Worker" },
-        { label: "Requested", value: "12" },
-        { label: "Allocated", value: "10" },
-        { label: "Decision Date", value: "1 Jul 2026" },
-        { label: "Reference", value: "ALLOC-ENT-260701" },
-      ],
-      notes: "Allocation decision reconciled to the internal CoS ledger.",
-      fileName: "cos_allocation_letter.pdf",
-      reviewed: "3 Aug 2026 by Alex Marin",
-    },
-    // Page 6: CoS Ledger Extract & SOP Manual
-    {
-      title: "CoS ledger extract",
-      isAttached: true,
-      fields: [
-        { label: "Ledger Period", value: "Jul-Aug 2026" },
-        { label: "Allocated", value: "10" },
-        { label: "Assigned", value: "6" },
-        { label: "Used", value: "5" },
-        { label: "Withdrawn", value: "1" },
-        { label: "Cancelled", value: "0" },
-      ],
-      notes: "Detailed ledger includes worker, project, assignment and status references.",
-      fileName: "cos_ledger_extract.pdf",
-      reviewed: "3 Aug 2026 by Alex Marin",
-    },
-    {
-      title: "SOP manual",
-      isAttached: true,
-      fields: [
-        { label: "Document", value: "Sponsor compliance SOP" },
-        { label: "Version", value: "2.1" },
-        { label: "Owner", value: "Alex Marin" },
-        { label: "Approved", value: "1 Jul 2026" },
-        { label: "Next Review", value: "1 Jan 2027" },
-        { label: "Controls", value: "RTW, records, reporting" },
-      ],
-      notes: "Policy covers identity checks, record retention, attendance and the 10-day reporting window.",
-      fileName: "ENT_Imm_Sponsor_Compliance_SOP.pdf",
-      reviewed: "3 Aug 2026 by Alex Marin",
-    },
-    // Page 7: SMS Access Register & UKVI Audit Correspondence
-    {
-      title: "SMS access register",
-      isAttached: true,
-      fields: [
-        { label: "System", value: "Sponsor Management System" },
-        { label: "Level 1 Users", value: "2" },
-        { label: "Primary User", value: "Alex Marin" },
-        { label: "Secondary User", value: "Priya Shah" },
-        { label: "Last Review", value: "3 Aug 2026" },
-        { label: "Next Review", value: "3 Nov 2026" },
-      ],
-      notes: "Access reviewed against current responsibilities; leaver and privilege checks recorded.",
-      fileName: "ENT_Imm_SMS_access_register.pdf",
-      reviewed: "3 Aug 2026 by Alex Marin",
-    },
-    {
-      title: "UKVI audit correspondence",
-      isAttached: true,
-      fields: [
-        { label: "Audit Date", value: "14 May 2026" },
-        { label: "Reference", value: "UKVI-AUD-ENT-140526" },
-        { label: "Reviewer", value: "UKVI Compliance Team" },
-        { label: "Outcome", value: "No action required" },
-        { label: "Actions Raised", value: "0" },
-        { label: "Closed", value: "14 May 2026" },
-      ],
-      notes: "Audit correspondence retained with findings and action closure evidence.",
-      fileName: "ukvi_audit_correspondence.pdf",
-      reviewed: "3 Aug 2026 by Alex Marin",
-    },
-  ];
-
-  const evidenceList = data?.evidenceRecords || defaultOrgEvidence;
-
-  for (let pageIdx = 0; pageIdx < 3; pageIdx++) {
+  for (let pageIdx = 0; pageIdx < evidencePagesCount; pageIdx++) {
     const pageNum = 5 + pageIdx;
     doc.addPage();
     drawHeader(doc, pageNum, totalPages);
@@ -1015,15 +1035,145 @@ export function generateCaseDossierReport(
     format: "a4",
   });
 
-  const name = data?.migrantName || "Alex Marin";
-  const role = data?.jobTitle || "Creative Director";
+  const name = data?.migrantName || "—";
+  const role = data?.jobTitle || "—";
   const sponsor = data?.sponsorName || "ENT Imm";
-  const caseNo = data?.caseNumber || "431/2026";
-  const cosRef = data?.cosReference || "C5K8M2P7Q";
+  const caseNo = data?.caseNumber || "—";
+  const cosRef = data?.cosReference || "—";
   const refCode = data?.refNumber || "CMD-20260803-AM-FULL";
   const genDate = data?.generatedDate || "3 Aug 2026 - 13:36";
   const isComplete = data?.statusComplete ?? true;
-  const totalPages = 8;
+
+  const defaultWorkerEvidence = [
+    // Page 5: Pre-employment screening & Signed contract
+    {
+      title: "Pre-employment screening",
+      isAttached: true,
+      fields: [
+        { label: "DBS Reference", value: "DBS-02673155" },
+        { label: "Authority", value: "Disclosure and Barring Service" },
+        { label: "Issue Date", value: "3 Aug 2026" },
+        { label: "Level", value: "Basic" },
+        { label: "Result", value: "Clear" },
+        { label: "Identity Matched", value: "Yes" },
+      ],
+      notes: "Screening result matched to the worker's verified identity.",
+      fileName: `dbs_screening_${(name || "worker").replace(/\s+/g, "_")}.pdf`,
+      reviewed: `3 Aug 2026 by ${sponsor}`,
+    },
+    {
+      title: "Signed contract / agreement",
+      isAttached: true,
+      fields: [
+        { label: "Employer", value: sponsor },
+        { label: "Worker", value: name },
+        { label: "Role", value: role },
+        { label: "Start Date", value: "16 Jul 2026" },
+        { label: "Annual Salary", value: "GBP 48,000" },
+        { label: "Signed", value: "12 Jul 2026" },
+      ],
+      notes: "Employment terms, signatures and remuneration evidence.",
+      fileName: "signed_contract_agreement.pdf",
+      reviewed: `3 Aug 2026 by ${sponsor}`,
+    },
+    // Page 6: Professional evidence & International creative status
+    {
+      title: "Professional evidence",
+      isAttached: true,
+      fields: [
+        { label: "Evidence Type", value: "CV and portfolio" },
+        { label: "Discipline", value: "Creative direction" },
+        { label: "Experience", value: "12 years" },
+        { label: "Portfolio", value: "portfolio.example/alex" },
+        { label: "Last Project", value: "Northstar Campaign" },
+        { label: "Verified", value: "3 Aug 2026" },
+      ],
+      notes: "CV, credits and portfolio extracts supporting the sponsored role.",
+      fileName: "professional_evidence.pdf",
+      reviewed: `3 Aug 2026 by ${sponsor}`,
+    },
+    {
+      title: "International / creative status",
+      isAttached: true,
+      fields: [
+        { label: "Evidence Pack", value: "Touring group dossier" },
+        { label: "Project", value: "Northstar Festival" },
+        { label: "Issuer", value: "Northstar Productions" },
+        { label: "Role", value: role },
+        { label: "Valid From", value: "15 Jul 2026" },
+        { label: "Valid To", value: "31 Mar 2027" },
+      ],
+      notes: "Evidence that the worker has an established international or specialist creative profile.",
+      fileName: "international_creative_status.pdf",
+      reviewed: `3 Aug 2026 by ${sponsor}`,
+    },
+    // Page 7: Certificate of Sponsorship & Passport scan
+    {
+      title: "Certificate of Sponsorship",
+      isAttached: true,
+      fields: [
+        { label: "CoS Reference", value: cosRef },
+        { label: "Sponsor", value: sponsor },
+        { label: "Route", value: "Creative Worker" },
+        { label: "SOC Code", value: "3416" },
+        { label: "Work Start", value: "16 Jul 2026" },
+        { label: "Work End", value: "31 Mar 2027" },
+      ],
+      notes: "Assigned CoS record aligned to the role, project and work dates.",
+      fileName: "certificate_of_sponsorship.pdf",
+      reviewed: `3 Aug 2026 by ${sponsor}`,
+    },
+    {
+      title: "Passport scan",
+      isAttached: true,
+      fields: [
+        { label: "Passport Number", value: "P1234567" },
+        { label: "Issuing Authority", value: "Republic of India" },
+        { label: "Nationality", value: "Indian" },
+        { label: "Date of Birth", value: "18 Feb 1988" },
+        { label: "Issue Date", value: "18 Feb 2024" },
+        { label: "Expiry Date", value: "17 Feb 2034" },
+      ],
+      notes: "Biographical page reviewed; name and date of birth match the worker record.",
+      fileName: "passport_P1234567_sample.pdf",
+      reviewed: `3 Aug 2026 by ${sponsor}`,
+    },
+    // Page 8: Arrival stamp & Departure stamp
+    {
+      title: "Arrival stamp",
+      isAttached: true,
+      fields: [
+        { label: "Arrival Date", value: "15 Jul 2026" },
+        { label: "Port", value: "London Heathrow" },
+        { label: "Flight", value: "BA138" },
+        { label: "Origin", value: "Mumbai" },
+        { label: "Entry Route", value: "Creative Worker" },
+        { label: "Page", value: "Passport page 12" },
+      ],
+      notes: "Entry evidence linked to the recorded inbound itinerary.",
+      fileName: "arrival_stamp.pdf",
+      reviewed: `3 Aug 2026 by ${sponsor}`,
+    },
+    {
+      title: "Departure stamp",
+      isAttached: true,
+      fields: [
+        { label: "Departure Date", value: "2 Apr 2027" },
+        { label: "Port", value: "London Heathrow" },
+        { label: "Flight", value: "BA139" },
+        { label: "Destination", value: "Mumbai" },
+        { label: "Journey Status", value: "Scheduled" },
+        { label: "Page", value: "Travel evidence pack" },
+      ],
+      notes: "Placeholder evidence for the planned departure; update after travel.",
+      fileName: "departure_stamp.pdf",
+      reviewed: `3 Aug 2026 by ${sponsor}`,
+    },
+  ];
+
+  const evidenceList = data?.workerEvidence && data.workerEvidence.length > 0 ? data.workerEvidence : defaultWorkerEvidence;
+  const evidencePagesCount = Math.max(1, Math.ceil(evidenceList.length / 2));
+  const totalPages = 4 + evidencePagesCount;
 
   // ----------------------------------------------------
   // PAGE 1: COVER
@@ -1152,22 +1302,22 @@ export function generateCaseDossierReport(
   doc.setTextColor(23, 23, 23);
   doc.text("Migrant profile", 15, 70);
 
-  const pers = data?.personalDetails || {
-    fullName: name,
-    dob: "18 Feb 1988",
-    nationality: "Indian",
-    jobTitle: role,
-    projectAssignment: "Northstar Festival & Film Cam...",
-    sponsor: sponsor,
+  const pers = {
+    fullName: data?.personalDetails?.fullName || name || "—",
+    dob: data?.personalDetails?.dob || "—",
+    nationality: data?.personalDetails?.nationality || "—",
+    jobTitle: data?.personalDetails?.jobTitle || role || "—",
+    projectAssignment: data?.personalDetails?.projectAssignment || "—",
+    sponsor: data?.personalDetails?.sponsor || sponsor || "—",
   };
 
-  const imm = data?.immigrationDetails || {
-    passportNumber: "P1234567",
-    sharecode: "W9A-4BC-72D",
-    visaValidFrom: "15 Jul 2026",
-    visaValidTo: "31 Mar 2027",
-    rtwCompletedDate: "12 Jul 2026",
-    cosReference: cosRef,
+  const imm = {
+    passportNumber: data?.immigrationDetails?.passportNumber || "—",
+    sharecode: data?.immigrationDetails?.sharecode || "—",
+    visaValidFrom: data?.immigrationDetails?.visaValidFrom || "—",
+    visaValidTo: data?.immigrationDetails?.visaValidTo || "—",
+    rtwCompletedDate: data?.immigrationDetails?.rtwCompletedDate || "—",
+    cosReference: data?.immigrationDetails?.cosReference || cosRef || "—",
   };
 
   // Card 1: Personal Details
@@ -1458,138 +1608,9 @@ export function generateCaseDossierReport(
   drawFooter(doc, refCode, 4, totalPages);
 
   // ----------------------------------------------------
-  // PAGES 5, 6, 7, 8: WORKER EVIDENCE FILE
+  // PAGES 5+: WORKER EVIDENCE FILE
   // ----------------------------------------------------
-  const defaultWorkerEvidence = [
-    // Page 5: Pre-employment screening & Signed contract
-    {
-      title: "Pre-employment screening",
-      isAttached: true,
-      fields: [
-        { label: "DBS Reference", value: "DBS-02673155" },
-        { label: "Authority", value: "Disclosure and Barring Service" },
-        { label: "Issue Date", value: "3 Aug 2026" },
-        { label: "Level", value: "Basic" },
-        { label: "Result", value: "Clear" },
-        { label: "Identity Matched", value: "Yes" },
-      ],
-      notes: "Screening result matched to the worker's verified identity.",
-      fileName: `dbs_screening_${name.replace(/\s+/g, "_")}.pdf`,
-      reviewed: `3 Aug 2026 by ${sponsor}`,
-    },
-    {
-      title: "Signed contract / agreement",
-      isAttached: true,
-      fields: [
-        { label: "Employer", value: sponsor },
-        { label: "Worker", value: name },
-        { label: "Role", value: role },
-        { label: "Start Date", value: "16 Jul 2026" },
-        { label: "Annual Salary", value: "GBP 48,000" },
-        { label: "Signed", value: "12 Jul 2026" },
-      ],
-      notes: "Employment terms, signatures and remuneration evidence.",
-      fileName: "signed_contract_agreement.pdf",
-      reviewed: `3 Aug 2026 by ${sponsor}`,
-    },
-    // Page 6: Professional evidence & International creative status
-    {
-      title: "Professional evidence",
-      isAttached: true,
-      fields: [
-        { label: "Evidence Type", value: "CV and portfolio" },
-        { label: "Discipline", value: "Creative direction" },
-        { label: "Experience", value: "12 years" },
-        { label: "Portfolio", value: "portfolio.example/alex" },
-        { label: "Last Project", value: "Northstar Campaign" },
-        { label: "Verified", value: "3 Aug 2026" },
-      ],
-      notes: "CV, credits and portfolio extracts supporting the sponsored role.",
-      fileName: "professional_evidence.pdf",
-      reviewed: `3 Aug 2026 by ${sponsor}`,
-    },
-    {
-      title: "International / creative status",
-      isAttached: true,
-      fields: [
-        { label: "Evidence Pack", value: "Touring group dossier" },
-        { label: "Project", value: "Northstar Festival" },
-        { label: "Issuer", value: "Northstar Productions" },
-        { label: "Role", value: role },
-        { label: "Valid From", value: "15 Jul 2026" },
-        { label: "Valid To", value: "31 Mar 2027" },
-      ],
-      notes: "Evidence that the worker has an established international or specialist creative profile.",
-      fileName: "international_creative_status.pdf",
-      reviewed: `3 Aug 2026 by ${sponsor}`,
-    },
-    // Page 7: Certificate of Sponsorship & Passport scan
-    {
-      title: "Certificate of Sponsorship",
-      isAttached: true,
-      fields: [
-        { label: "CoS Reference", value: cosRef },
-        { label: "Sponsor", value: sponsor },
-        { label: "Route", value: "Creative Worker" },
-        { label: "SOC Code", value: "3416" },
-        { label: "Work Start", value: "16 Jul 2026" },
-        { label: "Work End", value: "31 Mar 2027" },
-      ],
-      notes: "Assigned CoS record aligned to the role, project and work dates.",
-      fileName: "certificate_of_sponsorship.pdf",
-      reviewed: `3 Aug 2026 by ${sponsor}`,
-    },
-    {
-      title: "Passport scan",
-      isAttached: true,
-      fields: [
-        { label: "Passport Number", value: "P1234567" },
-        { label: "Issuing Authority", value: "Republic of India" },
-        { label: "Nationality", value: "Indian" },
-        { label: "Date of Birth", value: "18 Feb 1988" },
-        { label: "Issue Date", value: "18 Feb 2024" },
-        { label: "Expiry Date", value: "17 Feb 2034" },
-      ],
-      notes: "Biographical page reviewed; name and date of birth match the worker record.",
-      fileName: "passport_P1234567_sample.pdf",
-      reviewed: `3 Aug 2026 by ${sponsor}`,
-    },
-    // Page 8: Arrival stamp & Departure stamp
-    {
-      title: "Arrival stamp",
-      isAttached: true,
-      fields: [
-        { label: "Arrival Date", value: "15 Jul 2026" },
-        { label: "Port", value: "London Heathrow" },
-        { label: "Flight", value: "BA138" },
-        { label: "Origin", value: "Mumbai" },
-        { label: "Entry Route", value: "Creative Worker" },
-        { label: "Page", value: "Passport page 12" },
-      ],
-      notes: "Entry evidence linked to the recorded inbound itinerary.",
-      fileName: "arrival_stamp.pdf",
-      reviewed: `3 Aug 2026 by ${sponsor}`,
-    },
-    {
-      title: "Departure stamp",
-      isAttached: true,
-      fields: [
-        { label: "Departure Date", value: "2 Apr 2027" },
-        { label: "Port", value: "London Heathrow" },
-        { label: "Flight", value: "BA139" },
-        { label: "Destination", value: "Mumbai" },
-        { label: "Journey Status", value: "Scheduled" },
-        { label: "Page", value: "Travel evidence pack" },
-      ],
-      notes: "Placeholder evidence for the planned departure; update after travel.",
-      fileName: "departure_stamp.pdf",
-      reviewed: `3 Aug 2026 by ${sponsor}`,
-    },
-  ];
-
-  const evidenceList = data?.workerEvidence || defaultWorkerEvidence;
-
-  for (let pageIdx = 0; pageIdx < 4; pageIdx++) {
+  for (let pageIdx = 0; pageIdx < evidencePagesCount; pageIdx++) {
     const pageNum = 5 + pageIdx;
     doc.addPage();
     drawHeader(doc, pageNum, totalPages);

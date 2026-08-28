@@ -294,6 +294,29 @@ export default function ComplianceDocumentsPage() {
       setSortField(field);
       setSortOrder("asc");
     }
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (q: string) => {
+    setSearchQuery(q);
+    setCurrentPage(1);
+  };
+
+  const handleStatusFilterChange = (st: string) => {
+    setStatusDropdownFilter(st);
+    setCurrentPage(1);
+  };
+
+  const handleCategoryFilterChange = (cat: string | null) => {
+    setSelectedCategoryFilter(cat);
+    setCurrentPage(1);
+  };
+
+  const handleResetFilters = () => {
+    setStatusDropdownFilter("All status");
+    setSelectedCategoryFilter(null);
+    setSearchQuery("");
+    setCurrentPage(1);
   };
 
   // Filtered and sorted table rows
@@ -349,10 +372,6 @@ export default function ComplianceDocumentsPage() {
 
   const totalPages = Math.max(1, Math.ceil(filteredDocs.length / itemsPerPage));
   const safePage = Math.max(1, Math.min(currentPage, totalPages));
-
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, statusDropdownFilter, selectedCategoryFilter, sortField, sortOrder, itemsPerPage]);
 
   const paginatedDocs = React.useMemo(() => {
     const start = (safePage - 1) * itemsPerPage;
@@ -492,13 +511,13 @@ export default function ComplianceDocumentsPage() {
           role="button"
           tabIndex={0}
           onClick={() => {
-            setStatusDropdownFilter(statusDropdownFilter === "Review" ? "All status" : "Review");
+            handleStatusFilterChange(statusDropdownFilter === "Review" ? "All status" : "Review");
             setSelectedCategoryFilter(null);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              setStatusDropdownFilter(statusDropdownFilter === "Review" ? "All status" : "Review");
+              handleStatusFilterChange(statusDropdownFilter === "Review" ? "All status" : "Review");
               setSelectedCategoryFilter(null);
             }
           }}
@@ -537,13 +556,13 @@ export default function ComplianceDocumentsPage() {
           role="button"
           tabIndex={0}
           onClick={() => {
-            setStatusDropdownFilter(statusDropdownFilter === "Missing" ? "All status" : "Missing");
+            handleStatusFilterChange(statusDropdownFilter === "Missing" ? "All status" : "Missing");
             setSelectedCategoryFilter(null);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              setStatusDropdownFilter(statusDropdownFilter === "Missing" ? "All status" : "Missing");
+              handleStatusFilterChange(statusDropdownFilter === "Missing" ? "All status" : "Missing");
               setSelectedCategoryFilter(null);
             }
           }}
@@ -567,13 +586,13 @@ export default function ComplianceDocumentsPage() {
           role="button"
           tabIndex={0}
           onClick={() => {
-            setStatusDropdownFilter(statusDropdownFilter === "Verified" ? "All status" : "Verified");
+            handleStatusFilterChange(statusDropdownFilter === "Verified" ? "All status" : "Verified");
             setSelectedCategoryFilter(null);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              setStatusDropdownFilter(statusDropdownFilter === "Verified" ? "All status" : "Verified");
+              handleStatusFilterChange(statusDropdownFilter === "Verified" ? "All status" : "Verified");
               setSelectedCategoryFilter(null);
             }
           }}
@@ -608,13 +627,13 @@ export default function ComplianceDocumentsPage() {
               role="button"
               tabIndex={0}
               onClick={() => {
-                setStatusDropdownFilter("Missing");
+                handleStatusFilterChange("Missing");
                 setSelectedCategoryFilter(null);
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  setStatusDropdownFilter("Missing");
+                  handleStatusFilterChange("Missing");
                   setSelectedCategoryFilter(null);
                 }
               }}
@@ -638,13 +657,13 @@ export default function ComplianceDocumentsPage() {
               role="button"
               tabIndex={0}
               onClick={() => {
-                setStatusDropdownFilter("Review");
+                handleStatusFilterChange("Review");
                 setSelectedCategoryFilter(null);
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  setStatusDropdownFilter("Review");
+                  handleStatusFilterChange("Review");
                   setSelectedCategoryFilter(null);
                 }
               }}
@@ -668,13 +687,13 @@ export default function ComplianceDocumentsPage() {
               role="button"
               tabIndex={0}
               onClick={() => {
-                setStatusDropdownFilter("Review");
+                handleStatusFilterChange("Review");
                 setSelectedCategoryFilter(null);
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  setStatusDropdownFilter("Review");
+                  handleStatusFilterChange("Review");
                   setSelectedCategoryFilter(null);
                 }
               }}
@@ -704,12 +723,12 @@ export default function ComplianceDocumentsPage() {
                   role="button"
                   tabIndex={0}
                   onClick={() => {
-                    setSelectedCategoryFilter(isSelected ? null : cat.title);
+                    handleCategoryFilterChange(isSelected ? null : cat.title);
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      setSelectedCategoryFilter(isSelected ? null : cat.title);
+                      handleCategoryFilterChange(isSelected ? null : cat.title);
                     }
                   }}
                   className={`bg-white border rounded-[12px] p-3 h-[78px] flex flex-col justify-between shadow-x-small transition-all group cursor-pointer ${
@@ -725,7 +744,7 @@ export default function ComplianceDocumentsPage() {
                         <RiUserLine className="size-5 text-[#5C5C5C]" />
                       </div>
                       <div className="flex flex-col min-w-0">
-                        <span className="text-[14px] leading-[20px] font-medium text-[#171717] truncate">
+                        <span className="text-[14px] leading-[20px] font-medium text-[#171717] truncate font-aeonik-medium">
                           {cat.title}
                         </span>
                         <span className="text-[13px] leading-[20px] text-[#7B7B7B] truncate">
@@ -746,7 +765,7 @@ export default function ComplianceDocumentsPage() {
                     </div>
                   </div>
 
-                  {/* Bottom Segmented Progress Bar (Frame 2087326974) */}
+                  {/* Bottom Segmented Progress Bar */}
                   <div className="pl-[44px] flex items-center gap-[2px] h-1 w-full">
                     {cat.segments.red > 0 && (
                       <div
@@ -788,7 +807,7 @@ export default function ComplianceDocumentsPage() {
           {selectedCategoryFilter && (
             <button
               type="button"
-              onClick={() => setSelectedCategoryFilter(null)}
+              onClick={() => handleCategoryFilterChange(null)}
               className="text-[12px] font-medium text-[#7D52F4] hover:underline flex items-center gap-1 cursor-pointer border-0 bg-transparent p-0"
             >
               <span>Showing &quot;{selectedCategoryFilter}&quot;</span>
@@ -808,13 +827,13 @@ export default function ComplianceDocumentsPage() {
               type="text"
               placeholder="Search..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="w-full h-full pl-9 pr-8 bg-transparent text-paragraph-sm placeholder-[#A4A4A4] border-0 shadow-none focus-visible:ring-0"
             />
             {searchQuery && (
               <button
                 type="button"
-                onClick={() => setSearchQuery("")}
+                onClick={() => handleSearchChange("")}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A4A4A4] hover:text-[#171717] border-0 bg-transparent p-0 flex items-center justify-center cursor-pointer"
                 title="Clear search"
               >
@@ -828,13 +847,7 @@ export default function ComplianceDocumentsPage() {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => {
-              if (statusDropdownFilter !== "All status" || selectedCategoryFilter) {
-                setStatusDropdownFilter("All status");
-                setSelectedCategoryFilter(null);
-                setSearchQuery("");
-              }
-            }}
+            onClick={handleResetFilters}
             className="size-8 p-0 rounded-[8px] bg-white border border-neutral-200/40 shadow-x-small flex items-center justify-center text-[#5C5C5C] hover:bg-neutral-100"
             title="Reset Filters"
           >
@@ -851,7 +864,7 @@ export default function ComplianceDocumentsPage() {
               {["All status", "Missing", "Review", "Verified"].map((st) => (
                 <DropdownMenuItem
                   key={st}
-                  onClick={() => setStatusDropdownFilter(st)}
+                  onClick={() => handleStatusFilterChange(st)}
                   className={`text-[13px] font-medium rounded-[6px] px-2.5 py-1.5 cursor-pointer flex items-center justify-between ${
                     statusDropdownFilter === st ? "bg-[#F5F5F5] text-[#171717]" : "text-[#5C5C5C]"
                   }`}

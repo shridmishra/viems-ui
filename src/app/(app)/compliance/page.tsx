@@ -110,6 +110,7 @@ export default function ComplianceCentrePage() {
       setTaskSortCol(col);
       setTaskSortDir("asc");
     }
+    setCurrentPage(1);
   };
 
   // Sorting state for Migrant Compliance Table
@@ -127,6 +128,22 @@ export default function ComplianceCentrePage() {
       setMigrantSortCol(col);
       setMigrantSortDir("asc");
     }
+    setMigrantPage(1);
+  };
+
+  const handleTaskFilterChange = (filter: "ALL" | "HIGH" | "MEDIUM" | "LOW") => {
+    setSelectedTaskFilter(filter);
+    setCurrentPage(1);
+  };
+
+  const handleMigrantSearchChange = (q: string) => {
+    setSearchQuery(q);
+    setMigrantPage(1);
+  };
+
+  const handleMigrantStatusFilter = (st: string) => {
+    setStatusFilter(st);
+    setMigrantPage(1);
   };
 
   // Load live data from Backend API
@@ -386,10 +403,6 @@ export default function ComplianceCentrePage() {
   const totalTaskPages = Math.max(1, Math.ceil(filteredTasks.length / tasksPageSize));
   const safeTaskPage = Math.max(1, Math.min(currentPage, totalTaskPages));
 
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedTaskFilter, taskSortCol, taskSortDir]);
-
   const paginatedTasks = React.useMemo(() => {
     const start = (safeTaskPage - 1) * tasksPageSize;
     return filteredTasks.slice(start, start + tasksPageSize);
@@ -397,10 +410,6 @@ export default function ComplianceCentrePage() {
 
   const totalMigrantPages = Math.max(1, Math.ceil(filteredMigrants.length / migrantPageSize));
   const safeMigrantPage = Math.max(1, Math.min(migrantPage, totalMigrantPages));
-
-  React.useEffect(() => {
-    setMigrantPage(1);
-  }, [searchQuery, statusFilter, migrantSortCol, migrantSortDir, migrantPageSize]);
 
   const paginatedMigrants = React.useMemo(() => {
     const start = (safeMigrantPage - 1) * migrantPageSize;
@@ -454,39 +463,43 @@ export default function ComplianceCentrePage() {
 
   const handleExportSummary = (migrant: MigrantComplianceRow) => {
     try {
+      const migrantName = migrant.name || "—";
+      const initials = migrantName
+        .split(" ")
+        .filter(Boolean)
+        .map((w) => w[0]?.toUpperCase() || "")
+        .join("") || "M";
       const doc = generateCaseDossierReport({
-        migrantName: migrant.name,
+        migrantName,
         sponsorName: migrant.company || "ENT Imm",
-        caseNumber: migrant.caseId || "431/2026",
+        caseNumber: migrant.caseId || "—",
         statusComplete: migrant.status === "COMPLIANT",
-        refNumber: `CMD-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${migrant.name
-          .split(" ")
-          .map((w) => w[0])
-          .join("")}-FULL`,
+        refNumber: `CMD-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${initials}-FULL`,
         generatedDate: `${new Date().toLocaleDateString("en-GB", {
           day: "numeric",
           month: "short",
           year: "numeric",
         })} - ${new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`,
         personalDetails: {
-          fullName: migrant.name,
-          dob: "18 Feb 1988",
-          nationality: "Indian",
-          jobTitle: "Creative Director",
-          projectAssignment: "Northstar Festival & Film Campaign",
+          fullName: migrantName,
+          dob: "—",
+          nationality: "—",
+          jobTitle: "—",
+          projectAssignment: "—",
           sponsor: migrant.company || "ENT Imm",
         },
         immigrationDetails: {
-          passportNumber: "P1234567",
-          sharecode: "W9A-4BC-72D",
-          visaValidFrom: "15 Jul 2026",
-          visaValidTo: "31 Mar 2027",
-          rtwCompletedDate: migrant.nextRtw || "12 Jul 2026",
-          cosReference: "C5K8M2P7Q",
+          passportNumber: "—",
+          sharecode: "—",
+          visaValidFrom: "—",
+          visaValidTo: "—",
+          rtwCompletedDate: migrant.nextRtw || "—",
+          cosReference: "—",
         },
       });
-      downloadPdf(doc, `Viems_Case_Dossier_${migrant.name.replace(/\s+/g, "_")}.pdf`);
-      toast.success(`Comprehensive Case Dossier for ${migrant.name} downloaded.`);
+      const safeFileName = migrantName.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_") || "Migrant";
+      downloadPdf(doc, `Viems_Case_Dossier_${safeFileName}.pdf`);
+      toast.success(`Comprehensive Case Dossier for ${migrantName} downloaded.`);
     } catch (err) {
       console.error("Failed to generate case dossier:", err);
       toast.error("Failed to export case dossier PDF.");
@@ -1039,7 +1052,7 @@ export default function ComplianceCentrePage() {
           <div className="inline-flex items-center gap-1 bg-[#EBEBEB] rounded-full p-1 h-7 w-fit">
             <button
               type="button"
-              onClick={() => setSelectedTaskFilter("ALL")}
+              onClick={() => handleTaskFilterChange("ALL")}
               className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none flex items-center justify-center transition-all cursor-pointer border-0 ${
                 selectedTaskFilter === "ALL"
                   ? "bg-white text-[#171717] shadow-x-small"
@@ -1050,7 +1063,7 @@ export default function ComplianceCentrePage() {
             </button>
             <button
               type="button"
-              onClick={() => setSelectedTaskFilter("HIGH")}
+              onClick={() => handleTaskFilterChange("HIGH")}
               className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
                 selectedTaskFilter === "HIGH"
                   ? "bg-white text-[#171717] shadow-x-small"
@@ -1062,7 +1075,7 @@ export default function ComplianceCentrePage() {
             </button>
             <button
               type="button"
-              onClick={() => setSelectedTaskFilter("MEDIUM")}
+              onClick={() => handleTaskFilterChange("MEDIUM")}
               className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
                 selectedTaskFilter === "MEDIUM"
                   ? "bg-white text-[#171717] shadow-x-small"
@@ -1074,7 +1087,7 @@ export default function ComplianceCentrePage() {
             </button>
             <button
               type="button"
-              onClick={() => setSelectedTaskFilter("LOW")}
+              onClick={() => handleTaskFilterChange("LOW")}
               className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
                 selectedTaskFilter === "LOW"
                   ? "bg-white text-[#171717] shadow-x-small"
@@ -1261,7 +1274,7 @@ export default function ComplianceCentrePage() {
                 aria-label="Search migrants"
                 placeholder="Search..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleMigrantSearchChange(e.target.value)}
                 className="h-full border-0 bg-transparent px-2 text-[14px] text-[#171717] placeholder:text-[#A4A4A4] focus-visible:ring-0 focus-visible:border-0 shadow-none py-0"
               />
             </div>
@@ -1271,6 +1284,10 @@ export default function ComplianceCentrePage() {
               variant="outline"
               size="icon-sm"
               aria-label="Filter"
+              onClick={() => {
+                handleMigrantStatusFilter("All status");
+                handleMigrantSearchChange("");
+              }}
               className="size-8 rounded-[8px] bg-white border-0 shadow-[0px_1px_2px_rgba(10,13,20,0.03)] flex items-center justify-center text-[#5C5C5C] hover:bg-neutral-50 p-0"
             >
               <RiFilter3Line className="size-5 text-[#5C5C5C]" />
@@ -1283,16 +1300,16 @@ export default function ComplianceCentrePage() {
                 <RiArrowDownSLine className="size-5 text-[#5C5C5C]" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-40">
-                <DropdownMenuItem onClick={() => setStatusFilter("All status")}>
+                <DropdownMenuItem onClick={() => handleMigrantStatusFilter("All status")}>
                   All status
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("Compliant")}>
+                <DropdownMenuItem onClick={() => handleMigrantStatusFilter("Compliant")}>
                   Compliant
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("Review")}>
+                <DropdownMenuItem onClick={() => handleMigrantStatusFilter("Review")}>
                   Under Review
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("Action Needed")}>
+                <DropdownMenuItem onClick={() => handleMigrantStatusFilter("Action Needed")}>
                   Action Needed
                 </DropdownMenuItem>
               </DropdownMenuContent>
