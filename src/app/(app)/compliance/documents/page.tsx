@@ -20,6 +20,8 @@ import {
   RiAlertLine,
   RiEyeLine,
   RiLoader4Line,
+  RiArrowLeftDoubleLine,
+  RiArrowRightDoubleLine,
 } from "@remixicon/react";
 import { toast } from "sonner";
 import {
@@ -91,6 +93,10 @@ export default function ComplianceDocumentsPage() {
   // Sorting state
   const [sortField, setSortField] = React.useState<SortField | null>(null);
   const [sortOrder, setSortOrder] = React.useState<SortOrder>("asc");
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [itemsPerPage, setItemsPerPage] = React.useState(10);
 
   // Modal states
   const [isUploadModalOpen, setIsUploadModalOpen] = React.useState(false);
@@ -288,6 +294,29 @@ export default function ComplianceDocumentsPage() {
       setSortField(field);
       setSortOrder("asc");
     }
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (q: string) => {
+    setSearchQuery(q);
+    setCurrentPage(1);
+  };
+
+  const handleStatusFilterChange = (st: string) => {
+    setStatusDropdownFilter(st);
+    setCurrentPage(1);
+  };
+
+  const handleCategoryFilterChange = (cat: string | null) => {
+    setSelectedCategoryFilter(cat);
+    setCurrentPage(1);
+  };
+
+  const handleResetFilters = () => {
+    setStatusDropdownFilter("All status");
+    setSelectedCategoryFilter(null);
+    setSearchQuery("");
+    setCurrentPage(1);
   };
 
   // Filtered and sorted table rows
@@ -340,6 +369,30 @@ export default function ComplianceDocumentsPage() {
 
     return result;
   }, [migrantDocs, selectedCategoryFilter, statusDropdownFilter, searchQuery, sortField, sortOrder]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredDocs.length / itemsPerPage));
+  const safePage = Math.max(1, Math.min(currentPage, totalPages));
+
+  const paginatedDocs = React.useMemo(() => {
+    const start = (safePage - 1) * itemsPerPage;
+    return filteredDocs.slice(start, start + itemsPerPage);
+  }, [filteredDocs, safePage, itemsPerPage]);
+
+  const pageNumbers = React.useMemo(() => {
+    const pages: (number | "...")[] = [];
+    if (totalPages <= 5) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (safePage > 3) pages.push("...");
+      const start = Math.max(2, safePage - 1);
+      const end = Math.min(totalPages - 1, safePage + 1);
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (safePage < totalPages - 2) pages.push("...");
+      pages.push(totalPages);
+    }
+    return pages;
+  }, [safePage, totalPages]);
 
   const handleOpenPreviewDoc = (row: MigrantDocItem) => {
     setPreviewDoc({
@@ -458,13 +511,13 @@ export default function ComplianceDocumentsPage() {
           role="button"
           tabIndex={0}
           onClick={() => {
-            setStatusDropdownFilter(statusDropdownFilter === "Review" ? "All status" : "Review");
+            handleStatusFilterChange(statusDropdownFilter === "Review" ? "All status" : "Review");
             setSelectedCategoryFilter(null);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              setStatusDropdownFilter(statusDropdownFilter === "Review" ? "All status" : "Review");
+              handleStatusFilterChange(statusDropdownFilter === "Review" ? "All status" : "Review");
               setSelectedCategoryFilter(null);
             }
           }}
@@ -503,13 +556,13 @@ export default function ComplianceDocumentsPage() {
           role="button"
           tabIndex={0}
           onClick={() => {
-            setStatusDropdownFilter(statusDropdownFilter === "Missing" ? "All status" : "Missing");
+            handleStatusFilterChange(statusDropdownFilter === "Missing" ? "All status" : "Missing");
             setSelectedCategoryFilter(null);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              setStatusDropdownFilter(statusDropdownFilter === "Missing" ? "All status" : "Missing");
+              handleStatusFilterChange(statusDropdownFilter === "Missing" ? "All status" : "Missing");
               setSelectedCategoryFilter(null);
             }
           }}
@@ -533,13 +586,13 @@ export default function ComplianceDocumentsPage() {
           role="button"
           tabIndex={0}
           onClick={() => {
-            setStatusDropdownFilter(statusDropdownFilter === "Verified" ? "All status" : "Verified");
+            handleStatusFilterChange(statusDropdownFilter === "Verified" ? "All status" : "Verified");
             setSelectedCategoryFilter(null);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              setStatusDropdownFilter(statusDropdownFilter === "Verified" ? "All status" : "Verified");
+              handleStatusFilterChange(statusDropdownFilter === "Verified" ? "All status" : "Verified");
               setSelectedCategoryFilter(null);
             }
           }}
@@ -574,13 +627,13 @@ export default function ComplianceDocumentsPage() {
               role="button"
               tabIndex={0}
               onClick={() => {
-                setStatusDropdownFilter("Missing");
+                handleStatusFilterChange("Missing");
                 setSelectedCategoryFilter(null);
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  setStatusDropdownFilter("Missing");
+                  handleStatusFilterChange("Missing");
                   setSelectedCategoryFilter(null);
                 }
               }}
@@ -604,13 +657,13 @@ export default function ComplianceDocumentsPage() {
               role="button"
               tabIndex={0}
               onClick={() => {
-                setStatusDropdownFilter("Review");
+                handleStatusFilterChange("Review");
                 setSelectedCategoryFilter(null);
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  setStatusDropdownFilter("Review");
+                  handleStatusFilterChange("Review");
                   setSelectedCategoryFilter(null);
                 }
               }}
@@ -634,13 +687,13 @@ export default function ComplianceDocumentsPage() {
               role="button"
               tabIndex={0}
               onClick={() => {
-                setStatusDropdownFilter("Review");
+                handleStatusFilterChange("Review");
                 setSelectedCategoryFilter(null);
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  setStatusDropdownFilter("Review");
+                  handleStatusFilterChange("Review");
                   setSelectedCategoryFilter(null);
                 }
               }}
@@ -670,12 +723,12 @@ export default function ComplianceDocumentsPage() {
                   role="button"
                   tabIndex={0}
                   onClick={() => {
-                    setSelectedCategoryFilter(isSelected ? null : cat.title);
+                    handleCategoryFilterChange(isSelected ? null : cat.title);
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      setSelectedCategoryFilter(isSelected ? null : cat.title);
+                      handleCategoryFilterChange(isSelected ? null : cat.title);
                     }
                   }}
                   className={`bg-white border rounded-[12px] p-3 h-[78px] flex flex-col justify-between shadow-x-small transition-all group cursor-pointer ${
@@ -691,7 +744,7 @@ export default function ComplianceDocumentsPage() {
                         <RiUserLine className="size-5 text-[#5C5C5C]" />
                       </div>
                       <div className="flex flex-col min-w-0">
-                        <span className="text-[14px] leading-[20px] font-medium text-[#171717] truncate">
+                        <span className="text-[14px] leading-[20px] font-medium text-[#171717] truncate font-aeonik-medium">
                           {cat.title}
                         </span>
                         <span className="text-[13px] leading-[20px] text-[#7B7B7B] truncate">
@@ -712,7 +765,7 @@ export default function ComplianceDocumentsPage() {
                     </div>
                   </div>
 
-                  {/* Bottom Segmented Progress Bar (Frame 2087326974) */}
+                  {/* Bottom Segmented Progress Bar */}
                   <div className="pl-[44px] flex items-center gap-[2px] h-1 w-full">
                     {cat.segments.red > 0 && (
                       <div
@@ -754,7 +807,7 @@ export default function ComplianceDocumentsPage() {
           {selectedCategoryFilter && (
             <button
               type="button"
-              onClick={() => setSelectedCategoryFilter(null)}
+              onClick={() => handleCategoryFilterChange(null)}
               className="text-[12px] font-medium text-[#7D52F4] hover:underline flex items-center gap-1 cursor-pointer border-0 bg-transparent p-0"
             >
               <span>Showing &quot;{selectedCategoryFilter}&quot;</span>
@@ -774,13 +827,13 @@ export default function ComplianceDocumentsPage() {
               type="text"
               placeholder="Search..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="w-full h-full pl-9 pr-8 bg-transparent text-paragraph-sm placeholder-[#A4A4A4] border-0 shadow-none focus-visible:ring-0"
             />
             {searchQuery && (
               <button
                 type="button"
-                onClick={() => setSearchQuery("")}
+                onClick={() => handleSearchChange("")}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A4A4A4] hover:text-[#171717] border-0 bg-transparent p-0 flex items-center justify-center cursor-pointer"
                 title="Clear search"
               >
@@ -794,13 +847,7 @@ export default function ComplianceDocumentsPage() {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => {
-              if (statusDropdownFilter !== "All status" || selectedCategoryFilter) {
-                setStatusDropdownFilter("All status");
-                setSelectedCategoryFilter(null);
-                setSearchQuery("");
-              }
-            }}
+            onClick={handleResetFilters}
             className="size-8 p-0 rounded-[8px] bg-white border border-neutral-200/40 shadow-x-small flex items-center justify-center text-[#5C5C5C] hover:bg-neutral-100"
             title="Reset Filters"
           >
@@ -817,7 +864,7 @@ export default function ComplianceDocumentsPage() {
               {["All status", "Missing", "Review", "Verified"].map((st) => (
                 <DropdownMenuItem
                   key={st}
-                  onClick={() => setStatusDropdownFilter(st)}
+                  onClick={() => handleStatusFilterChange(st)}
                   className={`text-[13px] font-medium rounded-[6px] px-2.5 py-1.5 cursor-pointer flex items-center justify-between ${
                     statusDropdownFilter === st ? "bg-[#F5F5F5] text-[#171717]" : "text-[#5C5C5C]"
                   }`}
@@ -917,7 +964,7 @@ export default function ComplianceDocumentsPage() {
                 No document compliance records found matching your filters.
               </div>
             ) : (
-              filteredDocs.map((row, idx) => (
+              paginatedDocs.map((row, idx) => (
                 <div
                   key={row.id ? `doc-row-${row.id}-${idx}` : `doc-row-${row.caseId}-${idx}`}
                   role="button"
@@ -1050,6 +1097,135 @@ export default function ComplianceDocumentsPage() {
               ))
             )}
           </div>
+
+          {/* Pagination Group for Migrant Documents */}
+          {filteredDocs.length > 0 && (
+            <div className="flex flex-row items-center justify-between w-full h-[32px] gap-[24px] mt-2">
+              {/* Left: Page summary */}
+              <div className="w-[200px] h-[32px] py-[6px] flex items-center shrink-0">
+                <span className="text-[14px] font-normal leading-[20px] tracking-[-0.006em] text-[#5C5C5C] font-sans">
+                  Page {safePage} of {totalPages}
+                </span>
+              </div>
+
+              {/* Center: Pagination buttons */}
+              <div className="flex flex-row items-center justify-center gap-[8px] flex-1">
+                {/* First Page */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={safePage === 1}
+                  className="size-8 p-0 rounded-[8px] text-[#5C5C5C] hover:bg-neutral-200 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer border-0 shrink-0"
+                  title="First page"
+                >
+                  <RiArrowLeftDoubleLine className="size-5 text-[#5C5C5C]" />
+                </Button>
+
+                {/* Previous Page */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  className="size-8 p-0 rounded-[8px] text-[#5C5C5C] hover:bg-neutral-200 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer border-0 shrink-0"
+                  title="Previous page"
+                >
+                  <RiArrowLeftSLine className="size-5 text-[#5C5C5C]" />
+                </Button>
+
+                {/* Page number cells */}
+                <div className="flex flex-row items-center gap-[8px]">
+                  {pageNumbers.map((p, pIdx) => {
+                    if (p === "...") {
+                      return (
+                        <span
+                          key={`ellipsis-${pIdx}`}
+                          className="size-8 flex items-center justify-center text-[14px] font-medium text-[#5C5C5C]"
+                        >
+                          ...
+                        </span>
+                      );
+                    }
+
+                    const pageNum = Number(p);
+                    const isActive = safePage === pageNum;
+
+                    return (
+                      <Button
+                        key={`page-${pageNum}`}
+                        type="button"
+                        variant={isActive ? "primary-neutral" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`size-8 p-0 rounded-[8px] text-[14px] font-medium leading-[20px] flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                          isActive
+                            ? "bg-[#171717] text-white border-0 hover:bg-[#171717]"
+                            : "bg-white border border-[#EBEBEB] text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-50 shadow-[0px_1px_2px_rgba(10,13,20,0.03)]"
+                        }`}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                {/* Next Page */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  className="size-8 p-0 rounded-[8px] text-[#5C5C5C] hover:bg-neutral-200 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer border-0 shrink-0"
+                  title="Next page"
+                >
+                  <RiArrowRightSLine className="size-5 text-[#5C5C5C]" />
+                </Button>
+
+                {/* Last Page */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={safePage === totalPages}
+                  className="size-8 p-0 rounded-[8px] text-[#5C5C5C] hover:bg-neutral-200 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer border-0 shrink-0"
+                  title="Last page"
+                >
+                  <RiArrowRightDoubleLine className="size-5 text-[#5C5C5C]" />
+                </Button>
+              </div>
+
+              {/* Right: Items per page selector */}
+              <div className="w-[200px] h-[32px] flex items-center justify-end shrink-0">
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    className="min-w-[106px] h-8 px-2.5 py-1.5 rounded-[8px] border border-[#EBEBEB] bg-white text-[14px] font-normal text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-50 flex items-center justify-between gap-1.5 shadow-[0px_1px_2px_rgba(10,13,20,0.03)] cursor-pointer outline-none shrink-0 whitespace-nowrap select-none"
+                  >
+                    <span className="leading-[20px] whitespace-nowrap">{itemsPerPage} / page</span>
+                    <RiArrowDownSLine className="size-4 text-[#A4A4A4] shrink-0" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[110px] bg-white border border-[#EBEBEB] rounded-[10px] shadow-card-large p-1">
+                    {[10, 25, 50].map((size) => (
+                      <DropdownMenuItem
+                        key={size}
+                        onClick={() => {
+                          setItemsPerPage(size);
+                          setCurrentPage(1);
+                        }}
+                        className="text-[13px] text-[#171717] hover:bg-[#F5F5F5] rounded-[6px] px-2 py-1.5 cursor-pointer"
+                      >
+                        {size} / page
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

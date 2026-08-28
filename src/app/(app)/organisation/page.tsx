@@ -14,6 +14,11 @@ import {
   RiDownload2Line,
 } from "@remixicon/react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import {
+  generateOrganisationComplianceReport,
+  downloadPdf,
+} from "@/lib/pdf-report-generator";
 import { CompanyTab, CompanySubTab, COMPANY_SUB_TABS } from "./company-tab";
 import { DocumentsTab } from "./documents-tab";
 import { HistoryTab } from "./history-tab";
@@ -25,6 +30,7 @@ export type MainTab = (typeof MAIN_TABS)[number];
 function OrganisationPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [downloadingReport, setDownloadingReport] = React.useState(false);
 
   const tabParam = searchParams.get("tab")?.toLowerCase();
   const activeTab: MainTab =
@@ -46,7 +52,7 @@ function OrganisationPageContent() {
   const handleTabSelect = (tab: MainTab) => {
     let newSub = "";
     if (tab === "company") newSub = companySubTab;
-    if (tab === "team") newSub = teamSubTab;
+    else if (tab === "team") newSub = teamSubTab;
     const url = newSub ? `/organisation?tab=${tab}&sub=${newSub}` : `/organisation?tab=${tab}`;
     router.replace(url, { scroll: false });
   };
@@ -59,8 +65,33 @@ function OrganisationPageContent() {
     router.replace(`/organisation?tab=team&sub=${sub}`, { scroll: false });
   };
 
-  const handleDownloadReport = () => {
-    toast.success("Organisation Compliance & Sponsorship Report downloaded.");
+  const handleDownloadReport = async () => {
+    try {
+      setDownloadingReport(true);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const doc = generateOrganisationComplianceReport({
+        companyName: "ENT Imm",
+        sponsorLicence: "ENT1234567",
+        businessSector: "Creative sector / live events",
+        registeredAddress: "18 Soho Square, London W1D 3QL",
+        authorisingOfficer: "Alex Marin - Authorising Officer",
+        lastAuditDate: "14 May 2026",
+        statusComplete: true,
+        refNumber: `OCR-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-ENTIMM-FULL`,
+        generatedDate: `${new Date().toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })} - ${new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`,
+      });
+      downloadPdf(doc, "Viems_Organisation_Compliance_Report_ENT_Imm.pdf");
+      toast.success("Organisation Compliance Report downloaded.");
+    } catch (err) {
+      console.error("Failed to generate organisation report:", err);
+      toast.error("Failed to generate PDF report.");
+    } finally {
+      setDownloadingReport(false);
+    }
   };
 
   const mainTabs = [
@@ -106,14 +137,16 @@ function OrganisationPageContent() {
               </p>
             </div>
 
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={handleDownloadReport}
+              disabled={downloadingReport}
               className="h-10 px-4 rounded-[10px] bg-[#F5F5F5] hover:bg-[#EBEBEB] text-[#171717] text-[13px] font-medium flex items-center gap-2 border border-[#EBEBEB] shadow-x-small transition-all cursor-pointer self-start sm:self-auto shrink-0"
             >
               <RiDownload2Line className="size-4 text-[#5C5C5C]" />
-              <span>Download report</span>
-            </button>
+              <span>{downloadingReport ? "Generating PDF..." : "Download report"}</span>
+            </Button>
           </div>
 
           {/* ─── 4 Top-Level Horizontal Tabs: Company, Documents, History, Team — ALWAYS VISIBLE ─── */}

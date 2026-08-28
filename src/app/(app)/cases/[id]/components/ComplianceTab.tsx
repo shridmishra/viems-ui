@@ -10,10 +10,17 @@ import {
   RiArrowUpDownLine,
   RiArrowDownSLine,
   RiCalendarLine,
+  RiDownload2Line,
 } from "@remixicon/react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api-client";
 import { ENDPOINTS } from "@/lib/api-endpoints";
+import { toast } from "sonner";
+import {
+  generateCaseDossierReport,
+  downloadPdf,
+} from "@/lib/pdf-report-generator";
+import { formatFullName } from "@/lib/utils";
 import { TourGapCheckerCard } from "../../components/TourGapCheckerCard";
 
 // ─── Donut Chart Component ──────────────────────────────────
@@ -95,6 +102,66 @@ export function ComplianceTab({
   const [files, setFiles] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [exportingDossier, setExportingDossier] = React.useState(false);
+
+  const handleExportDossier = async () => {
+    try {
+      setExportingDossier(true);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const migrantName =
+        caseData?.name ||
+        caseData?.migrant?.name ||
+        formatFullName(caseData?.first_name, caseData?.last_name) ||
+        "—";
+      const initials = migrantName
+        .split(" ")
+        .filter(Boolean)
+        .map((w: string) => w[0]?.toUpperCase() || "")
+        .join("") || "M";
+      const doc = generateCaseDossierReport({
+        migrantName,
+        jobTitle:
+          caseData?.role ||
+          caseData?.job_title ||
+          caseData?.employment?.jobTitle ||
+          "—",
+        sponsorName: caseData?.sponsor_name || caseData?.employer || "ENT Imm",
+        caseNumber: String(caseData?.caseIdDisplay || caseData?.caseNumber || id || "—"),
+        cosReference: caseData?.cosNumber || caseData?.cos_number || "—",
+        refNumber: `CMD-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${initials}-FULL`,
+        generatedDate: `${new Date().toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })} - ${new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`,
+        statusComplete: true,
+        personalDetails: {
+          fullName: migrantName,
+          dob: caseData?.dob || caseData?.date_of_birth || caseData?.personal?.dob || "—",
+          nationality: caseData?.nationality_value || caseData?.country || "—",
+          jobTitle: caseData?.role || caseData?.job_title || caseData?.employment?.jobTitle || "—",
+          projectAssignment: caseData?.project || caseData?.group || "—",
+          sponsor: caseData?.sponsor_name || caseData?.employer || "ENT Imm",
+        },
+        immigrationDetails: {
+          passportNumber: caseData?.passport_number || caseData?.passportNumber || "—",
+          sharecode: caseData?.share_code || caseData?.sharecode || "—",
+          visaValidFrom: caseData?.visa_start_date || caseData?.cosStartDate || "—",
+          visaValidTo: caseData?.visa_end_date || caseData?.cosEndDate || "—",
+          rtwCompletedDate: caseData?.rtw_completed_date || caseData?.rtwCompletedDate || "—",
+          cosReference: caseData?.cosNumber || caseData?.cos_number || "—",
+        },
+      });
+      const safeFileName = migrantName.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_") || "Migrant";
+      downloadPdf(doc, `Viems_Case_Dossier_${safeFileName}.pdf`);
+      toast.success(`Comprehensive Case Dossier for ${migrantName} downloaded.`);
+    } catch (err) {
+      console.error("Failed to generate case dossier:", err);
+      toast.error("Failed to generate Case Dossier PDF.");
+    } finally {
+      setExportingDossier(false);
+    }
+  };
 
   React.useEffect(() => {
     if (!id) return;
@@ -502,6 +569,17 @@ export function ComplianceTab({
             <h3 className="font-aeonik-medium text-[20px] leading-[32px] text-[#171717]">
               Risk profile
             </h3>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleExportDossier}
+              disabled={exportingDossier || loading || !caseData}
+              className="h-8 px-3 rounded-[8px] bg-white hover:bg-[#F5F5F5] text-[#171717] text-[12px] font-medium flex items-center gap-1.5 border border-[#EBEBEB] shadow-x-small cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RiDownload2Line className="size-3.5 text-[#5C5C5C]" />
+              <span>{exportingDossier ? "Exporting..." : "Export Dossier (PDF)"}</span>
+            </Button>
           </div>
 
           <div className="bg-white border border-[#F5F5F5] rounded-[16px] p-4 flex flex-col gap-4 shadow-2xs">

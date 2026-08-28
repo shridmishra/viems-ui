@@ -22,11 +22,17 @@ import {
   RiUserLine,
   RiDownloadLine,
   RiRefreshLine,
+  RiArrowLeftDoubleLine,
+  RiArrowRightDoubleLine,
 } from "@remixicon/react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { ENDPOINTS } from "@/lib/api-endpoints";
 import { formatFullName, formatTitleCase, getInitials } from "@/lib/format";
+import {
+  generateCaseDossierReport,
+  downloadPdf,
+} from "@/lib/pdf-report-generator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -86,6 +92,8 @@ export default function ComplianceCentrePage() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("All status");
   const [currentPage, setCurrentPage] = React.useState(1);
+  const [migrantPage, setMigrantPage] = React.useState(1);
+  const [migrantPageSize, setMigrantPageSize] = React.useState(10);
 
   // Sorting state for Priority Tasks
   const [taskSortCol, setTaskSortCol] = React.useState<string | null>(null);
@@ -102,6 +110,7 @@ export default function ComplianceCentrePage() {
       setTaskSortCol(col);
       setTaskSortDir("asc");
     }
+    setCurrentPage(1);
   };
 
   // Sorting state for Migrant Compliance Table
@@ -119,6 +128,22 @@ export default function ComplianceCentrePage() {
       setMigrantSortCol(col);
       setMigrantSortDir("asc");
     }
+    setMigrantPage(1);
+  };
+
+  const handleTaskFilterChange = (filter: "ALL" | "HIGH" | "MEDIUM" | "LOW") => {
+    setSelectedTaskFilter(filter);
+    setCurrentPage(1);
+  };
+
+  const handleMigrantSearchChange = (q: string) => {
+    setSearchQuery(q);
+    setMigrantPage(1);
+  };
+
+  const handleMigrantStatusFilter = (st: string) => {
+    setStatusFilter(st);
+    setMigrantPage(1);
   };
 
   // Load live data from Backend API
@@ -378,14 +403,34 @@ export default function ComplianceCentrePage() {
   const totalTaskPages = Math.max(1, Math.ceil(filteredTasks.length / tasksPageSize));
   const safeTaskPage = Math.max(1, Math.min(currentPage, totalTaskPages));
 
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedTaskFilter, taskSortCol, taskSortDir]);
-
   const paginatedTasks = React.useMemo(() => {
     const start = (safeTaskPage - 1) * tasksPageSize;
     return filteredTasks.slice(start, start + tasksPageSize);
   }, [filteredTasks, safeTaskPage, tasksPageSize]);
+
+  const totalMigrantPages = Math.max(1, Math.ceil(filteredMigrants.length / migrantPageSize));
+  const safeMigrantPage = Math.max(1, Math.min(migrantPage, totalMigrantPages));
+
+  const paginatedMigrants = React.useMemo(() => {
+    const start = (safeMigrantPage - 1) * migrantPageSize;
+    return filteredMigrants.slice(start, start + migrantPageSize);
+  }, [filteredMigrants, safeMigrantPage, migrantPageSize]);
+
+  const migrantPageNumbers = React.useMemo(() => {
+    const pages: (number | "...")[] = [];
+    if (totalMigrantPages <= 5) {
+      for (let i = 1; i <= totalMigrantPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (safeMigrantPage > 3) pages.push("...");
+      const start = Math.max(2, safeMigrantPage - 1);
+      const end = Math.min(totalMigrantPages - 1, safeMigrantPage + 1);
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (safeMigrantPage < totalMigrantPages - 2) pages.push("...");
+      pages.push(totalMigrantPages);
+    }
+    return pages;
+  }, [safeMigrantPage, totalMigrantPages]);
 
   const handleResolveTask = async (taskId: string) => {
     const prevTasks = [...tasks];
@@ -417,16 +462,48 @@ export default function ComplianceCentrePage() {
   };
 
   const handleExportSummary = (migrant: MigrantComplianceRow) => {
-    const header = ["Case ID", "Name", "Company", "Status", "Next RTW", "Documents"].map(escapeCsvField).join(",");
-    const row = [migrant.caseId, migrant.name, migrant.company, migrant.status, migrant.nextRtw, migrant.docs].map(escapeCsvField).join(",");
-    const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(`${header}\n${row}\n`);
-    const link = document.createElement("a");
-    link.setAttribute("href", csvContent);
-    link.setAttribute("download", `${migrant.name.replace(/\s+/g, "_")}_Compliance_Summary.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success(`Exported compliance record for ${migrant.name}`);
+    try {
+      const migrantName = migrant.name || "—";
+      const initials = migrantName
+        .split(" ")
+        .filter(Boolean)
+        .map((w) => w[0]?.toUpperCase() || "")
+        .join("") || "M";
+      const doc = generateCaseDossierReport({
+        migrantName,
+        sponsorName: migrant.company || "ENT Imm",
+        caseNumber: migrant.caseId || "—",
+        statusComplete: migrant.status === "COMPLIANT",
+        refNumber: `CMD-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${initials}-FULL`,
+        generatedDate: `${new Date().toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })} - ${new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`,
+        personalDetails: {
+          fullName: migrantName,
+          dob: "—",
+          nationality: "—",
+          jobTitle: "—",
+          projectAssignment: "—",
+          sponsor: migrant.company || "ENT Imm",
+        },
+        immigrationDetails: {
+          passportNumber: "—",
+          sharecode: "—",
+          visaValidFrom: "—",
+          visaValidTo: "—",
+          rtwCompletedDate: migrant.nextRtw || "—",
+          cosReference: "—",
+        },
+      });
+      const safeFileName = migrantName.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_") || "Migrant";
+      downloadPdf(doc, `Viems_Case_Dossier_${safeFileName}.pdf`);
+      toast.success(`Comprehensive Case Dossier for ${migrantName} downloaded.`);
+    } catch (err) {
+      console.error("Failed to generate case dossier:", err);
+      toast.error("Failed to export case dossier PDF.");
+    }
   };
 
   return (
@@ -975,7 +1052,7 @@ export default function ComplianceCentrePage() {
           <div className="inline-flex items-center gap-1 bg-[#EBEBEB] rounded-full p-1 h-7 w-fit">
             <button
               type="button"
-              onClick={() => setSelectedTaskFilter("ALL")}
+              onClick={() => handleTaskFilterChange("ALL")}
               className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none flex items-center justify-center transition-all cursor-pointer border-0 ${
                 selectedTaskFilter === "ALL"
                   ? "bg-white text-[#171717] shadow-x-small"
@@ -986,7 +1063,7 @@ export default function ComplianceCentrePage() {
             </button>
             <button
               type="button"
-              onClick={() => setSelectedTaskFilter("HIGH")}
+              onClick={() => handleTaskFilterChange("HIGH")}
               className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
                 selectedTaskFilter === "HIGH"
                   ? "bg-white text-[#171717] shadow-x-small"
@@ -998,7 +1075,7 @@ export default function ComplianceCentrePage() {
             </button>
             <button
               type="button"
-              onClick={() => setSelectedTaskFilter("MEDIUM")}
+              onClick={() => handleTaskFilterChange("MEDIUM")}
               className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
                 selectedTaskFilter === "MEDIUM"
                   ? "bg-white text-[#171717] shadow-x-small"
@@ -1010,7 +1087,7 @@ export default function ComplianceCentrePage() {
             </button>
             <button
               type="button"
-              onClick={() => setSelectedTaskFilter("LOW")}
+              onClick={() => handleTaskFilterChange("LOW")}
               className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
                 selectedTaskFilter === "LOW"
                   ? "bg-white text-[#171717] shadow-x-small"
@@ -1197,7 +1274,7 @@ export default function ComplianceCentrePage() {
                 aria-label="Search migrants"
                 placeholder="Search..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleMigrantSearchChange(e.target.value)}
                 className="h-full border-0 bg-transparent px-2 text-[14px] text-[#171717] placeholder:text-[#A4A4A4] focus-visible:ring-0 focus-visible:border-0 shadow-none py-0"
               />
             </div>
@@ -1207,6 +1284,10 @@ export default function ComplianceCentrePage() {
               variant="outline"
               size="icon-sm"
               aria-label="Filter"
+              onClick={() => {
+                handleMigrantStatusFilter("All status");
+                handleMigrantSearchChange("");
+              }}
               className="size-8 rounded-[8px] bg-white border-0 shadow-[0px_1px_2px_rgba(10,13,20,0.03)] flex items-center justify-center text-[#5C5C5C] hover:bg-neutral-50 p-0"
             >
               <RiFilter3Line className="size-5 text-[#5C5C5C]" />
@@ -1219,16 +1300,16 @@ export default function ComplianceCentrePage() {
                 <RiArrowDownSLine className="size-5 text-[#5C5C5C]" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-40">
-                <DropdownMenuItem onClick={() => setStatusFilter("All status")}>
+                <DropdownMenuItem onClick={() => handleMigrantStatusFilter("All status")}>
                   All status
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("Compliant")}>
+                <DropdownMenuItem onClick={() => handleMigrantStatusFilter("Compliant")}>
                   Compliant
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("Review")}>
+                <DropdownMenuItem onClick={() => handleMigrantStatusFilter("Review")}>
                   Under Review
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("Action Needed")}>
+                <DropdownMenuItem onClick={() => handleMigrantStatusFilter("Action Needed")}>
                   Action Needed
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -1291,7 +1372,7 @@ export default function ComplianceCentrePage() {
                 </Button>
               </div>
             ) : (
-              filteredMigrants.map((m, idx) => (
+              paginatedMigrants.map((m, idx) => (
                 <div
                   key={`migrant-${m.caseId}-${idx}`}
                   role="button"
@@ -1401,6 +1482,135 @@ export default function ComplianceCentrePage() {
               ))
             )}
           </div>
+
+          {/* Pagination Group for Migrant Compliance */}
+          {filteredMigrants.length > 0 && (
+            <div className="flex flex-row items-center justify-between w-full h-[32px] gap-[24px] mt-2">
+              {/* Left: Page summary */}
+              <div className="w-[200px] h-[32px] py-[6px] flex items-center shrink-0">
+                <span className="text-[14px] font-normal leading-[20px] tracking-[-0.006em] text-[#5C5C5C] font-sans">
+                  Page {safeMigrantPage} of {totalMigrantPages}
+                </span>
+              </div>
+
+              {/* Center: Pagination buttons */}
+              <div className="flex flex-row items-center justify-center gap-[8px] flex-1">
+                {/* First Page */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setMigrantPage(1)}
+                  disabled={safeMigrantPage === 1}
+                  className="size-8 p-0 rounded-[8px] text-[#5C5C5C] hover:bg-neutral-200 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer border-0 shrink-0"
+                  title="First page"
+                >
+                  <RiArrowLeftDoubleLine className="size-5 text-[#5C5C5C]" />
+                </Button>
+
+                {/* Previous Page */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setMigrantPage((p) => Math.max(1, p - 1))}
+                  disabled={safeMigrantPage === 1}
+                  className="size-8 p-0 rounded-[8px] text-[#5C5C5C] hover:bg-neutral-200 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer border-0 shrink-0"
+                  title="Previous page"
+                >
+                  <RiArrowLeftSLine className="size-5 text-[#5C5C5C]" />
+                </Button>
+
+                {/* Page number cells */}
+                <div className="flex flex-row items-center gap-[8px]">
+                  {migrantPageNumbers.map((p, pIdx) => {
+                    if (p === "...") {
+                      return (
+                        <span
+                          key={`ellipsis-${pIdx}`}
+                          className="size-8 flex items-center justify-center text-[14px] font-medium text-[#5C5C5C]"
+                        >
+                          ...
+                        </span>
+                      );
+                    }
+
+                    const pageNum = Number(p);
+                    const isActive = safeMigrantPage === pageNum;
+
+                    return (
+                      <Button
+                        key={`page-${pageNum}`}
+                        type="button"
+                        variant={isActive ? "primary-neutral" : "outline"}
+                        size="sm"
+                        onClick={() => setMigrantPage(pageNum)}
+                        className={`size-8 p-0 rounded-[8px] text-[14px] font-medium leading-[20px] flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                          isActive
+                            ? "bg-[#171717] text-white border-0 hover:bg-[#171717]"
+                            : "bg-white border border-[#EBEBEB] text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-50 shadow-[0px_1px_2px_rgba(10,13,20,0.03)]"
+                        }`}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                {/* Next Page */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setMigrantPage((p) => Math.min(totalMigrantPages, p + 1))}
+                  disabled={safeMigrantPage === totalMigrantPages}
+                  className="size-8 p-0 rounded-[8px] text-[#5C5C5C] hover:bg-neutral-200 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer border-0 shrink-0"
+                  title="Next page"
+                >
+                  <RiArrowRightSLine className="size-5 text-[#5C5C5C]" />
+                </Button>
+
+                {/* Last Page */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setMigrantPage(totalMigrantPages)}
+                  disabled={safeMigrantPage === totalMigrantPages}
+                  className="size-8 p-0 rounded-[8px] text-[#5C5C5C] hover:bg-neutral-200 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer border-0 shrink-0"
+                  title="Last page"
+                >
+                  <RiArrowRightDoubleLine className="size-5 text-[#5C5C5C]" />
+                </Button>
+              </div>
+
+              {/* Right: Items per page selector */}
+              <div className="w-[200px] h-[32px] flex items-center justify-end shrink-0">
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    className="min-w-[106px] h-8 px-2.5 py-1.5 rounded-[8px] border border-[#EBEBEB] bg-white text-[14px] font-normal text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-50 flex items-center justify-between gap-1.5 shadow-[0px_1px_2px_rgba(10,13,20,0.03)] cursor-pointer outline-none shrink-0 whitespace-nowrap select-none"
+                  >
+                    <span className="leading-[20px] whitespace-nowrap">{migrantPageSize} / page</span>
+                    <RiArrowDownSLine className="size-4 text-[#A4A4A4] shrink-0" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[110px] bg-white border border-[#EBEBEB] rounded-[10px] shadow-card-large p-1">
+                    {[10, 25, 50].map((size) => (
+                      <DropdownMenuItem
+                        key={size}
+                        onClick={() => {
+                          setMigrantPageSize(size);
+                          setMigrantPage(1);
+                        }}
+                        className="text-[13px] text-[#171717] hover:bg-[#F5F5F5] rounded-[6px] px-2 py-1.5 cursor-pointer"
+                      >
+                        {size} / page
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

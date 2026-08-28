@@ -1063,10 +1063,10 @@ export default function RtwChecksPage() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="w-[99px] h-8 px-[10px] py-[6px] rounded-[8px] border border-[#EBEBEB] bg-white text-[14px] font-normal text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-50 flex items-center justify-between shadow-[0px_1px_2px_rgba(10,13,20,0.03)] cursor-pointer outline-none shrink-0"
+                      className="min-w-[106px] h-8 px-2.5 py-1.5 rounded-[8px] border border-[#EBEBEB] bg-white text-[14px] font-normal text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-50 flex items-center justify-between gap-1.5 shadow-[0px_1px_2px_rgba(10,13,20,0.03)] cursor-pointer outline-none shrink-0 whitespace-nowrap select-none"
                     >
-                      <span className="leading-[20px]">{itemsPerPage} / page</span>
-                      <RiArrowDownSLine className="size-5 text-[#A4A4A4]" />
+                      <span className="leading-[20px] whitespace-nowrap">{itemsPerPage} / page</span>
+                      <RiArrowDownSLine className="size-4 text-[#A4A4A4] shrink-0" />
                     </Button>
                   } />
                   <DropdownMenuContent align="end" className="w-[110px] bg-white border border-[#EBEBEB] rounded-[10px] shadow-card-large p-1">
