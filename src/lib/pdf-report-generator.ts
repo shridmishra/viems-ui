@@ -26,29 +26,91 @@ const COLOR = {
 // HELPER DRAWING PRIMITIVES (A4: 210 x 297 mm)
 // ==========================================
 
-function drawViemsLogo(doc: jsPDF, x: number, y: number) {
-  // Stylized VIEMS logo icon
-  doc.setFillColor(51, 92, 255); // #335CFF
-  doc.triangle(x, y, x + 4, y + 8, x - 4, y + 8, "F");
-  doc.setFillColor(99, 102, 241);
-  doc.triangle(x + 4, y, x + 8, y + 8, x, y + 8, "F");
+let cachedLogoDataUrl: string | null = null;
 
-  // Logo Text
+/**
+ * Generates a crisp, high-resolution raster data URL of the official Viems brand logo
+ * (converging purple wings icon from Group 636 + "viems" Aeonik brand typography).
+ */
+function getViemsLogoDataUrl(): string {
+  if (cachedLogoDataUrl) return cachedLogoDataUrl;
+  if (typeof document === "undefined") return "";
+
+  try {
+    const scale = 4; // 4x for retina print resolution
+    const width = 140 * scale;
+    const height = 36 * scale;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return "";
+
+    ctx.scale(scale, scale);
+
+    // 1. Draw Brand Purple Converging Wings Logo Icon (#7D52F4)
+    ctx.fillStyle = "#7D52F4";
+    ctx.save();
+    // Native SVG size is 41 x 33. We scale to height 24px (ratio: 24/33 = 0.7272, width = ~30px)
+    const iconScale = 24 / 33;
+    ctx.translate(0, 6);
+    ctx.scale(iconScale, iconScale);
+
+    const leftWing = new Path2D(
+      "M0.0674336 0.715702L18.51 32.3517C18.7538 32.7698 19.3936 32.5969 19.3936 32.113V17.7509C19.3936 13.7628 17.3053 10.066 13.8896 8.00732L0.721635 0.0709877C0.301304 -0.182343 -0.179734 0.291718 0.0674336 0.715702Z"
+    );
+    const rightWing = new Path2D(
+      "M40.9326 0.715702L22.49 32.3517C22.2462 32.7698 21.6064 32.5969 21.6064 32.113V17.7509C21.6064 13.7628 23.6947 10.066 27.1104 8.00732L40.2784 0.0709877C40.6987 -0.182343 41.1797 0.291718 40.9326 0.715702Z"
+    );
+    ctx.fill(leftWing);
+    ctx.fill(rightWing);
+    ctx.restore();
+
+    // 2. Draw "viems" Brand Typography (Aeonik / Helvetica)
+    ctx.fillStyle = "#171717";
+    ctx.font = "bold 24px Aeonik, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.fillText("viems", 36, 18);
+
+    cachedLogoDataUrl = canvas.toDataURL("image/png");
+    return cachedLogoDataUrl;
+  } catch (err) {
+    console.error("Failed to generate Viems logo data URL:", err);
+    return "";
+  }
+}
+
+function drawViemsLogo(doc: jsPDF, x: number, y: number, w: number = 28, h: number = 7.2) {
+  try {
+    const logoDataUrl = getViemsLogoDataUrl();
+    if (logoDataUrl) {
+      doc.addImage(logoDataUrl, "PNG", x, y, w, h);
+      return;
+    }
+  } catch (e) {
+    console.error("Failed to render logo image:", e);
+  }
+
+  // Fallback vector drawing if canvas is unavailable
+  doc.setFillColor(125, 82, 244); // #7D52F4
+  doc.triangle(x, y + 1, x + 3.5, y + 6.5, x - 3.5, y + 6.5, "F");
+  doc.triangle(x + 3.5, y + 1, x + 7, y + 6.5, x, y + 6.5, "F");
+
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
   doc.setTextColor(23, 23, 23);
-  doc.text("viems", x + 10, y + 6.5);
+  doc.text("viems", x + 9, y + 6);
 }
 
 function drawHeader(doc: jsPDF, pageNum: number, totalPages: number) {
-  drawViemsLogo(doc, 15, 14);
+  drawViemsLogo(doc, 15, 12, 28, 7.2);
 
   // Page Indicator (e.g. "02 / 07")
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(92, 92, 92);
   const pageStr = `${String(pageNum).padStart(2, "0")} / ${String(totalPages).padStart(2, "0")}`;
-  doc.text(pageStr, 195, 20, { align: "right" });
+  doc.text(pageStr, 195, 18, { align: "right" });
 
   doc.setDrawColor(235, 235, 235);
   doc.setLineWidth(0.3);
