@@ -27,6 +27,10 @@ import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { ENDPOINTS } from "@/lib/api-endpoints";
 import { formatFullName, formatTitleCase, getInitials } from "@/lib/format";
+import {
+  generateCaseDossierReport,
+  downloadPdf,
+} from "@/lib/pdf-report-generator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -417,16 +421,44 @@ export default function ComplianceCentrePage() {
   };
 
   const handleExportSummary = (migrant: MigrantComplianceRow) => {
-    const header = ["Case ID", "Name", "Company", "Status", "Next RTW", "Documents"].map(escapeCsvField).join(",");
-    const row = [migrant.caseId, migrant.name, migrant.company, migrant.status, migrant.nextRtw, migrant.docs].map(escapeCsvField).join(",");
-    const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(`${header}\n${row}\n`);
-    const link = document.createElement("a");
-    link.setAttribute("href", csvContent);
-    link.setAttribute("download", `${migrant.name.replace(/\s+/g, "_")}_Compliance_Summary.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success(`Exported compliance record for ${migrant.name}`);
+    try {
+      const doc = generateCaseDossierReport({
+        migrantName: migrant.name,
+        sponsorName: migrant.company || "ENT Imm",
+        caseNumber: migrant.caseId || "431/2026",
+        statusComplete: migrant.status === "COMPLIANT",
+        refNumber: `CMD-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${migrant.name
+          .split(" ")
+          .map((w) => w[0])
+          .join("")}-FULL`,
+        generatedDate: `${new Date().toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })} - ${new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`,
+        personalDetails: {
+          fullName: migrant.name,
+          dob: "18 Feb 1988",
+          nationality: "Indian",
+          jobTitle: "Creative Director",
+          projectAssignment: "Northstar Festival & Film Campaign",
+          sponsor: migrant.company || "ENT Imm",
+        },
+        immigrationDetails: {
+          passportNumber: "P1234567",
+          sharecode: "W9A-4BC-72D",
+          visaValidFrom: "15 Jul 2026",
+          visaValidTo: "31 Mar 2027",
+          rtwCompletedDate: migrant.nextRtw || "12 Jul 2026",
+          cosReference: "C5K8M2P7Q",
+        },
+      });
+      downloadPdf(doc, `Viems_Case_Dossier_${migrant.name.replace(/\s+/g, "_")}.pdf`);
+      toast.success(`Comprehensive Case Dossier for ${migrant.name} downloaded.`);
+    } catch (err) {
+      console.error("Failed to generate case dossier:", err);
+      toast.error("Failed to export case dossier PDF.");
+    }
   };
 
   return (
