@@ -618,33 +618,42 @@ export default function MigrantDetailPage() {
               return;
             }
             let success = false;
-            try {
-              await apiClient.patch(ENDPOINTS.cases.byId(id), {
+            const targetCaseId = migrant.caseNumericId || (migrant.cases?.[0]?.id) || (id ? parseInt(id, 10) : null);
+            if (targetCaseId && !isNaN(Number(targetCaseId))) {
+              try {
+                const formData = new FormData();
+                const roleId = typeof migrant.roleId === "number"
+                  ? migrant.roleId
+                  : parseInt(String(migrant.roleId || migrant.rawCase?.role?.id || migrant.rawCase?.role || 1), 10) || 1;
+
+                formData.append("category", JSON.stringify({ id: roleId }));
+                formData.append("status", newStatus);
+
+                if (newStatus.toLowerCase().includes("approved") || newStatus === "visa_approved") {
+                  formData.append("decision", JSON.stringify({ id: "Granted" }));
+                } else if (newStatus.toLowerCase().includes("refused") || newStatus === "visa_refused") {
+                  formData.append("decision", JSON.stringify({ id: "Refused" }));
+                }
+
+                await apiClient.patch(ENDPOINTS.cases.byId(targetCaseId), {
+                  body: formData,
+                });
+                success = true;
+              } catch (caseErr) {
+                console.warn("Case endpoint update failed, attempting migrant patch fallback:", caseErr);
+              }
+            }
+
+            if (!success) {
+              await apiClient.patch(ENDPOINTS.migrants.byId(migrant.migrantId || id), {
                 case_status: newStatus,
                 status: newStatus,
               });
               success = true;
-            } catch (caseErr: unknown) {
-              console.error("Initial case endpoint update failed:", caseErr);
-              const statusCode =
-                typeof caseErr === "object" && caseErr !== null
-                  ? (caseErr as { status?: number; response?: { status?: number } })
-                      .status ||
-                    (caseErr as { status?: number; response?: { status?: number } })
-                      .response?.status
-                  : undefined;
-              if (statusCode === 404 || statusCode === 405) {
-                await apiClient.patch(ENDPOINTS.migrants.byId(migrant.migrantId || id), {
-                  case_status: newStatus,
-                  status: newStatus,
-                });
-                success = true;
-              } else {
-                throw caseErr;
-              }
             }
+
             if (success) {
-              toast.success("Migrant status updated successfully");
+              toast.success("Status updated successfully");
               loadMigrantDetail();
             }
           } catch (err: unknown) {

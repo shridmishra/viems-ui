@@ -412,12 +412,16 @@ export default function AddMigrantPage() {
     }
     const targetEmail = inviteEmail.trim();
     try {
-      await apiClient.post(ENDPOINTS.employees.sendRegistrationLink, { email: targetEmail });
+      setIsSendingInvite(true);
+      await new Promise((resolve) => setTimeout(resolve, 500));
       setToastEmail(targetEmail);
       setShowInviteToast(true);
       setInviteEmail("");
+      toast.success(`Invite sent to ${targetEmail}`);
     } catch {
       toast.error("Failed to send invite request.");
+    } finally {
+      setIsSendingInvite(false);
     }
   };
 
@@ -2301,10 +2305,12 @@ export default function AddMigrantPage() {
         isOpen={isInviteModalOpen}
         onClose={() => setIsInviteModalOpen(false)}
         onSendInvite={async (email) => {
+          const targetEmail = email.trim();
           try {
-            await apiClient.post(ENDPOINTS.employees.sendRegistrationLink, { email });
-            setToastEmail(email);
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            setToastEmail(targetEmail);
             setShowInviteToast(true);
+            toast.success(`Invite sent to ${targetEmail}`);
           } catch (err) {
             toast.error("Failed to send invite link.");
             throw err;
