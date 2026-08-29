@@ -918,6 +918,12 @@ export default function InsightsPage() {
   const drawerCases = React.useMemo(() => {
     const matched = filteredCases.filter((c) => {
       if (selectedStatusKey === "Total Cases" || selectedStatusKey === "ALL") return true;
+      if (selectedStatusKey === "IN_PROGRESS" || selectedStatusKey === "In Progress" || selectedStatusKey === "IN PROGRESS") {
+        const resolved = resolveCanonicalStatus(c.case_status);
+        const isApproved = resolved === "VISA APPROVED" || resolved === "COS ASSIGNED" || Boolean(c.is_active);
+        const isRefused = resolved === "VISA REFUSED";
+        return !isApproved && !isRefused;
+      }
       return matchesStatus(c.case_status, selectedStatusKey);
     });
 
@@ -1121,7 +1127,7 @@ export default function InsightsPage() {
                           fill="#EBEBEB"
                           isAnimationActive={false}
                           radius={!visibleSeries.Refused && !visibleSeries.Approved ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                          onClick={() => handleOpenStatusDrawer("ELIGIBILITY ASSESSMENT", "In Progress Cases")}
+                          onClick={() => handleOpenStatusDrawer("IN_PROGRESS", "In Progress Cases")}
                           className="cursor-pointer"
                         >
                           {!visibleSeries.Refused && !visibleSeries.Approved && (
