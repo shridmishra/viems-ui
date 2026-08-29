@@ -619,14 +619,35 @@ export default function InsightsPage() {
       }
     });
 
-    return buckets.map(({ name, Approved, Refused, "In Progress": inProg, total }) => ({
-      name,
-      Approved,
-      Refused,
-      "In Progress": inProg,
-      total,
-    }));
-  }, [filteredCases, activeFilter]);
+    return buckets.map(({ name, Approved, Refused, "In Progress": inProg, total }) => {
+      const activeApproved = visibleSeries.Approved ? Approved : 0;
+      const activeRefused = visibleSeries.Refused ? Refused : 0;
+      const activeInProg = visibleSeries["In Progress"] ? inProg : 0;
+      const activeTotal = activeApproved + activeRefused + activeInProg;
+
+      let topSeries: "Approved" | "Refused" | "In Progress" | null = null;
+      if (activeApproved > 0) topSeries = "Approved";
+      else if (activeRefused > 0) topSeries = "Refused";
+      else if (activeInProg > 0) topSeries = "In Progress";
+
+      return {
+        name,
+        Approved,
+        Refused,
+        "In Progress": inProg,
+        total: activeTotal,
+        topSeries,
+      };
+    });
+  }, [filteredCases, activeFilter, visibleSeries]);
+
+  const dynamicBarSize = React.useMemo(() => {
+    const count = chartData.length;
+    if (count <= 3) return 48;
+    if (count <= 6) return 40;
+    if (count <= 12) return 24;
+    return Math.max(14, Math.min(32, Math.floor(360 / count)));
+  }, [chartData.length]);
 
   // 6 Top KPI Metrics Configuration
   const metrics = [
@@ -897,6 +918,12 @@ export default function InsightsPage() {
   const drawerCases = React.useMemo(() => {
     const matched = filteredCases.filter((c) => {
       if (selectedStatusKey === "Total Cases" || selectedStatusKey === "ALL") return true;
+      if (selectedStatusKey === "IN_PROGRESS" || selectedStatusKey === "In Progress" || selectedStatusKey === "IN PROGRESS") {
+        const resolved = resolveCanonicalStatus(c.case_status);
+        const isApproved = resolved === "VISA APPROVED" || resolved === "COS ASSIGNED" || Boolean(c.is_active);
+        const isRefused = resolved === "VISA REFUSED";
+        return !isApproved && !isRefused;
+      }
       return matchesStatus(c.case_status, selectedStatusKey);
     });
 
@@ -1013,15 +1040,15 @@ export default function InsightsPage() {
               key={idx}
               type="button"
               onClick={m.onClick}
-              className="bg-white border border-[#EBEBEB] hover:border-neutral-300 hover:shadow-xs transition-all duration-150 rounded-[16px] p-[20px] flex flex-col justify-between h-[126px] text-left cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#7D52F4]/30"
+              className="bg-white border border-[#EBEBEB] hover:border-neutral-300 hover:shadow-xs transition-all duration-150 rounded-[16px] p-[16px_18px] flex flex-col justify-between min-h-[126px] h-full text-left cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#7D52F4]/30"
             >
-              <span className="text-[11px] font-medium tracking-[0.02em] text-[#171717] uppercase">
+              <span className="text-[11px] font-medium tracking-[0.02em] text-[#171717] uppercase leading-[14px]">
                 {m.title}
               </span>
-              <span className="text-[28px] font-medium text-[#171717] leading-none tracking-tight font-aeonik-medium my-auto">
+              <span className="text-[26px] font-medium text-[#171717] leading-tight font-aeonik-medium my-auto">
                 {m.value}
               </span>
-              <span className="text-[13px] text-[#7B7B7B] font-normal truncate">
+              <span className="text-[12px] text-[#7B7B7B] font-normal leading-[16px] truncate">
                 {m.subtext}
               </span>
             </button>
@@ -1040,19 +1067,20 @@ export default function InsightsPage() {
                 Cases overview
               </h2>
 
-              <div className="bg-white border border-[#EBEBEB] rounded-[16px] p-[20px] pb-[16px] flex flex-col justify-between shadow-[0px_1px_2px_rgba(10,13,20,0.03)] h-[320px] w-full">
+              <div className="bg-white border border-[#EBEBEB] rounded-[16px] p-[20px] pb-[16px] flex flex-col justify-between shadow-[0px_1px_2px_rgba(10,13,20,0.03)] h-[350px] w-full">
                 {/* Stacked Chart Container */}
-                <div className="w-full h-[210px] relative">
+                <div className="w-full h-[250px] relative">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={chartData}
-                      margin={{ top: 24, right: 0, left: 0, bottom: 0 }}
-                      barSize={48}
+                      margin={{ top: 24, right: 8, left: 8, bottom: 20 }}
+                      barSize={dynamicBarSize}
                     >
                       <XAxis
                         dataKey="name"
                         axisLine={false}
                         tickLine={false}
+                        height={30}
                         tick={{ fill: "#5C5C5C", fontSize: 11, fontWeight: 500 }}
                         dy={8}
                       />
@@ -1097,26 +1125,47 @@ export default function InsightsPage() {
                           dataKey="In Progress"
                           stackId="a"
                           fill="#EBEBEB"
-                          radius={[0, 0, 0, 0]}
-                          onClick={() => handleOpenStatusDrawer("ELIGIBILITY ASSESSMENT", "In Progress Cases")}
+                          isAnimationActive={false}
+                          radius={!visibleSeries.Refused && !visibleSeries.Approved ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                          onClick={() => handleOpenStatusDrawer("IN_PROGRESS", "In Progress Cases")}
                           className="cursor-pointer"
-                        />
+                        >
+                          {!visibleSeries.Refused && !visibleSeries.Approved && (
+                            <LabelList
+                              dataKey="total"
+                              position="top"
+                              offset={8}
+                              style={{ fill: "#171717", fontSize: 12, fontWeight: 500 }}
+                            />
+                          )}
+                        </Bar>
                       )}
                       {visibleSeries.Refused && (
                         <Bar
                           dataKey="Refused"
                           stackId="a"
                           fill="#FB3748"
-                          radius={[0, 0, 0, 0]}
+                          isAnimationActive={false}
+                          radius={!visibleSeries.Approved ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                           onClick={() => handleOpenStatusDrawer("VISA REFUSED", "Visa Refused")}
                           className="cursor-pointer"
-                        />
+                        >
+                          {!visibleSeries.Approved && (
+                            <LabelList
+                              dataKey="total"
+                              position="top"
+                              offset={8}
+                              style={{ fill: "#171717", fontSize: 12, fontWeight: 500 }}
+                            />
+                          )}
+                        </Bar>
                       )}
                       {visibleSeries.Approved && (
                         <Bar
                           dataKey="Approved"
                           stackId="a"
                           fill="#1FC16B"
+                          isAnimationActive={false}
                           radius={[4, 4, 0, 0]}
                           onClick={() => handleOpenStatusDrawer("VISA APPROVED", "Visa Approved")}
                           className="cursor-pointer"
@@ -1125,7 +1174,7 @@ export default function InsightsPage() {
                             dataKey="total"
                             position="top"
                             offset={8}
-                            style={{ fill: "#171717", fontSize: 13, fontWeight: 500 }}
+                            style={{ fill: "#171717", fontSize: 12, fontWeight: 500 }}
                           />
                         </Bar>
                       )}

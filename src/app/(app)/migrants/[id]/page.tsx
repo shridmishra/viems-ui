@@ -286,10 +286,24 @@ function mapBackendMigrantToDetail(c: any) {
     email: ec.email || ec.emergency_contact_email || "",
   };
 
+  const extractedRoleId =
+    c.role?.id ||
+    (typeof c.role === "number" ? c.role : null) ||
+    c.roleId ||
+    c.category?.id ||
+    (typeof c.category === "number" ? c.category : null) ||
+    (typeof c.category === "object" ? c.category?.id : null) ||
+    (Array.isArray(c.cases) && c.cases[0]?.role?.id) ||
+    (Array.isArray(c.cases) && typeof c.cases[0]?.role === "number" ? c.cases[0].role : null) ||
+    (Array.isArray(m.cases) && m.cases[0]?.role?.id) ||
+    (Array.isArray(m.cases) && typeof m.cases[0]?.role === "number" ? m.cases[0].role : null) ||
+    null;
+
   return {
-    id: m.id || c.id || 1,
+    id: m.id || 1,
     migrantId: migrantIdStr,
-    caseNumericId: c.id,
+    caseNumericId: c.caseNumericId !== undefined ? c.caseNumericId : (c.migrant && c.id ? c.id : null),
+    roleId: extractedRoleId,
     name,
     avatar: m.avatar || m.photo_url || pInfo.avatars?.[0]?.url || "",
     avatarText: getInitials(name) || "—",
@@ -419,13 +433,16 @@ export default function MigrantDetailPage() {
         }
       }
 
+      const resolvedCaseId = caseData?.id || (migrantData && Array.isArray(migrantData.cases) && migrantData.cases[0]?.id) || null;
       const combined = {
         ...(caseData || {}),
         migrant: {
           ...(caseData?.migrant || {}),
           ...(migrantData || {}),
         },
-        id,
+        id: migrantData?.id || caseData?.migrant?.id || caseData?.migrantId || id,
+        caseNumericId: resolvedCaseId,
+        role: caseData?.role || caseData?.category || migrantData?.cases?.[0]?.role,
       };
 
       const detail = mapBackendMigrantToDetail(combined);
@@ -618,33 +635,50 @@ export default function MigrantDetailPage() {
               return;
             }
             let success = false;
-            try {
-              await apiClient.patch(ENDPOINTS.cases.byId(id), {
+            const targetCaseId = migrant.caseNumericId || (migrant.cases?.[0]?.id) || null;
+            if (targetCaseId && !isNaN(Number(targetCaseId))) {
+              try {
+                const formData = new FormData();
+                const roleId = typeof migrant.roleId === "number"
+                  ? migrant.roleId
+                  : parseInt(String(migrant.roleId || migrant.rawCase?.role?.id || migrant.rawCase?.role || 1), 10) || 1;
+
+                formData.append("category", JSON.stringify({ id: roleId }));
+                formData.append("status", newStatus);
+
+                if (newStatus.toLowerCase().includes("approved") || newStatus === "visa_approved") {
+                  formData.append("decision", JSON.stringify({ id: "Granted" }));
+                } else if (newStatus.toLowerCase().includes("refused") || newStatus === "visa_refused") {
+                  formData.append("decision", JSON.stringify({ id: "Refused" }));
+                }
+
+                await apiClient.patch(ENDPOINTS.cases.byId(targetCaseId), {
+                  body: formData,
+                });
+                success = true;
+              } catch (caseErr: any) {
+                const statusCode =
+                  typeof caseErr === "object" && caseErr !== null
+                    ? caseErr.status || caseErr.response?.status
+                    : undefined;
+                if (statusCode === 404 || statusCode === 405) {
+                  console.warn("Case endpoint unsupported (404/405), attempting migrant patch fallback:", caseErr);
+                } else {
+                  throw caseErr;
+                }
+              }
+            }
+
+            if (!success) {
+              await apiClient.patch(ENDPOINTS.migrants.byId(migrant.migrantId || id), {
                 case_status: newStatus,
                 status: newStatus,
               });
               success = true;
-            } catch (caseErr: unknown) {
-              console.error("Initial case endpoint update failed:", caseErr);
-              const statusCode =
-                typeof caseErr === "object" && caseErr !== null
-                  ? (caseErr as { status?: number; response?: { status?: number } })
-                      .status ||
-                    (caseErr as { status?: number; response?: { status?: number } })
-                      .response?.status
-                  : undefined;
-              if (statusCode === 404 || statusCode === 405) {
-                await apiClient.patch(ENDPOINTS.migrants.byId(migrant.migrantId || id), {
-                  case_status: newStatus,
-                  status: newStatus,
-                });
-                success = true;
-              } else {
-                throw caseErr;
-              }
             }
+
             if (success) {
-              toast.success("Migrant status updated successfully");
+              toast.success("Status updated successfully");
               loadMigrantDetail();
             }
           } catch (err: unknown) {
