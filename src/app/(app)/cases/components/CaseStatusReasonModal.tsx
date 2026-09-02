@@ -6,6 +6,7 @@ import {
   RiArrowDownSLine,
   RiCheckLine,
   RiCloseLine,
+  RiDownload2Line,
   RiFileTextLine,
   RiFolderShield2Line,
 } from "@remixicon/react";
@@ -29,6 +30,11 @@ import {
   getReasonOptionsForStatus,
   StatusReasonOption,
 } from "@/lib/case-status-rules";
+import {
+  generateCurtailmentLetter,
+  downloadPdf,
+  CurtailmentLetterData,
+} from "@/lib/pdf-report-generator";
 
 interface CaseStatusReasonModalProps {
   open: boolean;
@@ -41,6 +47,10 @@ interface CaseStatusReasonModalProps {
     name?: string;
     avatarText?: string;
     avatarUrl?: string;
+    cosNumber?: string;
+    passportNumber?: string;
+    role?: string;
+    sponsor_name?: string;
   } | null;
   onConfirm: (payload: {
     newStatus: string;
@@ -65,6 +75,8 @@ export function CaseStatusReasonModal({
   const [selectedReason, setSelectedReason] = React.useState<StatusReasonOption | null>(() => reasonOptions[0] || null);
   const [customNotes, setCustomNotes] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
+  const [downloadLetterOnConfirm, setDownloadLetterOnConfirm] = React.useState(true);
+  const [downloadingLetter, setDownloadingLetter] = React.useState(false);
 
   // Sync default selection if target status options change
   React.useEffect(() => {
@@ -98,10 +110,59 @@ export function CaseStatusReasonModal({
   const requiresNotes = selectedReason?.requiresDescription || selectedReason?.value === "other";
   const isValid = selectedReason && (!requiresNotes || customNotes.trim().length > 0);
 
+  const triggerLetterDownload = async () => {
+    if (!caseInfo || !selectedReason) return;
+    try {
+      const migrantName = caseInfo.name || "Sponsored Worker";
+      const initials = migrantName
+        .split(" ")
+        .filter(Boolean)
+        .map((w: string) => w[0]?.toUpperCase() || "")
+        .join("") || "CRT";
+
+      const payload: CurtailmentLetterData = {
+        migrantName,
+        caseNumber: String(caseInfo.caseId || caseInfo.id || "—"),
+        cosReference: caseInfo.cosNumber || "—",
+        passportNumber: caseInfo.passportNumber || "—",
+        jobTitle: caseInfo.role || "—",
+        sponsorName: caseInfo.sponsor_name || "Viems Licensed Sponsor",
+        cessationType: isWithdrawal ? "withdrawal" : isClosed ? "closure" : "curtailment",
+        cessationReason: selectedReason.label,
+        sponsorshipEndDate: new Date().toISOString().slice(0, 10),
+        lastDayOfWork: new Date().toISOString().slice(0, 10),
+        notes: customNotes.trim() || undefined,
+        refNumber: `UKVI-CRT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${initials}`,
+      };
+
+      const doc = generateCurtailmentLetter(payload);
+      const safeName = migrantName.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_") || "Worker";
+      const docTypePrefix = isWithdrawal ? "Withdrawal_Notice" : "Case_Closure_Letter";
+      downloadPdf(doc, `Viems_${docTypePrefix}_${safeName}.pdf`);
+      toast.success(`Official letter downloaded for ${migrantName}.`);
+    } catch (err) {
+      console.error("Failed to generate curtailment letter:", err);
+    }
+  };
+
+  const handleDownloadOnly = async () => {
+    if (!isValid) return;
+    try {
+      setDownloadingLetter(true);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      await triggerLetterDownload();
+    } finally {
+      setDownloadingLetter(false);
+    }
+  };
+
   const handleConfirm = async () => {
     if (!selectedReason || !isValid) return;
     try {
       setSubmitting(true);
+      if (downloadLetterOnConfirm && (isClosed || isWithdrawal)) {
+        await triggerLetterDownload();
+      }
       await onConfirm({
         newStatus: targetStatus,
         reasonCode: selectedReason.value,
@@ -121,9 +182,9 @@ export function CaseStatusReasonModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-[520px] w-[95vw] !p-0 !gap-0 !overflow-hidden rounded-[20px] bg-white border border-[#F5F5F5] shadow-2xl font-sans flex flex-col max-h-[85vh]">
+      <DialogContent className="max-w-[520px] w-[95vw] !p-0 !gap-0 !overflow-hidden rounded-[20px] bg-white border border-neutral-200 shadow-2xl font-sans flex flex-col max-h-[88vh]">
         {/* Header */}
-        <DialogHeader className="px-6 py-4.5 pr-14 border-b border-[#F5F5F5] bg-white flex flex-row items-center justify-between space-y-0 text-left shrink-0">
+        <DialogHeader className="px-6 py-4.5 pr-14 border-b border-neutral-200 bg-white flex flex-row items-center justify-between space-y-0 text-left shrink-0">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <div
               className={`size-9 rounded-full flex items-center justify-center shrink-0 shadow-2xs ${
@@ -250,6 +311,34 @@ export function CaseStatusReasonModal({
               className="min-h-[90px] text-[13px] rounded-[10px] border border-neutral-200 focus-visible:ring-1 focus-visible:ring-brand-medium resize-none bg-white placeholder-[#A4A4A4]"
             />
           </div>
+
+          {/* Curtailment / Closure Letter Generation Option */}
+          {(isClosed || isWithdrawal || selectedReason?.value === "curtailment_issued") && (
+            <div className="p-3.5 rounded-[12px] bg-[#F9F9FB] border border-[#EBEBF0] flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <RiFileTextLine className="size-4 text-brand-dark shrink-0" />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[12px] font-semibold text-[#171717]">
+                    Official UKVI Letter & Audit Certificate
+                  </span>
+                  <span className="text-[11px] text-[#7B7B7B] truncate">
+                    Generate 1-page Home Office curtailment / closure notice (PDF)
+                  </span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!isValid || downloadingLetter}
+                onClick={handleDownloadOnly}
+                className="h-7.5 px-2.5 rounded-[8px] text-[11px] font-medium bg-white hover:bg-neutral-50 text-[#171717] border border-neutral-200 shadow-x-small flex items-center gap-1 shrink-0 cursor-pointer"
+              >
+                <RiDownload2Line className="size-3 text-[#5C5C5C]" />
+                <span>{downloadingLetter ? "Generating..." : "Download Letter"}</span>
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

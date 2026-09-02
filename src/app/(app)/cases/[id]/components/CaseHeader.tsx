@@ -10,6 +10,7 @@ import {
   RiUploadLine,
   RiArchiveLine,
   RiDeleteBinLine,
+  RiFileTextLine,
 } from "@remixicon/react";
 import {
   DropdownMenu,
@@ -35,6 +36,7 @@ interface CaseHeaderProps {
   onEditHeader?: () => void;
   onAddNote?: () => void;
   onUpload?: () => void;
+  onCurtailmentLetter?: () => void;
   onArchive?: () => void;
   onDelete?: () => void;
 }
@@ -54,6 +56,7 @@ export function CaseHeader({
   onEditHeader,
   onAddNote,
   onUpload,
+  onCurtailmentLetter,
   onArchive,
   onDelete,
 }: CaseHeaderProps) {
@@ -220,7 +223,20 @@ export function CaseHeader({
                 </DropdownMenuItem>
               )}
 
-              {(onAddNote || onUpload) && (onArchive || onDelete) && (
+              {onCurtailmentLetter && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    setOpen(false);
+                    onCurtailmentLetter();
+                  }}
+                  className="w-[235px] h-9 px-2 py-2 text-left text-[14px] flex items-center gap-[8px] cursor-pointer transition-colors border-0 bg-transparent rounded-[8px] font-medium text-[#171717] hover:bg-[#F5F5F5]"
+                >
+                  <RiFileTextLine className="size-5 text-[#5C5C5C]" />
+                  <span className="flex-1">Curtailment letter</span>
+                </DropdownMenuItem>
+              )}
+
+              {(onAddNote || onUpload || onCurtailmentLetter) && (onArchive || onDelete) && (
                 <DropdownMenuSeparator className="w-[235px] h-[1px] bg-[#EBEBEB] my-1 self-center" />
               )}
 

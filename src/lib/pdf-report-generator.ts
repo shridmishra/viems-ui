@@ -1669,9 +1669,339 @@ export function generateCaseDossierReport(
 }
 
 // ==========================================
-// 3. EXPORT / DOWNLOAD HELPER
+// 3. CURTAILMENT / CASE CLOSING LETTER GENERATOR (1-PAGE A4)
+// ==========================================
+
+export interface CurtailmentLetterData {
+  migrantName: string;
+  caseNumber: string;
+  cosReference?: string;
+  passportNumber?: string;
+  dateOfBirth?: string;
+  nationality?: string;
+  currentAddress?: string;
+  jobTitle?: string;
+  sponsorName?: string;
+  sponsorLicenceNumber?: string;
+  sponsorAddress?: string;
+  authorisingOfficer?: string;
+  authorisingOfficerRole?: string;
+  cessationType?: "curtailment" | "closure" | "withdrawal";
+  cessationReason: string;
+  lastDayOfWork?: string;
+  sponsorshipEndDate: string;
+  smsReportReference?: string;
+  smsReportDate?: string;
+  notes?: string;
+  refNumber?: string;
+  generatedDate?: string;
+}
+
+export function generateCurtailmentLetter(data: CurtailmentLetterData): jsPDF {
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+  });
+
+  const migrantName = data.migrantName || "—";
+  const sponsorName = data.sponsorName || "Viems Licensed Sponsor";
+  const sponsorLicence = data.sponsorLicenceNumber || "1A2B3C4D5";
+  const sponsorAddress = data.sponsorAddress || "14 Berkeley Square, Mayfair, London W1J 6BL, United Kingdom";
+  const authorisingOfficer = data.authorisingOfficer || "Nathan Wood";
+  const authorisingOfficerRole = data.authorisingOfficerRole || "Compliance Manager & Level 1 User";
+  const cessationType = data.cessationType || "curtailment";
+
+  const initials = migrantName
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w[0]?.toUpperCase() || "")
+    .join("") || "CRT";
+
+  const dateStr = data.generatedDate || new Date().toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  const refCode = data.refNumber || `UKVI-CRT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${initials}`;
+  const smsReportRef = data.smsReportReference || `SMS-REP-${Math.floor(100000 + Math.random() * 900000)}`;
+
+  // Page 1: Single Page Layout
+  // 1. Top Header
+  drawViemsLogo(doc, 15, 14, 28, 7.2);
+
+  // Sponsor Info on Right Header
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(23, 23, 23);
+  doc.text(sponsorName, 195, 15, { align: "right" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(92, 92, 92);
+  doc.text(`Sponsor Licence: ${sponsorLicence}`, 195, 19.5, { align: "right" });
+  doc.text(sponsorAddress, 195, 23.5, { align: "right" });
+
+  // Divider Line
+  doc.setDrawColor(235, 235, 235);
+  doc.setLineWidth(0.3);
+  doc.line(15, 28, 195, 28);
+
+  // 2. Reference & Date Bar
+  doc.setFillColor(250, 250, 250);
+  doc.rect(15, 31, 180, 8, "F");
+  doc.setDrawColor(235, 235, 235);
+  doc.rect(15, 31, 180, 8, "S");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(92, 92, 92);
+  doc.text("DATE:", 19, 36);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(23, 23, 23);
+  doc.text(dateStr, 30, 36);
+
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(92, 92, 92);
+  doc.text("NOTICE REF:", 75, 36);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(23, 23, 23);
+  doc.text(refCode, 94, 36);
+
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(92, 92, 92);
+  doc.text("UKVI SMS REF:", 145, 36);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(23, 23, 23);
+  doc.text(smsReportRef, 168, 36);
+
+  // 3. Recipient Details Box
+  let curY = 43;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(92, 92, 92);
+  doc.text("TO (SPONSORED WORKER):", 15, curY);
+
+  curY += 4.5;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(23, 23, 23);
+  doc.text(migrantName, 15, curY);
+
+  curY += 4;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(92, 92, 92);
+  const migrantIdLine = `Passport: ${data.passportNumber || "—"}  •  Nationality: ${data.nationality || "—"}  •  DOB: ${data.dateOfBirth || "—"}  •  CoS: ${data.cosReference || "—"}`;
+  doc.text(migrantIdLine, 15, curY);
+
+  // 4. Formal Notice Title Banner
+  curY += 7;
+  const isWithdrawal = cessationType === "withdrawal";
+  const isClosure = cessationType === "closure";
+
+  const titleText = isWithdrawal
+    ? "NOTICE OF APPLICATION WITHDRAWAL & SPONSORSHIP CANCELLATION"
+    : isClosure
+    ? "CERTIFICATE OF SPONSORSHIP CONCLUSION & CASE CLOSURE"
+    : "NOTICE OF EARLY SPONSORSHIP CESSATION & UKVI CURTAILMENT";
+
+  const badgeVariant = isWithdrawal || cessationType === "curtailment" ? "error" : "purple";
+
+  doc.setFillColor(248, 249, 250);
+  doc.roundedRect(15, curY, 180, 12, 2, 2, "F");
+  doc.setDrawColor(220, 225, 235);
+  doc.roundedRect(15, curY, 180, 12, 2, 2, "S");
+
+  drawBadge(doc, 19, curY + 3.2, isWithdrawal ? "WITHDRAWAL" : isClosure ? "CASE CLOSED" : "CURTAILMENT", badgeVariant);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.setTextColor(23, 23, 23);
+  doc.text(titleText, 50, curY + 7.5);
+
+  // 5. Formal Notification Statement
+  curY += 16;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(23, 23, 23);
+
+  const openingText = isWithdrawal
+    ? `This official letter confirms that your sponsorship under the UK Home Office Worker / Temporary Worker route has been formally withdrawn and cancelled by ${sponsorName}.`
+    : isClosure
+    ? `This official letter confirms that your sponsored engagement with ${sponsorName} has formally concluded, and your sponsorship record is now closed in accordance with UKVI regulations.`
+    : `This official letter serves as formal notification that your Certificate of Sponsorship (${data.cosReference || "—"}) with ${sponsorName} has ceased prior to the original visa expiry date.`;
+
+  const splitOpening = doc.splitTextToSize(openingText, 180);
+  doc.text(splitOpening, 15, curY);
+  curY += splitOpening.length * 4.2 + 2;
+
+  // 6. Sponsorship & Cessation Summary Card
+  drawCard(doc, 15, curY, 180, 36, [250, 250, 250]);
+
+  let rowY = curY + 5.5;
+  const col1X = 19;
+  const col1ValX = 62;
+  const col2X = 105;
+  const col2ValX = 150;
+
+  const drawRow = (label: string, val: string, lx: number, vx: number, y: number) => {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(92, 92, 92);
+    doc.text(label.toUpperCase(), lx, y);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(23, 23, 23);
+    doc.text(val, vx, y);
+  };
+
+  drawRow("Job Title / Role:", data.jobTitle || "—", col1X, col1ValX, rowY);
+  drawRow("Effective Cessation Date:", data.sponsorshipEndDate || dateStr, col2X, col2ValX, rowY);
+
+  rowY += 6;
+  drawRow("CoS Reference:", data.cosReference || "—", col1X, col1ValX, rowY);
+  drawRow("Last Day of Work:", data.lastDayOfWork || data.sponsorshipEndDate || "—", col2X, col2ValX, rowY);
+
+  rowY += 6;
+  drawRow("Sponsor Licence:", sponsorLicence, col1X, col1ValX, rowY);
+  drawRow("Case ID:", String(data.caseNumber || "—").replace(/^#+/, "#"), col2X, col2ValX, rowY);
+
+  rowY += 6;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(92, 92, 92);
+  doc.text("REASON / GROUNDS:", col1X, rowY);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(180, 83, 9);
+  doc.text(data.cessationReason || "Sponsorship Concluded", col1ValX, rowY);
+
+  rowY += 6;
+  if (data.notes) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(92, 92, 92);
+    doc.text("COMPLIANCE NOTES:", col1X, rowY);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(50, 50, 50);
+    const splitNotes = doc.splitTextToSize(data.notes, 125);
+    doc.text(splitNotes[0] || "—", col1ValX, rowY);
+  }
+
+  curY += 40;
+
+  // 7. Statutory UKVI SMS Reporting Confirmation
+  doc.setFillColor(240, 244, 255);
+  doc.roundedRect(15, curY, 180, 16, 2, 2, "F");
+  doc.setDrawColor(210, 225, 250);
+  doc.roundedRect(15, curY, 180, 16, 2, 2, "S");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(30, 64, 175);
+  doc.text("STATUTORY UKVI SMS REPORTING COMPLIANCE", 19, curY + 4.5);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(30, 50, 100);
+  const smsStatement = `In accordance with UK Home Office Sponsor Guidance Part 3 and Appendix D duties, ${sponsorName} has formally notified UK Visas and Immigration (UKVI) via the Sponsor Management System (SMS Ref: ${smsReportRef}) within the statutory 10-working-day reporting window.`;
+  const splitSms = doc.splitTextToSize(smsStatement, 172);
+  doc.text(splitSms, 19, curY + 8.5);
+
+  curY += 20;
+
+  // 8. Crucial Immigration Guidance to Migrant (60-Day Curtailment Policy)
+  doc.setFillColor(255, 250, 235);
+  doc.roundedRect(15, curY, 180, 36, 2, 2, "F");
+  doc.setDrawColor(254, 232, 211);
+  doc.roundedRect(15, curY, 180, 36, 2, 2, "S");
+
+  doc.setFillColor(246, 181, 30);
+  doc.rect(15, curY, 2, 36, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(180, 83, 9);
+  doc.text("IMPORTANT NOTICE REGARDING YOUR UK IMMIGRATION STATUS (60-DAY RULE):", 20, curY + 5);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(98, 76, 24);
+  const adviseBullets = [
+    "• UKVI Curtailment Notice: UK Visas and Immigration will write to you to curtail your remaining permission to stay in the UK to 60 calendar days (or until your original visa expiry date, whichever is shorter).",
+    "• Switch Sponsor or New Visa: If you wish to remain in the UK, you must make a valid immigration application under a new licensed sponsor or alternative visa category before the curtailment date.",
+    "• Departure Requirement: If you do not submit a new application, you must depart the United Kingdom before the curtailment expiry date to prevent unlawful overstaying.",
+    "• Proof of Exit: You must email a copy of your flight departure confirmation / exit boarding pass to the sponsor compliance team for statutory audit verification.",
+  ];
+
+  let bulletY = curY + 10;
+  adviseBullets.forEach((bullet) => {
+    const splitB = doc.splitTextToSize(bullet, 170);
+    doc.text(splitB, 20, bulletY);
+    bulletY += splitB.length * 3.6 + 1.2;
+  });
+
+  curY += 40;
+
+  // 9. Authorising Officer Signatory Block
+  drawCard(doc, 15, curY, 180, 34, [255, 255, 255]);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(92, 92, 92);
+  doc.text("ISSUED ON BEHALF OF LICENSED SPONSOR:", 19, curY + 5.5);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(23, 23, 23);
+  doc.text(authorisingOfficer, 19, curY + 11);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(92, 92, 92);
+  doc.text(authorisingOfficerRole, 19, curY + 15.5);
+  doc.text(`${sponsorName} • Sponsor Licence: ${sponsorLicence}`, 19, curY + 19.5);
+  doc.text(`Contact: compliance@${sponsorName.toLowerCase().replace(/[^\w]/g, "") || "sponsor"}.co.uk`, 19, curY + 23.5);
+
+  // Official Signature Box on Right
+  doc.setFillColor(250, 250, 250);
+  doc.roundedRect(125, curY + 4, 65, 26, 2, 2, "F");
+  doc.setDrawColor(220, 220, 220);
+  doc.roundedRect(125, curY + 4, 65, 26, 2, 2, "S");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.5);
+  doc.setTextColor(150, 150, 150);
+  doc.text("DIGITAL VERIFICATION & COMPLIANCE SEAL", 157.5, curY + 8, { align: "center" });
+
+  doc.setFont("courier", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(107, 33, 168);
+  doc.text("[ VERIFIED SPONSOR SIGNATURE ]", 157.5, curY + 15, { align: "center" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.5);
+  doc.setTextColor(92, 92, 92);
+  doc.text(`Auth Code: ${refCode}`, 157.5, curY + 20, { align: "center" });
+  doc.text(`Timestamp: ${dateStr}`, 157.5, curY + 24, { align: "center" });
+
+  // 10. Footer
+  drawFooter(doc, refCode, 1, 1);
+
+  return doc;
+}
+
+// ==========================================
+// 4. EXPORT / DOWNLOAD HELPER
 // ==========================================
 
 export function downloadPdf(doc: jsPDF, fileName: string) {
   doc.save(fileName.endsWith(".pdf") ? fileName : `${fileName}.pdf`);
 }
+
