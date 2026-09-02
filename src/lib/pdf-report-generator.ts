@@ -1698,18 +1698,31 @@ export interface CurtailmentLetterData {
 }
 
 export function generateCurtailmentLetter(data: CurtailmentLetterData): jsPDF {
+  if (
+    !data.migrantName ||
+    !data.caseNumber ||
+    !data.sponsorName ||
+    !data.sponsorLicenceNumber ||
+    !data.sponsorshipEndDate ||
+    !data.cessationReason
+  ) {
+    throw new Error(
+      "Missing required curtailment letter data: migrantName, caseNumber, sponsorName, sponsorLicenceNumber, sponsorshipEndDate, and cessationReason must be provided."
+    );
+  }
+
   const doc = new jsPDF({
     orientation: "portrait",
     unit: "mm",
     format: "a4",
   });
 
-  const migrantName = data.migrantName || "—";
-  const sponsorName = data.sponsorName || "Viems Licensed Sponsor";
-  const sponsorLicence = data.sponsorLicenceNumber || "1A2B3C4D5";
+  const migrantName = data.migrantName;
+  const sponsorName = data.sponsorName;
+  const sponsorLicence = data.sponsorLicenceNumber;
   const sponsorAddress = data.sponsorAddress || "14 Berkeley Square, Mayfair, London W1J 6BL, United Kingdom";
   const authorisingOfficer = data.authorisingOfficer || "Nathan Wood";
-  const authorisingOfficerRole = data.authorisingOfficerRole || "Compliance Manager & Level 1 User";
+  const authorisingOfficerRole = data.authorisingOfficerRole || "Compliance Officer & Level 1 User";
   const cessationType = data.cessationType || "curtailment";
 
   const initials = migrantName
@@ -1725,7 +1738,7 @@ export function generateCurtailmentLetter(data: CurtailmentLetterData): jsPDF {
   });
 
   const refCode = data.refNumber || `UKVI-CRT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${initials}`;
-  const smsReportRef = data.smsReportReference || `SMS-REP-${Math.floor(100000 + Math.random() * 900000)}`;
+  const smsReportRef = data.smsReportReference?.trim() || null;
 
   // Page 1: Single Page Layout
   // 1. Top Header
@@ -1758,93 +1771,105 @@ export function generateCurtailmentLetter(data: CurtailmentLetterData): jsPDF {
   doc.setFontSize(7.5);
   doc.setTextColor(92, 92, 92);
   doc.text("DATE:", 19, 36);
+
   doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
   doc.setTextColor(23, 23, 23);
-  doc.text(dateStr, 30, 36);
+  doc.text(dateStr, 31, 36);
 
   doc.setFont("helvetica", "bold");
   doc.setTextColor(92, 92, 92);
-  doc.text("NOTICE REF:", 75, 36);
+  doc.text("NOTICE REF:", 82, 36);
+
   doc.setFont("helvetica", "normal");
   doc.setTextColor(23, 23, 23);
-  doc.text(refCode, 94, 36);
+  doc.text(refCode, 102, 36);
 
   doc.setFont("helvetica", "bold");
   doc.setTextColor(92, 92, 92);
-  doc.text("UKVI SMS REF:", 145, 36);
+  doc.text("UKVI SMS REF:", 142, 36);
+
   doc.setFont("helvetica", "normal");
   doc.setTextColor(23, 23, 23);
-  doc.text(smsReportRef, 168, 36);
+  doc.text(smsReportRef || "Pending / Not Registered", 164, 36);
 
-  // 3. Recipient Details Box
-  let curY = 43;
+  let curY = 44;
+
+  // 3. Recipient & Migrant Details Block
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.setTextColor(92, 92, 92);
-  doc.text("TO (SPONSORED WORKER):", 15, curY);
+  doc.text("SPONSORED MIGRANT DETAILS:", 15, curY);
 
   curY += 4.5;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   doc.setTextColor(23, 23, 23);
   doc.text(migrantName, 15, curY);
 
-  curY += 4;
+  curY += 4.5;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(92, 92, 92);
-  const migrantIdLine = `Passport: ${data.passportNumber || "—"}  •  Nationality: ${data.nationality || "—"}  •  DOB: ${data.dateOfBirth || "—"}  •  CoS: ${data.cosReference || "—"}`;
-  doc.text(migrantIdLine, 15, curY);
+  const migrantIdLine = [
+    data.dateOfBirth ? `DOB: ${data.dateOfBirth}` : null,
+    data.nationality ? `Nationality: ${data.nationality}` : null,
+    data.passportNumber ? `Passport: ${data.passportNumber}` : null,
+  ]
+    .filter(Boolean)
+    .join("  |  ");
+  doc.text(migrantIdLine || `Case: ${data.caseNumber}`, 15, curY);
 
-  // 4. Formal Notice Title Banner
+  if (data.currentAddress) {
+    curY += 4;
+    doc.text(`Residential Address: ${data.currentAddress}`, 15, curY);
+  }
+
   curY += 7;
-  const isWithdrawal = cessationType === "withdrawal";
-  const isClosure = cessationType === "closure";
 
-  const titleText = isWithdrawal
-    ? "NOTICE OF APPLICATION WITHDRAWAL & SPONSORSHIP CANCELLATION"
-    : isClosure
-    ? "CERTIFICATE OF SPONSORSHIP CONCLUSION & CASE CLOSURE"
-    : "NOTICE OF EARLY SPONSORSHIP CESSATION & UKVI CURTAILMENT";
+  // 4. Formal Notice Banner
+  const bannerTitles = {
+    curtailment: "OFFICIAL NOTICE: CESSATION OF UKVI IMMIGRATION SPONSORSHIP",
+    closure: "OFFICIAL NOTICE: SPONSORSHIP CASE CLOSURE & CONCLUSION OF ENGAGEMENT",
+    withdrawal: "OFFICIAL NOTICE: WITHDRAWAL OF CERTIFICATE OF SPONSORSHIP",
+  };
 
-  const badgeVariant = isWithdrawal || cessationType === "curtailment" ? "error" : "purple";
-
-  doc.setFillColor(248, 249, 250);
-  doc.roundedRect(15, curY, 180, 12, 2, 2, "F");
-  doc.setDrawColor(220, 225, 235);
-  doc.roundedRect(15, curY, 180, 12, 2, 2, "S");
-
-  drawBadge(doc, 19, curY + 3.2, isWithdrawal ? "WITHDRAWAL" : isClosure ? "CASE CLOSED" : "CURTAILMENT", badgeVariant);
+  doc.setFillColor(245, 243, 255);
+  doc.roundedRect(15, curY, 180, 10, 2, 2, "F");
+  doc.setDrawColor(221, 214, 254);
+  doc.roundedRect(15, curY, 180, 10, 2, 2, "S");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
-  doc.setTextColor(23, 23, 23);
-  doc.text(titleText, 50, curY + 7.5);
+  doc.setTextColor(109, 40, 217);
+  doc.text(bannerTitles[cessationType], 105, curY + 6.5, { align: "center" });
 
-  // 5. Formal Notification Statement
-  curY += 16;
+  curY += 14;
+
+  // 5. Statutory Cessation Statement
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(23, 23, 23);
+  doc.setFontSize(8);
+  doc.setTextColor(50, 50, 50);
 
-  const openingText = isWithdrawal
-    ? `This official letter confirms that your sponsorship under the UK Home Office Worker / Temporary Worker route has been formally withdrawn and cancelled by ${sponsorName}.`
-    : isClosure
-    ? `This official letter confirms that your sponsored engagement with ${sponsorName} has formally concluded, and your sponsorship record is now closed in accordance with UKVI regulations.`
-    : `This official letter serves as formal notification that your Certificate of Sponsorship (${data.cosReference || "—"}) with ${sponsorName} has ceased prior to the original visa expiry date.`;
+  const statementText =
+    cessationType === "withdrawal"
+      ? `This letter provides formal written notice that ${sponsorName} has withdrawn Certificate of Sponsorship (CoS: ${data.cosReference || "—"}) assigned to ${migrantName} (Case ID: ${data.caseNumber}). Consequently, UKVI sponsorship duties under this assignment have been formally cancelled.`
+      : cessationType === "closure"
+      ? `This certificate provides formal confirmation that the sponsored employment engagement for ${migrantName} under Certificate of Sponsorship ${data.cosReference || "—"} has reached conclusion. All associated sponsorship duties for Case ID ${data.caseNumber} have been completed in accordance with Home Office regulations.`
+      : `This letter provides formal written notification that ${sponsorName} has ceased immigration sponsorship for ${migrantName} under Certificate of Sponsorship (CoS: ${data.cosReference || "—"}). All active sponsorship obligations for Case ID ${data.caseNumber} have terminated with effect from ${data.sponsorshipEndDate}.`;
 
-  const splitOpening = doc.splitTextToSize(openingText, 180);
-  doc.text(splitOpening, 15, curY);
-  curY += splitOpening.length * 4.2 + 2;
+  const splitStatement = doc.splitTextToSize(statementText, 180);
+  doc.text(splitStatement, 15, curY);
+  curY += splitStatement.length * 4 + 3;
 
   // 6. Sponsorship & Cessation Summary Card
-  drawCard(doc, 15, curY, 180, 36, [250, 250, 250]);
+  drawCard(doc, 15, curY, 180, 36, [255, 255, 255]);
 
-  let rowY = curY + 5.5;
   const col1X = 19;
-  const col1ValX = 62;
-  const col2X = 105;
-  const col2ValX = 150;
+  const col1ValX = 64;
+  const col2X = 108;
+  const col2ValX = 154;
+  let rowY = curY + 6;
 
   const drawRow = (label: string, val: string, lx: number, vx: number, y: number) => {
     doc.setFont("helvetica", "bold");
@@ -1890,8 +1915,10 @@ export function generateCurtailmentLetter(data: CurtailmentLetterData): jsPDF {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(50, 50, 50);
-    const splitNotes = doc.splitTextToSize(data.notes, 125);
-    doc.text(splitNotes[0] || "—", col1ValX, rowY);
+    const splitNotes = doc.splitTextToSize(data.notes, 120);
+    const maxLines = 3;
+    const renderedNotes = splitNotes.slice(0, maxLines);
+    doc.text(renderedNotes, col1ValX, rowY);
   }
 
   curY += 40;
@@ -1910,13 +1937,15 @@ export function generateCurtailmentLetter(data: CurtailmentLetterData): jsPDF {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(30, 50, 100);
-  const smsStatement = `In accordance with UK Home Office Sponsor Guidance Part 3 and Appendix D duties, ${sponsorName} has formally notified UK Visas and Immigration (UKVI) via the Sponsor Management System (SMS Ref: ${smsReportRef}) within the statutory 10-working-day reporting window.`;
+  const smsStatement = smsReportRef
+    ? `In accordance with UK Home Office Sponsor Guidance Part 3 and Appendix D duties, ${sponsorName} has formally notified UK Visas and Immigration (UKVI) via the Sponsor Management System (SMS Ref: ${smsReportRef}) within the statutory 10-working-day reporting window.`
+    : `In accordance with UK Home Office Sponsor Guidance Part 3, ${sponsorName} records statutory cessation for audit compliance. Sponsor Management System (SMS) reporting will be submitted within the statutory 10-working-day reporting window as required under Appendix D.`;
   const splitSms = doc.splitTextToSize(smsStatement, 172);
   doc.text(splitSms, 19, curY + 8.5);
 
   curY += 20;
 
-  // 8. Crucial Immigration Guidance to Migrant (60-Day Curtailment Policy)
+  // 8. Crucial Immigration Guidance to Migrant (Contextualized per notice type)
   doc.setFillColor(255, 250, 235);
   doc.roundedRect(15, curY, 180, 36, 2, 2, "F");
   doc.setDrawColor(254, 232, 211);
@@ -1928,17 +1957,41 @@ export function generateCurtailmentLetter(data: CurtailmentLetterData): jsPDF {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.setTextColor(180, 83, 9);
-  doc.text("IMPORTANT NOTICE REGARDING YOUR UK IMMIGRATION STATUS (60-DAY RULE):", 20, curY + 5);
+
+  const guidanceTitle =
+    cessationType === "withdrawal"
+      ? "IMPORTANT NOTICE REGARDING WITHDRAWAL & IMMIGRATION STATUS:"
+      : cessationType === "closure"
+      ? "IMPORTANT NOTICE REGARDING ENGAGEMENT CONCLUSION & STATUS:"
+      : "IMPORTANT NOTICE REGARDING YOUR UK IMMIGRATION STATUS (60-DAY RULE):";
+
+  doc.text(guidanceTitle, 20, curY + 5);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(98, 76, 24);
-  const adviseBullets = [
-    "• UKVI Curtailment Notice: UK Visas and Immigration will write to you to curtail your remaining permission to stay in the UK to 60 calendar days (or until your original visa expiry date, whichever is shorter).",
-    "• Switch Sponsor or New Visa: If you wish to remain in the UK, you must make a valid immigration application under a new licensed sponsor or alternative visa category before the curtailment date.",
-    "• Departure Requirement: If you do not submit a new application, you must depart the United Kingdom before the curtailment expiry date to prevent unlawful overstaying.",
-    "• Proof of Exit: You must email a copy of your flight departure confirmation / exit boarding pass to the sponsor compliance team for statutory audit verification.",
-  ];
+
+  const adviseBullets =
+    cessationType === "withdrawal"
+      ? [
+          "• CoS Assignment Withdrawn: Certificate of Sponsorship assignment has been cancelled prior to entry or visa activation.",
+          "• No Active Sponsorship: No ongoing UKVI sponsorship duties or active employment rights exist under this withdrawn assignment.",
+          "• New Application Requirement: If you intend to take up future employment in the UK, a new Certificate of Sponsorship and visa application will be required.",
+          "• Audit Archive: This withdrawal record is retained in the sponsor's statutory compliance register in accordance with UKVI Appendix D rules.",
+        ]
+      : cessationType === "closure"
+      ? [
+          "• Normal Sponsorship Conclusion: The sponsored employment engagement has concluded on the agreed effective date in accordance with Sponsor Guidance Part 3.",
+          "• Status Expiry: Permission to work under this sponsor ceases on the effective date. Remaining leave is governed by your original visa expiration date or wrap-up period.",
+          "• Departure / Extension: If leaving the UK upon engagement completion, departure confirmation should be provided. For continued stay, ensure valid permission is maintained.",
+          "• Statutory Retention: Copies of this closure record and right-to-work history are retained for the statutory period required under Appendix D.",
+        ]
+      : [
+          "• UKVI Curtailment Notice: UK Visas and Immigration will write to you to curtail your remaining permission to stay in the UK to 60 calendar days (or until your original visa expiry date, whichever is shorter).",
+          "• Switch Sponsor or New Visa: If you wish to remain in the UK, you must make a valid immigration application under a new licensed sponsor or alternative visa category before the curtailment date.",
+          "• Departure Requirement: If you do not submit a new application, you must depart the United Kingdom before the curtailment expiry date to prevent unlawful overstaying.",
+          "• Proof of Exit: You must email a copy of your flight departure confirmation / exit boarding pass to the sponsor compliance team for statutory audit verification.",
+        ];
 
   let bulletY = curY + 10;
   adviseBullets.forEach((bullet) => {

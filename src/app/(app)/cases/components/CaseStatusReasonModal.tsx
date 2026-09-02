@@ -110,10 +110,40 @@ export function CaseStatusReasonModal({
   const requiresNotes = selectedReason?.requiresDescription || selectedReason?.value === "other";
   const isValid = selectedReason && (!requiresNotes || customNotes.trim().length > 0);
 
+  const hasRequiredLetterData = Boolean(
+    caseInfo?.name?.trim() &&
+    (caseInfo?.caseId || caseInfo?.id) &&
+    (caseInfo?.cosNumber || (caseInfo as any)?.cosReference) &&
+    (caseInfo?.sponsor_name || (caseInfo as any)?.employer) &&
+    ((caseInfo as any)?.sponsor_licence_number || (caseInfo as any)?.sponsorLicenceNumber) &&
+    (caseInfo?.role || (caseInfo as any)?.job_title)
+  );
+
   const triggerLetterDownload = async () => {
     if (!caseInfo || !selectedReason) return;
+
+    const migrantName = caseInfo.name?.trim();
+    const caseNumber = String(caseInfo.caseId || caseInfo.id || "").trim();
+    const cosReference = (caseInfo.cosNumber || (caseInfo as any)?.cosReference || "").trim();
+    const sponsorName = (caseInfo.sponsor_name || (caseInfo as any)?.employer || "").trim();
+    const sponsorLicence = (
+      (caseInfo as any)?.sponsor_licence_number ||
+      (caseInfo as any)?.sponsorLicenceNumber ||
+      ""
+    ).trim();
+    const jobTitle = (caseInfo.role || (caseInfo as any)?.job_title || "").trim();
+    const passportNumber = (
+      caseInfo.passportNumber ||
+      (caseInfo as any)?.passport_number ||
+      ""
+    ).trim() || undefined;
+
+    if (!migrantName || !caseNumber || !cosReference || !sponsorName || !sponsorLicence || !jobTitle) {
+      toast.error("Cannot generate notice: case is missing verified identity, CoS, or sponsor details.");
+      return;
+    }
+
     try {
-      const migrantName = caseInfo.name || "Sponsored Worker";
       const initials = migrantName
         .split(" ")
         .filter(Boolean)
@@ -122,11 +152,12 @@ export function CaseStatusReasonModal({
 
       const payload: CurtailmentLetterData = {
         migrantName,
-        caseNumber: String(caseInfo.caseId || caseInfo.id || "—"),
-        cosReference: caseInfo.cosNumber || "—",
-        passportNumber: caseInfo.passportNumber || "—",
-        jobTitle: caseInfo.role || "—",
-        sponsorName: caseInfo.sponsor_name || "Viems Licensed Sponsor",
+        caseNumber,
+        cosReference,
+        passportNumber,
+        jobTitle,
+        sponsorName,
+        sponsorLicenceNumber: sponsorLicence,
         cessationType: isWithdrawal ? "withdrawal" : isClosed ? "closure" : "curtailment",
         cessationReason: selectedReason.label,
         sponsorshipEndDate: new Date().toISOString().slice(0, 10),
@@ -142,6 +173,7 @@ export function CaseStatusReasonModal({
       toast.success(`Official letter downloaded for ${migrantName}.`);
     } catch (err) {
       console.error("Failed to generate curtailment letter:", err);
+      toast.error(err instanceof Error ? err.message : "Failed to generate PDF letter.");
     }
   };
 
@@ -160,15 +192,15 @@ export function CaseStatusReasonModal({
     if (!selectedReason || !isValid) return;
     try {
       setSubmitting(true);
-      if (downloadLetterOnConfirm && (isClosed || isWithdrawal)) {
-        await triggerLetterDownload();
-      }
       await onConfirm({
         newStatus: targetStatus,
         reasonCode: selectedReason.value,
         reasonLabel: selectedReason.label,
         notes: customNotes.trim() || undefined,
       });
+      if (downloadLetterOnConfirm && (isClosed || isWithdrawal) && hasRequiredLetterData) {
+        await triggerLetterDownload();
+      }
       onOpenChange(false);
     } catch (e) {
       console.error("Failed to commit status reason:", e);

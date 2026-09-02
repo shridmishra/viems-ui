@@ -198,38 +198,14 @@ export function ComplianceTab({
           }
 
           if (!hasAnySuccess && (caseRes.status === "rejected" || tasksRes.status === "rejected" || filesRes.status === "rejected")) {
-            // Provide fallback sample data for seamless offline rendering
-            setCaseData({
-              id: caseId || "1",
-              name: "Elena Rostova",
-              role: "Lead VFX Artist",
-              sponsor_name: "AX Studios UK Ltd",
-              sponsor_licence_number: "1A2B3C4D5",
-              caseNumber: String(caseId || "1024"),
-              caseIdDisplay: `#${caseId || "1024"}`,
-              cosNumber: "COS-2026-UKVI-88910",
-              passport_number: "FK992140",
-              nationality_value: "Ukrainian",
-              dob: "1992-05-14",
-              visa_start_date: "15 Jan 2026",
-              visa_end_date: "14 Jan 2027",
-              rtw_completed_date: "10 Jan 2026",
-              share_code: "9XY-418-L92",
-            });
-            setTasks([
-              { id: 1, title: "Verify Right to Work digital share code", priority: "HIGH", isCompleted: true, status: "completed", dueDate: "2026-01-10" },
-              { id: 2, title: "Upload signed employment contract & job description", priority: "HIGH", isCompleted: true, status: "completed", dueDate: "2026-01-12" },
-              { id: 3, title: "Confirm UK residential address & biometric evidence", priority: "MEDIUM", isCompleted: false, status: "pending", dueDate: "2026-09-15" },
-            ]);
-            setFiles([
-              { id: "1", name: "Elena_Rostova_Passport.pdf", status: "uploaded", category: "Passport" },
-              { id: "2", name: "Employment_Contract_Signed.pdf", status: "uploaded", category: "Contract" },
-              { id: "3", name: "UKVI_RTW_Verification_Result.pdf", status: "uploaded", category: "RTW" },
-            ]);
+            setError("Unable to load compliance data for this case.");
           }
         }
       } catch (err) {
         console.error("Failed to load compliance data:", err);
+        if (!isCancelled) {
+          setError("Failed to load compliance records.");
+        }
       } finally {
         if (!isCancelled) setLoading(false);
       }

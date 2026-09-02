@@ -555,56 +555,10 @@ export default function MigrantOverviewPage() {
       const detail = mapBackendCaseToDetail(combined);
       setMigrant(detail);
     } catch (err) {
-      console.warn("Using fallback case detail:", err);
-      const fallbackCombined = {
-        id: id || "1",
-        caseId: `#${id || "1024"}`,
-        caseIdDisplay: `#${id || "1024"}`,
-        caseNumber: String(id || "1024"),
-        name: "Elena Rostova",
-        first_name: "Elena",
-        last_name: "Rostova",
-        role: "Lead VFX Artist",
-        job_title: "Lead VFX Artist",
-        sponsor_name: "AX Studios UK Ltd",
-        sponsor_licence_number: "1A2B3C4D5",
-        cosNumber: "COS-2026-UKVI-88910",
-        cosReference: "COS-2026-UKVI-88910",
-        visaStatus: "ACTIVE",
-        approvalStatus: "VISA APPROVED",
-        country: "Ukraine",
-        nationality_value: "Ukrainian",
-        passport_number: "FK992140",
-        dob: "1992-05-14",
-        date_of_birth: "1992-05-14",
-        created_at: new Date().toISOString(),
-        personal: {
-          firstName: "Elena",
-          lastName: "Rostova",
-          dob: "1992-05-14",
-          country: "Ukraine",
-          jobTitle: "Lead VFX Artist",
-          groupName: "AX Studios",
-          passportNumber: "FK992140",
-        },
-        employment: {
-          jobTitle: "Lead VFX Artist",
-          employer: "AX Studios UK Ltd",
-          cosReference: "COS-2026-UKVI-88910",
-          startDate: "2026-01-15",
-          endDate: "2027-01-14",
-          grossSalary: "£65,000/year",
-        },
-        decision: {
-          id: "Granted",
-          granted: {
-            visaStartDate: "2026-01-15",
-            visaEndDate: "2027-01-14",
-          },
-        },
-      };
-      setRawMigrantData(fallbackCombined);
-      setMigrant(mapBackendCaseToDetail(fallbackCombined));
+      console.error("Failed to fetch case detail:", err);
+      setMigrant(null);
+      setRawMigrantData(null);
+      toast.error("Failed to load case details.");
     } finally {
       setLoading(false);
     }

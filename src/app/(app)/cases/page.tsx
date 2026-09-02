@@ -204,68 +204,16 @@ export default function CasesPage() {
       );
 
       const rawData = response && (Array.isArray(response) ? response : Array.isArray((response as any).data) ? (response as any).data : null);
-      if (!rawData || rawData.length === 0) {
-        throw new Error("Empty response payload from cases endpoint");
+      if (!rawData) {
+        throw new Error("Invalid response payload from cases endpoint");
       }
 
       const mapped = getMappedCasesWithOverrides(rawData);
       setCases(mapped);
     } catch (err) {
-      console.warn("Using mock cases fallback:", err);
-      const fallbackCases: CaseRow[] = [
-        {
-          id: 1,
-          caseId: "1024",
-          country: "Ukraine",
-          countryCode: "UA",
-          countryHalf: "ukr",
-          flag: "🇺🇦",
-          name: "Elena Rostova",
-          group: "AX Studios",
-          avatarText: "ER",
-          status: "Visa Approved",
-          statusColor: "success",
-          migration: "Creative Worker",
-          action: "Review RTW",
-          actionColor: "blue",
-          passportNumber: "FK992140",
-        },
-        {
-          id: 2,
-          caseId: "1025",
-          country: "India",
-          countryCode: "IN",
-          countryHalf: "ind",
-          flag: "🇮🇳",
-          name: "Aarav Sharma",
-          group: "Universal Group",
-          avatarText: "AS",
-          status: "CoS Assigned",
-          statusColor: "success",
-          migration: "Skilled Worker",
-          action: "Upload Passport",
-          actionColor: "yellow",
-          passportNumber: "Z6182941",
-        },
-        {
-          id: 3,
-          caseId: "1026",
-          country: "United States",
-          countryCode: "US",
-          countryHalf: "usa",
-          flag: "🇺🇸",
-          name: "Marcus Vance",
-          group: "BBC Productions",
-          avatarText: "MV",
-          status: "Case Closed",
-          statusColor: "gray",
-          migration: "Temporary Worker",
-          action: "Curtailment Letter",
-          actionColor: "gray",
-          passportNumber: "P4481902",
-        },
-      ];
-      setCases(fallbackCases);
+      console.error("Failed to fetch cases:", err);
+      setCases([]);
+      toast.error("Failed to load cases. Please try again.");
     } finally {
       setLoading(false);
     }

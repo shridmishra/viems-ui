@@ -32,11 +32,58 @@ import {
 } from "@/lib/pdf-report-generator";
 import { formatFullName } from "@/lib/utils";
 
+export interface CurtailmentCaseSource {
+  id?: number | string;
+  caseId?: string;
+  caseIdDisplay?: string;
+  caseNumber?: string;
+  case_number?: string;
+  name?: string;
+  first_name?: string;
+  last_name?: string;
+  role?: string;
+  job_title?: string;
+  cosNumber?: string;
+  cos_number?: string;
+  cosRef?: string;
+  cosReference?: string;
+  passport_number?: string;
+  passportNumber?: string;
+  dob?: string;
+  date_of_birth?: string;
+  country?: string;
+  nationality?: string;
+  nationality_value?: string;
+  sponsor_name?: string;
+  employer?: string;
+  sponsor_licence_number?: string;
+  sponsorLicenceNumber?: string;
+  smsReportReference?: string;
+  sms_reference?: string;
+  personal?: {
+    firstName?: string;
+    lastName?: string;
+    dob?: string;
+    country?: string;
+    jobTitle?: string;
+    passportNumber?: string;
+  };
+  employment?: {
+    jobTitle?: string;
+    employer?: string;
+    cosReference?: string;
+  };
+  passport?: {
+    passport_number?: string;
+  };
+  migrant?: CurtailmentCaseSource;
+}
+
 export interface CurtailmentLetterModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  caseData?: any;
-  migrant?: any;
+  caseData?: CurtailmentCaseSource | null;
+  migrant?: CurtailmentCaseSource | null;
   initialReason?: string;
   initialNotes?: string;
   initialCessationType?: "curtailment" | "closure" | "withdrawal";
@@ -67,123 +114,213 @@ export function CurtailmentLetterModal({
     initialCessationType
   );
 
+  const getDefaultReasonCode = (type: "curtailment" | "closure" | "withdrawal") => {
+    if (type === "closure") return "engagement_completed";
+    if (type === "withdrawal") return "production_canceled";
+    return "curtailment_issued";
+  };
+
   const [selectedReason, setSelectedReason] = React.useState<string>(() => {
-    if (initialReason) return initialReason;
-    if (initialCessationType === "closure") return "Engagement / production successfully completed";
-    if (initialCessationType === "withdrawal") return "Production / filming canceled or postponed";
-    return "Home Office curtailment letter issued";
+    if (initialReason) {
+      const found = PRESET_REASONS.find((r) => r.value === initialReason || r.label === initialReason);
+      return found ? found.value : "other";
+    }
+    return getDefaultReasonCode(initialCessationType);
   });
 
-  const [customReasonText, setCustomReasonText] = React.useState<string>("");
-  const [effectiveDate, setEffectiveDate] = React.useState<string>(() => {
-    return new Date().toISOString().slice(0, 10);
+  const [customReasonText, setCustomReasonText] = React.useState<string>(() => {
+    if (initialReason && !PRESET_REASONS.some((r) => r.value === initialReason || r.label === initialReason)) {
+      return initialReason;
+    }
+    return "";
   });
-  const [lastDayOfWork, setLastDayOfWork] = React.useState<string>(() => {
-    return new Date().toISOString().slice(0, 10);
-  });
-  const [smsReference, setSmsReference] = React.useState<string>(() => {
-    return `SMS-REP-${Math.floor(100000 + Math.random() * 900000)}`;
-  });
+
+  const [effectiveDate, setEffectiveDate] = React.useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [lastDayOfWork, setLastDayOfWork] = React.useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [smsReference, setSmsReference] = React.useState<string>("");
   const [authorisingOfficer, setAuthorisingOfficer] = React.useState<string>("Nathan Wood");
   const [officerRole, setOfficerRole] = React.useState<string>("Compliance Officer & Level 1 User");
   const [notes, setNotes] = React.useState<string>(initialNotes || "");
   const [downloading, setDownloading] = React.useState<boolean>(false);
 
-  // Sync initial values when modal opens
+  // Case identity tracking for fresh reset
+  const caseKey = `${caseData?.id || ""}_${caseData?.caseId || ""}_${migrant?.id || ""}`;
+
   React.useEffect(() => {
     if (open) {
-      if (initialCessationType) setCessationType(initialCessationType);
-      if (initialReason) setSelectedReason(initialReason);
-      if (initialNotes) setNotes(initialNotes);
-    }
-  }, [open, initialCessationType, initialReason, initialNotes]);
+      const type = initialCessationType || "curtailment";
+      setCessationType(type);
 
-  // Derive migrant info
+      if (initialReason) {
+        const found = PRESET_REASONS.find((r) => r.value === initialReason || r.label === initialReason);
+        if (found) {
+          setSelectedReason(found.value);
+          setCustomReasonText("");
+        } else {
+          setSelectedReason("other");
+          setCustomReasonText(initialReason);
+        }
+      } else {
+        setSelectedReason(getDefaultReasonCode(type));
+        setCustomReasonText("");
+      }
+
+      setNotes(initialNotes || "");
+      setEffectiveDate(new Date().toISOString().slice(0, 10));
+      setLastDayOfWork(new Date().toISOString().slice(0, 10));
+
+      const existingSms =
+        caseData?.smsReportReference ||
+        caseData?.sms_reference ||
+        migrant?.smsReportReference ||
+        migrant?.sms_reference ||
+        "";
+      setSmsReference(existingSms);
+      setAuthorisingOfficer("Nathan Wood");
+      setOfficerRole("Compliance Officer & Level 1 User");
+    }
+  }, [open, caseKey, initialCessationType, initialReason, initialNotes, caseData, migrant]);
+
+  // Derive migrant & case info
   const m = migrant || caseData?.migrant || caseData || {};
-  const migrantName =
+  const rawMigrantName =
     caseData?.name ||
     m.name ||
-    formatFullName(m.first_name || caseData?.first_name, m.last_name || caseData?.last_name) ||
-    "Sponsored Worker";
+    formatFullName(
+      m.first_name || caseData?.first_name || m.personal?.firstName,
+      m.last_name || caseData?.last_name || m.personal?.lastName
+    );
+  const migrantName = rawMigrantName?.trim() || "";
 
-  const caseNumber = String(
+  const rawCaseNumber =
     caseData?.caseIdDisplay ||
     caseData?.caseNumber ||
     caseData?.case_number ||
+    caseData?.caseId ||
     caseData?.id ||
     m.id ||
-    "—"
-  );
+    "";
+  const caseNumber = String(rawCaseNumber).trim();
 
-  const cosReference =
+  const rawCosRef =
     caseData?.cosNumber ||
     caseData?.cos_number ||
     caseData?.cosRef ||
+    caseData?.cosReference ||
+    caseData?.employment?.cosReference ||
     m.cosNumber ||
-    "—";
+    m.cosReference ||
+    m.employment?.cosReference ||
+    "";
+  const cosReference = rawCosRef.trim();
 
-  const passportNumber =
+  const rawPassportNumber =
     caseData?.passport_number ||
     caseData?.passportNumber ||
+    caseData?.personal?.passportNumber ||
     m.passport_number ||
+    m.passportNumber ||
     m.passport?.passport_number ||
-    "—";
+    m.personal?.passportNumber ||
+    "";
+  const passportNumber = rawPassportNumber.trim();
 
   const dateOfBirth =
     caseData?.dob ||
     caseData?.date_of_birth ||
     caseData?.personal?.dob ||
     m.dob ||
-    "—";
+    m.date_of_birth ||
+    m.personal?.dob ||
+    "";
 
   const nationality =
     caseData?.nationality_value ||
     caseData?.country ||
     caseData?.nationality ||
+    caseData?.personal?.country ||
+    m.nationality_value ||
     m.country ||
-    "—";
+    m.nationality ||
+    m.personal?.country ||
+    "";
 
-  const jobTitle =
+  const rawJobTitle =
     caseData?.role ||
     caseData?.job_title ||
     caseData?.employment?.jobTitle ||
+    caseData?.personal?.jobTitle ||
     m.role ||
-    "—";
+    m.job_title ||
+    m.employment?.jobTitle ||
+    m.personal?.jobTitle ||
+    "";
+  const jobTitle = rawJobTitle.trim();
 
-  const sponsorName =
+  const rawSponsorName =
     caseData?.sponsor_name ||
     caseData?.employer ||
-    "Viems Licensed Sponsor";
+    caseData?.employment?.employer ||
+    m.sponsor_name ||
+    m.employer ||
+    m.employment?.employer ||
+    "";
+  const sponsorName = rawSponsorName.trim();
 
-  const sponsorLicence =
+  const rawSponsorLicence =
     caseData?.sponsor_licence_number ||
     caseData?.sponsorLicenceNumber ||
-    "1A2B3C4D5";
+    m.sponsor_licence_number ||
+    m.sponsorLicenceNumber ||
+    "";
+  const sponsorLicence = rawSponsorLicence.trim();
+
+  // Validate required notice metadata
+  const missingFields: string[] = [];
+  if (!migrantName) missingFields.push("Migrant Name");
+  if (!caseNumber) missingFields.push("Case Number");
+  if (!cosReference) missingFields.push("CoS Reference");
+  if (!jobTitle) missingFields.push("Job Title / Role");
+  if (!sponsorName) missingFields.push("Sponsor Name");
+  if (!sponsorLicence) missingFields.push("Sponsor Licence Number");
+
+  const isCustomReason = selectedReason === "other";
+  const isReasonValid = isCustomReason ? customReasonText.trim().length > 0 : selectedReason.length > 0;
+  const isFormValid = missingFields.length === 0 && isReasonValid && effectiveDate.length > 0;
+
+  const selectedPresetObj = PRESET_REASONS.find((r) => r.value === selectedReason);
+  const selectedLabel = selectedPresetObj?.label || selectedReason;
 
   const handleDownload = async () => {
+    if (!isFormValid) {
+      if (missingFields.length > 0) {
+        toast.error(`Cannot generate letter: missing verified ${missingFields.join(", ")}.`);
+      } else if (!isReasonValid) {
+        toast.error("Please enter a custom reason for cessation.");
+      }
+      return;
+    }
+
     try {
       setDownloading(true);
-      // Yield to UI thread so loading state renders
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      const finalReason =
-        selectedReason === "other" && customReasonText.trim()
-          ? customReasonText.trim()
-          : selectedReason;
+      const finalReason = isCustomReason ? customReasonText.trim() : selectedLabel;
 
-      const initials = migrantName
-        .split(" ")
-        .filter(Boolean)
-        .map((w: string) => w[0]?.toUpperCase() || "")
-        .join("") || "CRT";
+      const initials =
+        migrantName
+          .split(" ")
+          .filter(Boolean)
+          .map((w: string) => w[0]?.toUpperCase() || "")
+          .join("") || "CRT";
 
       const payload: CurtailmentLetterData = {
         migrantName,
         caseNumber,
         cosReference,
-        passportNumber,
-        dateOfBirth,
-        nationality,
+        passportNumber: passportNumber || undefined,
+        dateOfBirth: dateOfBirth || undefined,
+        nationality: nationality || undefined,
         jobTitle,
         sponsorName,
         sponsorLicenceNumber: sponsorLicence,
@@ -191,9 +328,9 @@ export function CurtailmentLetterModal({
         authorisingOfficerRole: officerRole.trim() || "Compliance Officer",
         cessationType,
         cessationReason: finalReason,
-        lastDayOfWork,
+        lastDayOfWork: lastDayOfWork || undefined,
         sponsorshipEndDate: effectiveDate,
-        smsReportReference: smsReference.trim(),
+        smsReportReference: smsReference.trim() || undefined,
         notes: notes.trim() || undefined,
         refNumber: `UKVI-CRT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${initials}`,
         generatedDate: new Date().toLocaleDateString("en-GB", {
@@ -217,7 +354,7 @@ export function CurtailmentLetterModal({
       onOpenChange(false);
     } catch (err) {
       console.error("Failed to generate curtailment letter:", err);
-      toast.error("Failed to generate PDF letter.");
+      toast.error(err instanceof Error ? err.message : "Failed to generate PDF letter.");
     } finally {
       setDownloading(false);
     }
@@ -237,7 +374,7 @@ export function CurtailmentLetterModal({
                 Generate Curtailment / Case Closing Letter
               </DialogTitle>
               <p className="text-[12px] text-[#7B7B7B] mt-0.5 truncate">
-                Case {caseNumber.replace(/^#+/, "#")} · {migrantName} · {cosReference}
+                Case {caseNumber.replace(/^#+/, "#") || "—"} · {migrantName || "—"} · {cosReference || "—"}
               </p>
             </div>
           </div>
@@ -245,6 +382,15 @@ export function CurtailmentLetterModal({
 
         {/* Scrollable Body */}
         <div className="p-6 overflow-y-auto flex flex-col gap-4.5 bg-white flex-1 text-[13px]">
+          {/* Missing Fields Warning Banner */}
+          {missingFields.length > 0 && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-[12px] text-[12px] text-red-800">
+              <span className="font-semibold block">Missing Required Verification Data</span>
+              The following verified fields are required before this statutory notice can be exported:{" "}
+              <span className="font-medium">{missingFields.join(", ")}</span>.
+            </div>
+          )}
+
           {/* Notice Type Selector Tabs */}
           <div className="flex flex-col gap-1.5">
             <Label className="text-[12px] font-medium text-[#171717]">Document Notice Type</Label>
@@ -253,7 +399,8 @@ export function CurtailmentLetterModal({
                 type="button"
                 onClick={() => {
                   setCessationType("curtailment");
-                  setSelectedReason("Home Office curtailment letter issued");
+                  setSelectedReason("curtailment_issued");
+                  setCustomReasonText("");
                 }}
                 className={`py-1.5 px-2 rounded-[8px] text-[12px] font-medium transition-all cursor-pointer ${
                   cessationType === "curtailment"
@@ -267,7 +414,8 @@ export function CurtailmentLetterModal({
                 type="button"
                 onClick={() => {
                   setCessationType("closure");
-                  setSelectedReason("Engagement / production successfully completed");
+                  setSelectedReason("engagement_completed");
+                  setCustomReasonText("");
                 }}
                 className={`py-1.5 px-2 rounded-[8px] text-[12px] font-medium transition-all cursor-pointer ${
                   cessationType === "closure"
@@ -281,7 +429,8 @@ export function CurtailmentLetterModal({
                 type="button"
                 onClick={() => {
                   setCessationType("withdrawal");
-                  setSelectedReason("Production / filming canceled or postponed");
+                  setSelectedReason("production_canceled");
+                  setCustomReasonText("");
                 }}
                 className={`py-1.5 px-2 rounded-[8px] text-[12px] font-medium transition-all cursor-pointer ${
                   cessationType === "withdrawal"
@@ -301,8 +450,9 @@ export function CurtailmentLetterModal({
               <span className="font-semibold text-[#171717] block">
                 Official UKVI Compliance Notification Letter
               </span>
-              This creates a formal 1-page A4 PDF on sponsor letterhead confirming sponsorship cessation,
-              UKVI SMS notification (Ref: {smsReference}), and essential 60-day immigration notice instructions.
+              This creates a formal 1-page A4 PDF on verified sponsor letterhead confirming statutory sponsorship
+              cessation, SMS reference {smsReference ? `(${smsReference})` : "(pending)"}, and applicable immigration
+              notice instructions.
             </div>
           </div>
 
@@ -319,18 +469,23 @@ export function CurtailmentLetterModal({
                     variant="outline"
                     className="w-full h-9 px-3 justify-between bg-white text-[13px] font-normal text-[#171717] border border-neutral-200 hover:bg-neutral-50 rounded-[10px] shadow-x-small cursor-pointer"
                   >
-                    <span className="truncate">{selectedReason}</span>
+                    <span className="truncate">{selectedLabel}</span>
                     <RiArrowDownSLine className="size-4 text-[#7B7B7B] shrink-0 ml-2" />
                   </Button>
                 }
               />
               <DropdownMenuContent className="w-[560px] max-w-[90vw] p-1 rounded-[12px] bg-white border border-neutral-200 shadow-card-large z-50">
                 {PRESET_REASONS.map((r) => {
-                  const isSelected = selectedReason === r.label || selectedReason === r.value;
+                  const isSelected = selectedReason === r.value;
                   return (
                     <DropdownMenuItem
                       key={r.value}
-                      onClick={() => setSelectedReason(r.label)}
+                      onClick={() => {
+                        setSelectedReason(r.value);
+                        if (r.value !== "other") {
+                          setCustomReasonText("");
+                        }
+                      }}
                       className={`flex items-center justify-between px-3 py-2 text-[13px] rounded-[8px] cursor-pointer ${
                         isSelected
                           ? "bg-brand-light text-brand-dark font-medium"
@@ -345,6 +500,22 @@ export function CurtailmentLetterModal({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+
+          {/* Conditional Custom Reason Text Input */}
+          {isCustomReason && (
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-[12px] font-medium text-[#171717]">
+                Custom Statutory Cessation Reason <span className="text-[#FB3748]">*</span>
+              </Label>
+              <Input
+                type="text"
+                placeholder="Enter specific statutory grounds for curtailment or case closure..."
+                value={customReasonText}
+                onChange={(e) => setCustomReasonText(e.target.value)}
+                className="h-9 text-[13px] rounded-[10px] border border-neutral-200 bg-white placeholder-[#A4A4A4]"
+              />
+            </div>
+          )}
 
           {/* Two-Column: Dates & References */}
           <div className="grid grid-cols-2 gap-3">
@@ -374,7 +545,7 @@ export function CurtailmentLetterModal({
               <Label className="text-[12px] font-medium text-[#171717]">UKVI SMS Report Reference</Label>
               <Input
                 type="text"
-                placeholder="e.g. SMS-REP-894210"
+                placeholder="e.g. SMS-REP-894210 (leave empty if pending)"
                 value={smsReference}
                 onChange={(e) => setSmsReference(e.target.value)}
                 className="h-9 text-[13px] rounded-[10px] border border-neutral-200 bg-white"
@@ -433,9 +604,9 @@ export function CurtailmentLetterModal({
           <Button
             type="button"
             size="sm"
-            disabled={downloading}
+            disabled={downloading || !isFormValid}
             onClick={handleDownload}
-            className="h-8.5 px-5 rounded-full text-[13px] font-medium bg-brand-medium hover:bg-brand-dark text-white shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+            className="h-8.5 px-5 rounded-full text-[13px] font-medium bg-brand-medium hover:bg-brand-dark text-white shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <RiDownload2Line className="size-4" />
             <span>{downloading ? "Generating PDF..." : "Download Letter (PDF)"}</span>
@@ -445,3 +616,4 @@ export function CurtailmentLetterModal({
     </Dialog>
   );
 }
+
