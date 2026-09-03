@@ -48,6 +48,7 @@ import { toast } from "sonner";
 import { ArchiveCaseModal } from "../components/ArchiveCaseModal";
 import { DeleteCaseModal } from "../components/DeleteCaseModal";
 import { AddNoteModal } from "../components/AddNoteModal";
+import { CurtailmentLetterModal } from "../components/CurtailmentLetterModal";
 import { CaseHeader } from "./components/CaseHeader";
 import { MigrationStatusCard, PersonalDetailsCard, PriorityActionsCard, TimelineCard, ProfileCard } from "./components/OverviewCards";
 import { ComplianceCard } from "./components/ComplianceCard";
@@ -498,6 +499,7 @@ export default function MigrantOverviewPage() {
   const [isAddNoteOpen, setIsAddNoteOpen] = React.useState(false);
   const [isArchiveOpen, setIsArchiveOpen] = React.useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
+  const [isCurtailmentModalOpen, setIsCurtailmentModalOpen] = React.useState(false);
 
   const handleArchiveCase = async () => {
     if (!id) return;
@@ -554,6 +556,9 @@ export default function MigrantOverviewPage() {
       setMigrant(detail);
     } catch (err) {
       console.error("Failed to fetch case detail:", err);
+      setMigrant(null);
+      setRawMigrantData(null);
+      toast.error("Failed to load case details.");
     } finally {
       setLoading(false);
     }
@@ -601,6 +606,7 @@ export default function MigrantOverviewPage() {
           onEditHeader={() => setIsPersonalModalOpen(true)}
           onAddNote={() => setIsAddNoteOpen(true)}
           onUpload={() => setActiveTab("Documents")}
+          onCurtailmentLetter={() => setIsCurtailmentModalOpen(true)}
           onArchive={() => setIsArchiveOpen(true)}
           onDelete={() => setIsDeleteOpen(true)}
         />
@@ -1098,6 +1104,12 @@ export default function MigrantOverviewPage() {
               avatarUrl: migrant.avatar,
             }}
             onConfirm={handleDeleteCase}
+          />
+          <CurtailmentLetterModal
+            open={isCurtailmentModalOpen}
+            onOpenChange={setIsCurtailmentModalOpen}
+            caseData={migrant}
+            migrant={migrant}
           />
         </>
       )}

@@ -22,6 +22,7 @@ import {
 } from "@/lib/pdf-report-generator";
 import { formatFullName } from "@/lib/utils";
 import { TourGapCheckerCard } from "../../components/TourGapCheckerCard";
+import { CurtailmentLetterModal } from "../../components/CurtailmentLetterModal";
 
 // ─── Donut Chart Component ──────────────────────────────────
 function ComplianceDonutChart({ percentage = 100 }: { percentage?: number }) {
@@ -103,6 +104,7 @@ export function ComplianceTab({
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [exportingDossier, setExportingDossier] = React.useState(false);
+  const [curtailmentModalOpen, setCurtailmentModalOpen] = React.useState(false);
 
   const handleExportDossier = async () => {
     try {
@@ -569,17 +571,31 @@ export function ComplianceTab({
             <h3 className="font-aeonik-medium text-[20px] leading-[32px] text-[#171717]">
               Risk profile
             </h3>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleExportDossier}
-              disabled={exportingDossier || loading || !caseData}
-              className="h-8 px-3 rounded-[8px] bg-white hover:bg-[#F5F5F5] text-[#171717] text-[12px] font-medium flex items-center gap-1.5 border border-[#EBEBEB] shadow-x-small cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <RiDownload2Line className="size-3.5 text-[#5C5C5C]" />
-              <span>{exportingDossier ? "Exporting..." : "Export Dossier (PDF)"}</span>
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setCurtailmentModalOpen(true)}
+                disabled={loading || !caseData}
+                className="h-8 px-2.5 rounded-[8px] bg-white hover:bg-[#F5F5F5] text-[#171717] text-[12px] font-medium flex items-center gap-1.5 border border-[#EBEBEB] shadow-x-small cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Generate statutory Curtailment or Case Closing Letter"
+              >
+                <RiFileTextLine className="size-3.5 text-[#5C5C5C]" />
+                <span>Curtailment</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleExportDossier}
+                disabled={exportingDossier || loading || !caseData}
+                className="h-8 px-2.5 rounded-[8px] bg-white hover:bg-[#F5F5F5] text-[#171717] text-[12px] font-medium flex items-center gap-1.5 border border-[#EBEBEB] shadow-x-small cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RiDownload2Line className="size-3.5 text-[#5C5C5C]" />
+                <span>{exportingDossier ? "Exporting..." : "Dossier"}</span>
+              </Button>
+            </div>
           </div>
 
           <div className="bg-white border border-[#F5F5F5] rounded-[16px] p-4 flex flex-col gap-4 shadow-2xs">
@@ -829,6 +845,12 @@ export function ComplianceTab({
           </div>
         </div>
       </div>
+
+      <CurtailmentLetterModal
+        open={curtailmentModalOpen}
+        onOpenChange={setCurtailmentModalOpen}
+        caseData={caseData}
+      />
     </div>
   );
 }

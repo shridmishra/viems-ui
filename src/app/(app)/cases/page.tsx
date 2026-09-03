@@ -46,6 +46,7 @@ import { EditGroupModal } from "./components/EditGroupModal";
 import { ArchiveCaseModal } from "./components/ArchiveCaseModal";
 import { DeleteCaseModal } from "./components/DeleteCaseModal";
 import { CaseActionModal } from "./components/CaseActionModal";
+import { CurtailmentLetterModal } from "./components/CurtailmentLetterModal";
 import { CASE_STATUSES, REFUSAL_REASONS } from "./case-status-data";
 import { checkAppendixDCompleteness, isCosAssignedStatus } from "@/lib/appendix-d-checker";
 import { apiClient } from "@/lib/api-client";
@@ -187,6 +188,8 @@ export default function CasesPage() {
   const [deleteModalRow, setDeleteModalRow] = React.useState<CaseRow | null>(null);
   const [actionModalOpen, setActionModalOpen] = React.useState(false);
   const [actionModalRow, setActionModalRow] = React.useState<CaseRow | null>(null);
+  const [curtailmentModalOpen, setCurtailmentModalOpen] = React.useState(false);
+  const [curtailmentModalRow, setCurtailmentModalRow] = React.useState<CaseRow | null>(null);
   const [completedActionCaseIds, setCompletedActionCaseIds] = React.useState<Set<number>>(new Set());
 
   // Mutable cases state for status updates
@@ -209,6 +212,7 @@ export default function CasesPage() {
       setCases(mapped);
     } catch (err) {
       console.error("Failed to fetch cases:", err);
+      setCases([]);
       toast.error("Failed to load cases. Please try again.");
     } finally {
       setLoading(false);
@@ -1902,6 +1906,10 @@ export default function CasesPage() {
                               setRefusedModalRow(row);
                               setRefusedModalOpen(true);
                             }}
+                            onCurtailmentLetter={() => {
+                              setCurtailmentModalRow(row);
+                              setCurtailmentModalOpen(true);
+                            }}
                             onArchive={() => {
                               setArchiveModalRow(row);
                               setArchiveModalOpen(true);
@@ -2148,6 +2156,10 @@ export default function CasesPage() {
                               setRefusedModalRow(row);
                               setRefusedModalOpen(true);
                             }}
+                            onCurtailmentLetter={() => {
+                              setCurtailmentModalRow(row);
+                              setCurtailmentModalOpen(true);
+                            }}
                             onArchive={() => {
                               setArchiveModalRow(row);
                               setArchiveModalOpen(true);
@@ -2390,6 +2402,13 @@ export default function CasesPage() {
         open={importModalOpen}
         onOpenChange={setImportModalOpen}
         onSuccess={loadCases}
+      />
+
+      <CurtailmentLetterModal
+        open={curtailmentModalOpen}
+        onOpenChange={setCurtailmentModalOpen}
+        caseData={curtailmentModalRow}
+        migrant={curtailmentModalRow}
       />
     </div>
   );
