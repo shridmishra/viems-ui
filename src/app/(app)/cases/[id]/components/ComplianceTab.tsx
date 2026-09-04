@@ -23,39 +23,50 @@ import {
 import { formatFullName } from "@/lib/utils";
 import { TourGapCheckerCard } from "../../components/TourGapCheckerCard";
 import { CurtailmentLetterModal } from "../../components/CurtailmentLetterModal";
+import {
+  TaskAssignee,
+  getDefaultAssigneeForTask,
+  getStoredTaskAssignment,
+} from "@/lib/task-assignment-storage";
 
 // ─── Donut Chart Component ──────────────────────────────────
 function ComplianceDonutChart({ percentage = 100 }: { percentage?: number }) {
   const radius = 24;
   const circumference = 2 * Math.PI * radius;
-  const clamped = Math.max(0, Math.min(100, percentage));
-  const offset = circumference - (clamped / 100) * circumference;
-
-  const strokeColor = clamped >= 80 ? "#10B981" : clamped >= 50 ? "#F6B51E" : "#FB3748";
+  const offset = circumference - (percentage / 100) * circumference;
 
   return (
-    <div className="relative size-[67px] flex items-center justify-center shrink-0">
-      <svg width="67" height="67" viewBox="0 0 67 67" className="rotate-[-90deg]">
+    <div className="relative size-[60px] shrink-0">
+      <svg className="size-full -rotate-90" viewBox="0 0 60 60">
+        {/* Background track */}
         <circle
-          cx="33.5"
-          cy="33.5"
+          cx="30"
+          cy="30"
           r={radius}
           fill="none"
           stroke="#EBEBEB"
-          strokeWidth="8"
+          strokeWidth="6"
         />
+        {/* Progress fill */}
         <circle
-          cx="33.5"
-          cy="33.5"
+          cx="30"
+          cy="30"
           r={radius}
           fill="none"
-          stroke={strokeColor}
-          strokeWidth="8"
+          stroke="#1FC16B"
+          strokeWidth="6"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
+          className="transition-all duration-500 ease-out"
         />
       </svg>
+      {/* Centered percentage text */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="font-aeonik-medium text-[14px] font-medium text-[#171717] leading-none">
+          {percentage}%
+        </span>
+      </div>
     </div>
   );
 }
@@ -88,6 +99,7 @@ interface PriorityTaskItem {
   statusText: string;
   statusColor: string;
   dueDate: string;
+  assignee?: TaskAssignee | null;
 }
 
 export function ComplianceTab({
@@ -284,8 +296,12 @@ export function ComplianceTab({
             getSafeString(t.name) ||
             "Pending Compliance Action";
 
+          const taskId = String(t.id || `pt-${idx}`);
+          const stored = getStoredTaskAssignment(taskId);
+          const assignee = stored?.assignee || getDefaultAssigneeForTask(safeTitle);
+
           return {
-            id: String(t.id || `pt-${idx}`),
+            id: taskId,
             title: safeTitle,
             priority,
             badgeBg: isHigh ? "bg-[#FFEBEC]" : isMed ? "bg-[#FFFAEB]" : "bg-[#F5F5F5]",
@@ -293,6 +309,7 @@ export function ComplianceTab({
             statusText: isHigh ? "Needs attention" : "Pending action",
             statusColor: isHigh ? "text-[#FB3748]" : isMed ? "text-[#E6A819]" : "text-[#5C5C5C]",
             dueDate: taskDueDate,
+            assignee,
           };
         });
     }
@@ -544,19 +561,29 @@ export function ComplianceTab({
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
+                      {task.assignee && (
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-800 text-[11px] font-medium">
+                          <span className="size-4 rounded-full bg-neutral-200 text-[9px] font-bold flex items-center justify-center">
+                            {task.assignee.avatarText}
+                          </span>
+                          <span className="truncate max-w-[80px]">{task.assignee.name.split(" ")[0]}</span>
+                        </div>
+                      )}
                       <div className={`flex items-center gap-1 text-[14px] font-medium ${task.statusColor}`}>
                         <RiCalendarLine className={`size-4 ${task.statusColor}`} />
                         <span>{task.statusText}</span>
                       </div>
                       <span className="text-[13px] text-[#5C5C5C]">{task.dueDate}</span>
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon-xs"
                         onClick={() => onNavigateTab && onNavigateTab("Tasks")}
                         aria-label={`View task details for ${task.title}`}
                         className="size-6 rounded-full bg-[#F5F5F5] hover:bg-neutral-200 flex items-center justify-center text-[#5C5C5C] hover:text-[#171717] transition-colors border-0 cursor-pointer"
                       >
                         <RiArrowRightSLine className="size-4" />
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ))

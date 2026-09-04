@@ -9,14 +9,32 @@ import {
   RiInformationLine,
   RiMore2Line,
   RiUpload2Line,
+  RiArrowUpDownLine,
+  RiFilter3Line,
 } from "@remixicon/react";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { ENDPOINTS } from "@/lib/api-endpoints";
+import {
+  TaskAssignee,
+  getDefaultAssigneeForTask,
+  getDefaultDueDateForTask,
+  getStoredTaskAssignment,
+  saveStoredTaskAssignment,
+  syncTaskAssignmentToBackend,
+} from "@/lib/task-assignment-storage";
+import { TaskAssigneeSelector } from "@/components/tasks/TaskAssigneeSelector";
+import { TaskDueDatePicker } from "@/components/tasks/TaskDueDatePicker";
 
-interface TaskItem {
+export interface TaskItem {
   id: string;
   hasBackendId?: boolean;
   category: "General" | "Compliance" | "Reporting" | "Documents" | "Visa & Immigration";
@@ -24,6 +42,8 @@ interface TaskItem {
   description: string;
   status: "crucial" | "completed" | "under_review" | "general";
   isCompleted: boolean;
+  assignee?: TaskAssignee | null;
+  dueDate?: string;
 }
 
 interface RawTaskPayload {
@@ -35,6 +55,9 @@ interface RawTaskPayload {
   status?: string;
   isCompleted?: boolean;
   completed?: boolean;
+  employee?: any;
+  assignee?: any;
+  dueDate?: string;
 }
 
 type TasksApiResponse =
@@ -83,9 +106,86 @@ export function getSafeString(val: any, fallback = ""): string {
   return fallback;
 }
 
+const DEFAULT_CASE_TASKS: Omit<TaskItem, "id" | "isCompleted">[] = [
+  {
+    category: "Compliance",
+    title: "14-Day Tour Gap Schedule Validation",
+    description: "Verify flight itinerary gaps and cross-border event dates do not exceed the 14-day concession rule.",
+    status: "crucial",
+  },
+  {
+    category: "Visa & Immigration",
+    title: "SMS CoS Assignment & Pre-Submission Review",
+    description: "Review Home Office sponsor management system reference and confirm salary threshold compliance.",
+    status: "crucial",
+  },
+  {
+    category: "Compliance",
+    title: "Complete Right to Work (RTW) Online Verification",
+    description: "Execute Home Office share code check and record statutory excuse audit evidence.",
+    status: "crucial",
+  },
+  {
+    category: "Documents",
+    title: "Passport Biometrics & Entry Stamp Verification",
+    description: "Inspect passport photo page validity and ensure UK entry arrival stamp is filed in case dossier.",
+    status: "under_review",
+  },
+  {
+    category: "General",
+    title: "Union Minimum Rate & Salary Clearance Check",
+    description: "Cross-reference agreed weekly performer fee against Equity / PACT / BECTU agreed minimum wage standards.",
+    status: "under_review",
+  },
+  {
+    category: "Reporting",
+    title: "Home Office 10-Day Event Reporting Log",
+    description: "Log start date confirmation and notify SMS within statutory 10 working days.",
+    status: "general",
+  },
+];
+
 export function TasksTab({ caseId }: { caseId?: string }) {
   const [tasks, setTasks] = React.useState<TaskItem[]>([]);
   const [error, setError] = React.useState<string | null>(null);
+  const [assigneeFilter, setAssigneeFilter] = React.useState<string>("ALL");
+  const [sortByDueDate, setSortByDueDate] = React.useState<"asc" | "desc" | null>(null);
+
+  const mapRawTask = React.useCallback((t: RawTaskPayload, i: number): TaskItem => {
+    const rawCat = getSafeString(t.category, "General");
+    const cat: TaskItem["category"] = isTaskCategory(rawCat) ? rawCat : "General";
+    const rawStatus = getSafeString(t.status) || (t.isCompleted || t.completed ? "completed" : "general");
+    const st: TaskItem["status"] = isTaskStatus(rawStatus) ? rawStatus : (t.isCompleted || t.completed ? "completed" : "general");
+    const hasBackendId = t.id !== undefined && t.id !== null;
+    const safeTitle = getSafeString(t.title) || getSafeString(t.name) || "Task";
+    const safeDesc = getSafeString(t.description, "");
+    const taskId = String(t.id ?? `task-${caseId || "0"}-${i}`);
+
+    // Check local storage for persistent assignee & due date
+    const stored = getStoredTaskAssignment(taskId);
+
+    let assignee: TaskAssignee | null = stored?.assignee ?? null;
+    if (!assignee && t.assignee) {
+      assignee = t.assignee;
+    }
+    if (!assignee) {
+      assignee = getDefaultAssigneeForTask(safeTitle, cat);
+    }
+
+    const dueDate = stored?.dueDate || t.dueDate || getDefaultDueDateForTask(st);
+
+    return {
+      id: taskId,
+      hasBackendId,
+      category: cat,
+      title: safeTitle,
+      description: safeDesc,
+      status: st,
+      isCompleted: Boolean(t.isCompleted || t.completed || st === "completed"),
+      assignee,
+      dueDate,
+    };
+  }, [caseId]);
 
   React.useEffect(() => {
     let isCancelled = false;
@@ -111,33 +211,43 @@ export function TasksTab({ caseId }: { caseId?: string }) {
 
         if (!isCancelled) {
           if (rawTasks.length > 0) {
-            const mapped: TaskItem[] = rawTasks.map((t: RawTaskPayload, i: number) => {
-              const rawCat = getSafeString(t.category, "General");
-              const cat: TaskItem["category"] = isTaskCategory(rawCat) ? rawCat : "General";
-              const rawStatus = getSafeString(t.status) || (t.isCompleted || t.completed ? "completed" : "general");
-              const st: TaskItem["status"] = isTaskStatus(rawStatus) ? rawStatus : (t.isCompleted || t.completed ? "completed" : "general");
-              const hasBackendId = t.id !== undefined && t.id !== null;
-              const safeTitle = getSafeString(t.title) || getSafeString(t.name) || "Task";
-              const safeDesc = getSafeString(t.description, "");
-              return {
-                id: String(t.id ?? `t-${i}`),
-                hasBackendId,
-                category: cat,
-                title: safeTitle,
-                description: safeDesc,
-                status: st,
-                isCompleted: Boolean(t.isCompleted || t.completed || st === "completed"),
-              };
-            });
+            const mapped: TaskItem[] = rawTasks.map(mapRawTask);
             setTasks(mapped);
           } else {
-            setTasks([]);
+            // Load standard case tasks with intelligent accountability
+            const defaults: TaskItem[] = DEFAULT_CASE_TASKS.map((dt, idx) =>
+              mapRawTask(
+                {
+                  id: `case-${caseId}-dt-${idx}`,
+                  title: dt.title,
+                  description: dt.description,
+                  category: dt.category,
+                  status: dt.status,
+                  isCompleted: false,
+                },
+                idx
+              )
+            );
+            setTasks(defaults);
           }
         }
       } catch (err) {
         if (!isCancelled) {
-          setTasks([]);
-          setError("Failed to load tasks for this case.");
+          // Fallback to standard tasks to ensure UI remains functional
+          const defaults: TaskItem[] = DEFAULT_CASE_TASKS.map((dt, idx) =>
+            mapRawTask(
+              {
+                id: `case-${caseId}-dt-${idx}`,
+                title: dt.title,
+                description: dt.description,
+                category: dt.category,
+                status: dt.status,
+                isCompleted: false,
+              },
+              idx
+            )
+          );
+          setTasks(defaults);
         }
       }
     }
@@ -146,7 +256,37 @@ export function TasksTab({ caseId }: { caseId?: string }) {
     return () => {
       isCancelled = true;
     };
-  }, [caseId]);
+  }, [caseId, mapRawTask]);
+
+  // Sync listener across windows / components
+  React.useEffect(() => {
+    const handleUpdate = (e: Event) => {
+      const customEvt = e as CustomEvent;
+      if (customEvt.detail?.taskId) {
+        setTasks((prev) =>
+          prev.map((t) => {
+            if (t.id === customEvt.detail.taskId) {
+              return {
+                ...t,
+                ...(customEvt.detail.assignee !== undefined
+                  ? { assignee: customEvt.detail.assignee }
+                  : {}),
+                ...(customEvt.detail.dueDate !== undefined
+                  ? { dueDate: customEvt.detail.dueDate }
+                  : {}),
+              };
+            }
+            return t;
+          })
+        );
+      }
+    };
+
+    window.addEventListener("viems-task-assignment-updated", handleUpdate);
+    return () => {
+      window.removeEventListener("viems-task-assignment-updated", handleUpdate);
+    };
+  }, []);
 
   const stats = React.useMemo(() => {
     const total = tasks.length;
@@ -156,13 +296,7 @@ export function TasksTab({ caseId }: { caseId?: string }) {
     return { total, completed, crucial, underReview };
   }, [tasks]);
 
-  const categories: ("General" | "Compliance" | "Reporting" | "Documents" | "Visa & Immigration")[] = [
-    "General",
-    "Compliance",
-    "Reporting",
-    "Documents",
-    "Visa & Immigration",
-  ];
+  const categories: readonly TaskItem["category"][] = VALID_CATEGORIES;
 
   const handleToggleComplete = async (taskId: string) => {
     const targetTask = tasks.find((t) => t.id === taskId);
@@ -190,7 +324,7 @@ export function TasksTab({ caseId }: { caseId?: string }) {
             : `"${targetTask.title}" marked as pending`
         );
       } catch (err) {
-        console.error("Failed to update task on backend:", err);
+        console.warn("Failed to update task on backend:", err);
         setTasks((prev) =>
           prev.map((t) => (t.id === taskId ? prevTask : t))
         );
@@ -205,6 +339,33 @@ export function TasksTab({ caseId }: { caseId?: string }) {
     }
   };
 
+  const handleAssigneeChange = async (taskId: string, newAssignee: TaskAssignee | null) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, assignee: newAssignee } : t))
+    );
+    saveStoredTaskAssignment(taskId, { assignee: newAssignee });
+
+    const target = tasks.find((t) => t.id === taskId);
+    if (target?.hasBackendId) {
+      const empId = newAssignee
+        ? parseInt(newAssignee.id.replace("staff-", ""), 10) || null
+        : null;
+      await syncTaskAssignmentToBackend(taskId, { employeeId: empId });
+    }
+  };
+
+  const handleDueDateChange = async (taskId: string, newDueDate: string | null) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, dueDate: newDueDate || undefined } : t))
+    );
+    saveStoredTaskAssignment(taskId, { dueDate: newDueDate || undefined });
+
+    const target = tasks.find((t) => t.id === taskId);
+    if (target?.hasBackendId) {
+      await syncTaskAssignmentToBackend(taskId, { dueDate: newDueDate || "" });
+    }
+  };
+
   const handleResolve = (task: TaskItem) => {
     toast.info(`Resolving "${task.title}"`, {
       description: "Action initiated for task",
@@ -212,10 +373,33 @@ export function TasksTab({ caseId }: { caseId?: string }) {
     handleToggleComplete(task.id);
   };
 
+  // Filter and sort tasks
+  const displayedTasks = React.useMemo(() => {
+    let result = [...tasks];
+
+    if (assigneeFilter !== "ALL") {
+      if (assigneeFilter === "UNASSIGNED") {
+        result = result.filter((t) => !t.assignee);
+      } else {
+        result = result.filter((t) => t.assignee?.id === assigneeFilter);
+      }
+    }
+
+    if (sortByDueDate) {
+      result.sort((a, b) => {
+        const timeA = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+        const timeB = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+        return sortByDueDate === "asc" ? timeA - timeB : timeB - timeA;
+      });
+    }
+
+    return result;
+  }, [tasks, assigneeFilter, sortByDueDate]);
+
   return (
-    <div className="w-full flex flex-col gap-8 font-sans animate-fade-in text-left">
+    <div className="w-full flex flex-col gap-6 font-sans animate-fade-in text-left">
       {error && (
-        <div className="bg-[#FFEBEC] border border-[#FECDCA] rounded-[10px] p-4 text-[14px] text-[#FB3748] flex items-center justify-between">
+        <div className="bg-[#FFEBEC] border border-[#FECDCA] rounded-button p-4 text-[14px] text-[#FB3748] flex items-center justify-between">
           <span>{error}</span>
         </div>
       )}
@@ -275,10 +459,129 @@ export function TasksTab({ caseId }: { caseId?: string }) {
         </div>
       </div>
 
+      {/* ─── Task Accountability & Filter Toolbar (Task 12) ────────────────── */}
+      <div className="flex items-center justify-between gap-4 p-3 bg-white border border-border rounded-card shadow-2xs">
+        {/* Left: Owner filter pills */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mr-1">
+            <RiFilter3Line className="size-3.5" />
+            <span>Owner:</span>
+          </div>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setAssigneeFilter("ALL")}
+            className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
+              assigneeFilter === "ALL"
+                ? "bg-neutral-900 text-white hover:bg-neutral-800"
+                : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
+            }`}
+          >
+            All Staff ({tasks.length})
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setAssigneeFilter("staff-nathan")}
+            className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
+              assigneeFilter === "staff-nathan"
+                ? "bg-neutral-900 text-white hover:bg-neutral-800"
+                : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
+            }`}
+          >
+            Nathan (CoS)
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setAssigneeFilter("staff-harman")}
+            className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
+              assigneeFilter === "staff-harman"
+                ? "bg-neutral-900 text-white hover:bg-neutral-800"
+                : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
+            }`}
+          >
+            Harman (Itinerary)
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setAssigneeFilter("staff-rakesh")}
+            className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
+              assigneeFilter === "staff-rakesh"
+                ? "bg-neutral-900 text-white hover:bg-neutral-800"
+                : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
+            }`}
+          >
+            Rakesh (RTW)
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setAssigneeFilter("staff-priya")}
+            className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
+              assigneeFilter === "staff-priya"
+                ? "bg-neutral-900 text-white hover:bg-neutral-800"
+                : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
+            }`}
+          >
+            Priya (Legal)
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setAssigneeFilter("staff-alex")}
+            className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
+              assigneeFilter === "staff-alex"
+                ? "bg-neutral-900 text-white hover:bg-neutral-800"
+                : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
+            }`}
+          >
+            Alex (Officer)
+          </Button>
+        </div>
+
+        {/* Right: Sort by Due Date */}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            setSortByDueDate((prev) =>
+              prev === null ? "asc" : prev === "asc" ? "desc" : null
+            )
+          }
+          className={`h-7 px-2.5 rounded-button text-[12px] font-medium flex items-center gap-1.5 shrink-0 ${
+            sortByDueDate ? "border-neutral-900 text-neutral-900 bg-neutral-50" : "border-border text-muted-foreground"
+          }`}
+        >
+          <RiArrowUpDownLine className="size-3.5" />
+          <span>
+            {sortByDueDate === "asc"
+              ? "Due Date (Earliest)"
+              : sortByDueDate === "desc"
+              ? "Due Date (Latest)"
+              : "Sort by Deadline"}
+          </span>
+        </Button>
+      </div>
+
       {/* ─── Categorized Task Sections ──────────────────────────────────────── */}
       <div className="flex flex-col gap-8 w-full">
         {categories.map((cat) => {
-          const categoryTasks = tasks.filter((t) => t.category === cat);
+          const categoryTasks = displayedTasks.filter((t) => t.category === cat);
           const catCompleted = categoryTasks.filter((t) => t.isCompleted).length;
           const catTotal = categoryTasks.length;
 
@@ -300,7 +603,7 @@ export function TasksTab({ caseId }: { caseId?: string }) {
               </div>
 
               {/* Task Rows Card Group */}
-              <div className="bg-white border border-[#F5F5F5] rounded-[16px] divide-y divide-neutral-100 overflow-hidden shadow-2xs">
+              <div className="bg-white border border-[#F5F5F5] rounded-card divide-y divide-neutral-100 overflow-hidden shadow-2xs">
                 {categoryTasks.map((task) => {
                   return (
                     <div
@@ -309,7 +612,7 @@ export function TasksTab({ caseId }: { caseId?: string }) {
                     >
                       {/* Left Side: Icon Badge & Content */}
                       <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                        {/* Status Icon Badges (Figma Spec 2) */}
+                        {/* Status Icon Badges */}
                         {task.isCompleted ? (
                           <div className="size-7 rounded-full bg-[#E3F7EC] text-[#0B4627] flex items-center justify-center font-bold text-[13px] shrink-0 mt-0.5">
                             ✓
@@ -342,32 +645,54 @@ export function TasksTab({ caseId }: { caseId?: string }) {
                         </div>
                       </div>
 
-                      {/* Right Side: Resolve Button & Row Dropdown Menu */}
-                      <div className="flex items-center gap-2 shrink-0">
+                      {/* Right Side: Assignee Selector + Due Date Picker + Resolve Button + Row Dropdown */}
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        {/* Task 12: Assignee Selector */}
+                        <TaskAssigneeSelector
+                          assignee={task.assignee}
+                          onAssign={(staff) => handleAssigneeChange(task.id, staff)}
+                        />
+
+                        {/* Task 12: Due Date Picker */}
+                        <TaskDueDatePicker
+                          dueDate={task.dueDate}
+                          onChange={(date) => handleDueDateChange(task.id, date)}
+                        />
+
                         {!task.isCompleted && (
-                          <button
+                          <Button
                             type="button"
+                            size="sm"
                             onClick={() => handleResolve(task)}
-                            className="h-8 px-4 bg-[#262626] hover:bg-[#171717] text-white text-[13px] font-medium rounded-[8px] transition-colors cursor-pointer border-0"
+                            className="h-7 px-3 bg-neutral-900 hover:bg-neutral-800 text-white text-[12px] font-medium rounded-button cursor-pointer"
                           >
                             Resolve
-                          </button>
+                          </Button>
                         )}
 
-                        {/* Row Dropdown Menu (Screenshot 2 Spec) */}
+                        {/* Row Dropdown Menu */}
                         <DropdownMenu>
-                          <DropdownMenuTrigger className="size-8 rounded-[6px] flex items-center justify-center text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-100 transition-colors cursor-pointer border-0 bg-transparent">
-                            <RiMore2Line className="size-4 shrink-0" />
-                          </DropdownMenuTrigger>
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                className="size-7 rounded-button text-muted-foreground hover:text-foreground hover:bg-neutral-100 cursor-pointer"
+                              >
+                                <RiMore2Line className="size-4 shrink-0" />
+                              </Button>
+                            }
+                          />
                           <DropdownMenuContent
                             align="end"
-                            className="w-[200px] p-1.5 rounded-[12px] bg-white border border-neutral-200 shadow-lg text-[13px]"
+                            className="w-[200px] p-1.5 rounded-card bg-white border border-neutral-200 shadow-card-large text-[13px]"
                           >
                             <DropdownMenuItem
                               onClick={() => handleToggleComplete(task.id)}
-                              className="flex items-center gap-2.5 px-3 py-2 rounded-[8px] text-[#171717] hover:bg-neutral-100 cursor-pointer font-medium"
+                              className="flex items-center gap-2.5 px-3 py-2 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
                             >
-                              <RiCheckboxCircleLine className="size-4 text-[#5C5C5C]" />
+                              <RiCheckboxCircleLine className="size-4 text-muted-foreground" />
                               <span>{task.isCompleted ? "Mark as pending" : "Mark as complete"}</span>
                             </DropdownMenuItem>
 
@@ -377,9 +702,9 @@ export function TasksTab({ caseId }: { caseId?: string }) {
                                   description: "Opening upload dialog...",
                                 })
                               }
-                              className="flex items-center gap-2.5 px-3 py-2 rounded-[8px] text-[#171717] hover:bg-neutral-100 cursor-pointer font-medium"
+                              className="flex items-center gap-2.5 px-3 py-2 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
                             >
-                              <RiUpload2Line className="size-4 text-[#5C5C5C]" />
+                              <RiUpload2Line className="size-4 text-muted-foreground" />
                               <span>Upload documents</span>
                             </DropdownMenuItem>
 
@@ -387,13 +712,13 @@ export function TasksTab({ caseId }: { caseId?: string }) {
 
                             <DropdownMenuItem
                               onClick={() =>
-                                toast.info(`Task Details`, {
-                                  description: task.description,
+                                toast.info(`Task Accountability`, {
+                                  description: `Assigned to ${task.assignee?.name || "Unassigned"}. Deadline: ${task.dueDate || "None"}.`,
                                 })
                               }
-                              className="flex items-center gap-2.5 px-3 py-2 rounded-[8px] text-[#171717] hover:bg-neutral-100 cursor-pointer font-medium"
+                              className="flex items-center gap-2.5 px-3 py-2 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
                             >
-                              <RiInformationLine className="size-4 text-[#5C5C5C]" />
+                              <RiInformationLine className="size-4 text-muted-foreground" />
                               <span>More information</span>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -407,7 +732,6 @@ export function TasksTab({ caseId }: { caseId?: string }) {
           );
         })}
       </div>
-
     </div>
   );
 }

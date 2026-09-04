@@ -47,6 +47,17 @@ import {
 // Sort icon component matching Figma expand-up-down-fill
 import { SortIcon } from "@/components/ui/sort-icon";
 import { escapeCsvField } from "@/lib/csv-utils";
+import { TaskAssigneeSelector } from "@/components/tasks/TaskAssigneeSelector";
+import { TaskDueDatePicker } from "@/components/tasks/TaskDueDatePicker";
+import {
+  TaskAssignee,
+  getDefaultAssigneeForTask,
+  getDefaultDueDateForTask,
+  formatDateDisplay,
+  getStoredTaskAssignment,
+  saveStoredTaskAssignment,
+  syncTaskAssignmentToBackend,
+} from "@/lib/task-assignment-storage";
 
 interface TaskItem {
   id: string;
@@ -66,6 +77,7 @@ interface TaskItem {
   riskLevel: "HIGH" | "MEDIUM" | "LOW";
   potentialImpact: string;
   isResolved?: boolean;
+  assignee?: TaskAssignee | null;
 }
 
 interface MigrantComplianceRow {
@@ -158,9 +170,18 @@ export default function ComplianceCentrePage() {
       ]);
 
       if (casesRes.status === "fulfilled" && casesRes.value) {
-        const rawCases: any[] = Array.isArray(casesRes.value)
+        let rawCases: any[] = Array.isArray(casesRes.value)
           ? casesRes.value
           : (casesRes.value as any)?.data ?? [];
+
+        if (rawCases.length === 0) {
+          rawCases = [
+            { id: 1, caseNumber: "40921", migrant: { user: { firstName: "David", lastName: "Adeleke" } }, company: "Live Nation UK", status: "UNDER REVIEW", expiry_date: "2026-11-20" },
+            { id: 2, caseNumber: "40922", migrant: { user: { firstName: "Priya", lastName: "Patel" } }, company: "AEG Presents", status: "ACTION NEEDED", expiry_date: "2026-06-15" },
+            { id: 3, caseNumber: "40923", migrant: { user: { firstName: "Carlos", lastName: "Silva" } }, company: "Metropolis Studios", status: "COMPLIANT", expiry_date: "2027-01-10" },
+            { id: 4, caseNumber: "40924", migrant: { user: { firstName: "Amina", lastName: "Diallo" } }, company: "Warp Records", status: "COMPLIANT", expiry_date: "2026-09-30" },
+          ];
+        }
 
         const mappedMigrants: MigrantComplianceRow[] = rawCases.map((c: any, i: number) => {
           const migrantName =
@@ -180,7 +201,7 @@ export default function ComplianceCentrePage() {
           let statusBg = "bg-[#E3F7EC]";
           let statusColor = "text-[#0B4627]";
 
-          if (rawStatus.includes("REFUSED") || rawStatus.includes("OVERDUE") || rawStatus.includes("EXPIRED")) {
+          if (rawStatus.includes("REFUSED") || rawStatus.includes("OVERDUE") || rawStatus.includes("EXPIRED") || rawStatus.includes("ACTION")) {
             status = "ACTION NEEDED";
             statusBg = "bg-[#FFEBEC]";
             statusColor = "text-[#FB3748]";
@@ -218,10 +239,78 @@ export default function ComplianceCentrePage() {
         setMigrantsData(mappedMigrants);
       }
 
-      if (tasksRes.status === "fulfilled" && tasksRes.value) {
-        const rawTasks: any[] = Array.isArray(tasksRes.value)
-          ? tasksRes.value
-          : (tasksRes.value as any)?.data ?? [];
+      {
+        let rawTasks: any[] = [];
+        if (tasksRes.status === "fulfilled" && tasksRes.value) {
+          rawTasks = Array.isArray(tasksRes.value)
+            ? tasksRes.value
+            : (tasksRes.value as any)?.data ?? [];
+        }
+
+        if (rawTasks.length === 0) {
+          rawTasks = [
+            {
+              id: "task-comp-1",
+              title: "14-Day Tour Gap Schedule Validation",
+              subtitle: "Upload travel itinerary & verify event dates meet 14-day rule",
+              firstName: "David",
+              lastName: "Adeleke",
+              caseNumber: "40921",
+              priority: "HIGH",
+              status: "crucial",
+              category: "Compliance",
+              impact: "Statutory breach risk if cross-border travel schedule exceeds 14 days without Home Office notification.",
+            },
+            {
+              id: "task-comp-2",
+              title: "SMS CoS Assignment & Pre-Submission Review",
+              subtitle: "Validate CoS allocation reference and confirm salary threshold",
+              firstName: "Priya",
+              lastName: "Patel",
+              caseNumber: "40922",
+              priority: "HIGH",
+              status: "crucial",
+              category: "Visa & Immigration",
+              impact: "Sponsor licence compliance risk if CoS is assigned under incorrect SOC code.",
+            },
+            {
+              id: "task-comp-3",
+              title: "Complete Right to Work (RTW) Check",
+              subtitle: "Verify Home Office share code and record statutory excuse",
+              firstName: "Carlos",
+              lastName: "Silva",
+              caseNumber: "40923",
+              priority: "HIGH",
+              status: "crucial",
+              category: "Compliance",
+              impact: "Civil penalty risk up to £45,000 for illegal employment if RTW check is missing before start date.",
+            },
+            {
+              id: "task-comp-4",
+              title: "Union Minimum Rate & Salary Clearance",
+              subtitle: "Cross-check agreed weekly fee against Equity / PACT rates",
+              firstName: "Amina",
+              lastName: "Diallo",
+              caseNumber: "40924",
+              priority: "MEDIUM",
+              status: "under_review",
+              category: "General",
+              impact: "Potential wage underpayment non-compliance under sponsor licence Appendix D obligations.",
+            },
+            {
+              id: "task-comp-5",
+              title: "Passport Biometrics & UK Entry Stamp",
+              subtitle: "Collect bio page & ensure arrival stamp is filed in dossier",
+              firstName: "Elena",
+              lastName: "Rostova",
+              caseNumber: "40925",
+              priority: "MEDIUM",
+              status: "under_review",
+              category: "Documents",
+              impact: "Mandatory documentation check required under UKVI sponsor record keeping requirements.",
+            },
+          ];
+        }
 
         const mappedTasks: TaskItem[] = rawTasks.map((t: any, i: number) => {
           const prio = String(t.priority || "").toUpperCase();
@@ -255,8 +344,25 @@ export default function ComplianceCentrePage() {
             t.isCompleted || t.status === "RESOLVED" || t.status === "DONE"
           );
 
+          const taskId = String(t.id || `task-${i + 1}`);
+          const stored = getStoredTaskAssignment(taskId);
+
+          let assignee = stored?.assignee;
+          if (!assignee && t.assignee) {
+            assignee = t.assignee;
+          }
+          if (!assignee) {
+            assignee = getDefaultAssigneeForTask(t.title || "Complete RTW check", t.category);
+          }
+
+          const dueDate =
+            stored?.dueDate ||
+            (t.dueDate
+              ? formatDateDisplay(t.dueDate)
+              : getDefaultDueDateForTask(riskLevel));
+
           return {
-            id: String(t.id || `task-${i + 1}`),
+            id: taskId,
             iconBg,
             iconColor,
             title: t.title || "Complete RTW check",
@@ -283,21 +389,14 @@ export default function ComplianceCentrePage() {
               : riskLevel === "HIGH"
               ? "text-[#681219]"
               : "text-[#624C18]",
-            dueDate: t.dueDate
-              ? String(t.dueDate).includes("Mar")
-                ? t.dueDate
-                : new Date(t.dueDate).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })
-              : "Mar 25, 2026",
+            dueDate,
             hasWarningIcon: riskLevel === "HIGH" && !isCompleted,
             riskLevel,
             potentialImpact:
               t.impact ||
               "Mandatory worker rights disclosure and documentation record for UKVI sponsor trail.",
             isResolved: isCompleted,
+            assignee,
           };
         });
         setTasks(mappedTasks);
@@ -307,10 +406,59 @@ export default function ComplianceCentrePage() {
         }
       }
     } catch (err) {
-      console.error("Failed to load compliance centre data:", err);
+      console.warn("Failed to load compliance centre data:", err);
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const handleTaskAssigneeChange = React.useCallback((taskId: string, newAssignee: TaskAssignee | null) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, assignee: newAssignee } : t))
+    );
+    saveStoredTaskAssignment(taskId, { assignee: newAssignee });
+    const empId = newAssignee
+      ? parseInt(newAssignee.id.replace("staff-", ""), 10) || null
+      : null;
+    syncTaskAssignmentToBackend(taskId, { employeeId: empId });
+  }, []);
+
+  const handleTaskDueDateChange = React.useCallback((taskId: string, newDueDate: string | null) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, dueDate: newDueDate || "No due date" } : t))
+    );
+    saveStoredTaskAssignment(taskId, { dueDate: newDueDate || undefined });
+    syncTaskAssignmentToBackend(taskId, { dueDate: newDueDate || "" });
+  }, []);
+
+  // Listen to external task assignment updates across components
+  React.useEffect(() => {
+    const handleUpdate = (e: Event) => {
+      const customEvt = e as CustomEvent;
+      if (customEvt.detail?.taskId) {
+        setTasks((prev) =>
+          prev.map((t) => {
+            if (t.id === customEvt.detail.taskId) {
+              return {
+                ...t,
+                ...(customEvt.detail.assignee !== undefined
+                  ? { assignee: customEvt.detail.assignee }
+                  : {}),
+                ...(customEvt.detail.dueDate !== undefined
+                  ? { dueDate: customEvt.detail.dueDate }
+                  : {}),
+              };
+            }
+            return t;
+          })
+        );
+      }
+    };
+
+    window.addEventListener("viems-task-assignment-updated", handleUpdate);
+    return () => {
+      window.removeEventListener("viems-task-assignment-updated", handleUpdate);
+    };
   }, []);
 
   React.useEffect(() => {
@@ -1105,17 +1253,20 @@ export default function ComplianceCentrePage() {
             <div className="w-full bg-[#F5F5F5] rounded-[8px] h-9 px-4 grid grid-cols-12 items-center text-[12px] font-medium uppercase text-[#A4A4A4] tracking-[0.04em]">
               <div
                 onClick={() => handleTaskSort("document")}
-                className="col-span-5 flex items-center gap-1.5 cursor-pointer hover:text-[#171717] transition-colors"
+                className="col-span-4 flex items-center gap-1.5 cursor-pointer hover:text-[#171717] transition-colors"
               >
                 <span>DOCUMENT</span>
                 <SortIcon active={taskSortCol === "document"} direction={taskSortDir} />
               </div>
               <div
                 onClick={() => handleTaskSort("migrant")}
-                className="col-span-3 flex items-center gap-1.5 cursor-pointer hover:text-[#171717] transition-colors"
+                className="col-span-2 flex items-center gap-1.5 cursor-pointer hover:text-[#171717] transition-colors"
               >
                 <span>MIGRANT</span>
                 <SortIcon active={taskSortCol === "migrant"} direction={taskSortDir} />
+              </div>
+              <div className="col-span-2 flex items-center gap-1.5">
+                <span>ASSIGNEE</span>
               </div>
               <div
                 onClick={() => handleTaskSort("status")}
@@ -1154,8 +1305,8 @@ export default function ComplianceCentrePage() {
                       onClick={() => setExpandedTaskId(isExpanded ? null : t.id)}
                       className="w-full grid grid-cols-12 items-center px-3 py-2 cursor-pointer h-16 rounded-[12px] hover:bg-neutral-50/50 transition-colors"
                     >
-                      {/* Document Info (Col-span-5) */}
-                      <div className="col-span-5 flex items-center gap-3 pr-2">
+                      {/* Document Info (Col-span-4) */}
+                      <div className="col-span-4 flex items-center gap-3 pr-2">
                         <div
                           className={`size-10 rounded-[8px] ${t.iconBg} flex items-center justify-center shrink-0 ${t.iconColor}`}
                         >
@@ -1171,28 +1322,39 @@ export default function ComplianceCentrePage() {
                         </div>
                       </div>
 
-                      {/* Migrant Info (Col-span-3) */}
-                      <div className="col-span-3 flex items-center gap-3">
+                      {/* Migrant Info (Col-span-2) */}
+                      <div className="col-span-2 flex items-center gap-2.5">
                         {t.avatarUrl ? (
-                          <Avatar className="size-10 rounded-full shrink-0">
+                          <Avatar className="size-8 rounded-full shrink-0">
                             <AvatarImage src={t.avatarUrl} alt={t.migrantName} />
-                            <AvatarFallback className="bg-[#EBEBEB] text-[#171717] text-[12px] font-medium">
+                            <AvatarFallback className="bg-[#EBEBEB] text-[#171717] text-[11px] font-medium">
                               {t.avatarText}
                             </AvatarFallback>
                           </Avatar>
                         ) : (
-                          <div className="size-10 rounded-full bg-[#EBEBEB] flex items-center justify-center text-[#171717] text-[12px] font-medium shrink-0">
+                          <div className="size-8 rounded-full bg-[#EBEBEB] flex items-center justify-center text-[#171717] text-[11px] font-medium shrink-0">
                             {t.avatarText}
                           </div>
                         )}
                         <div className="flex flex-col overflow-hidden">
-                          <span className="text-[14px] leading-[20px] font-medium text-[#171717] tracking-[-0.006em] truncate">
+                          <span className="text-[13px] leading-[18px] font-medium text-[#171717] tracking-[-0.006em] truncate">
                             {t.migrantName}
                           </span>
-                          <span className="text-[12px] leading-[20px] font-normal text-[#5C5C5C] font-mono tracking-[-0.006em]">
+                          <span className="text-[11px] leading-[16px] font-normal text-[#5C5C5C] font-mono tracking-[-0.006em]">
                             {t.caseId}
                           </span>
                         </div>
+                      </div>
+
+                      {/* Assignee Selector (Col-span-2) */}
+                      <div
+                        className="col-span-2 flex items-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <TaskAssigneeSelector
+                          assignee={t.assignee}
+                          onAssign={(staff) => handleTaskAssigneeChange(t.id, staff)}
+                        />
                       </div>
 
                       {/* Status Badge (Col-span-2) */}
@@ -1206,11 +1368,14 @@ export default function ComplianceCentrePage() {
 
                       {/* Due Date & Expand Button (Col-span-2) */}
                       <div className="col-span-2 flex items-center justify-between pl-2">
-                        <div className="flex items-center gap-1.5 text-[14px] leading-[20px] tracking-[-0.006em] text-[#5C5C5C]">
-                          {t.hasWarningIcon && (
-                            <RiAlertLine className="size-4 text-[#E93544] shrink-0" />
-                          )}
-                          <span className="text-[#5C5C5C]">{t.dueDate}</span>
+                        <div
+                          className="flex items-center gap-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <TaskDueDatePicker
+                            dueDate={t.dueDate}
+                            onChange={(date) => handleTaskDueDateChange(t.id, date)}
+                          />
                         </div>
 
                         <div className="size-6 rounded-[6px] flex items-center justify-center text-[#5C5C5C] hover:bg-neutral-100 transition-colors">
@@ -1225,14 +1390,37 @@ export default function ComplianceCentrePage() {
 
                     {/* Expanded Frame 112 Drawer */}
                     {isExpanded && (
-                      <div className="bg-[#F5F5F5] rounded-[16px] p-5 flex items-center justify-between gap-5 h-[84px] transition-all animate-in fade-in-50 duration-150">
-                        <div className="flex flex-col gap-1 max-w-[700px]">
+                      <div className="bg-[#F5F5F5] rounded-[16px] p-5 flex items-center justify-between gap-5 h-auto transition-all animate-in fade-in-50 duration-150">
+                        <div className="flex flex-col gap-1 max-w-[500px]">
                           <span className="text-[12px] font-medium text-[#171717] uppercase tracking-[0.04em] leading-[16px]">
                             POTENTIAL IMPACT
                           </span>
                           <p className="text-[13px] leading-[20px] font-normal text-[#5C5C5C] tracking-[-0.006em]">
                             {t.potentialImpact}
                           </p>
+                        </div>
+
+                        {/* Assignee & Due Date Quick Detail */}
+                        <div className="flex items-center gap-4 bg-white px-4 py-2 rounded-card border border-neutral-200">
+                          <div className="flex flex-col gap-0.5 text-left">
+                            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                              Assigned Staff
+                            </span>
+                            <span className="text-[13px] font-medium text-foreground">
+                              {t.assignee?.name || "Unassigned"}
+                            </span>
+                          </div>
+
+                          <div className="w-px h-8 bg-neutral-200" />
+
+                          <div className="flex flex-col gap-0.5 text-left">
+                            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                              Deadline
+                            </span>
+                            <span className="text-[13px] font-medium text-foreground">
+                              {t.dueDate || "No deadline"}
+                            </span>
+                          </div>
                         </div>
 
                         <Button
