@@ -93,7 +93,7 @@ export function TaskAssigneeSelector({
 
       <DropdownMenuContent
         align="start"
-        className="w-[240px] p-1.5 rounded-card bg-popover text-popover-foreground border-border shadow-card-large"
+        className="w-[260px] min-w-[260px] p-1.5 rounded-card bg-popover text-popover-foreground border-border shadow-card-large"
       >
         <DropdownMenuGroup>
           <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-2 py-1">
@@ -106,20 +106,20 @@ export function TaskAssigneeSelector({
               <DropdownMenuItem
                 key={staff.id}
                 onClick={() => handleSelect(staff)}
-                className="flex items-center justify-between px-2 py-1.5 rounded-button cursor-pointer hover:bg-neutral-100 transition-colors"
+                className="flex items-center justify-between px-2.5 py-1.5 rounded-button cursor-pointer hover:bg-neutral-100 transition-colors w-full gap-2"
               >
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
                   <Avatar className="size-6 rounded-full shrink-0">
                     {staff.avatarUrl && <AvatarImage src={staff.avatarUrl} alt={staff.name} />}
                     <AvatarFallback className="text-[10px] font-semibold bg-neutral-200 text-neutral-800">
                       {staff.avatarText}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-[13px] font-medium text-foreground truncate">
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="text-[13px] font-medium text-foreground whitespace-nowrap">
                       {staff.name}
                     </span>
-                    <span className="text-[11px] text-muted-foreground truncate">
+                    <span className="text-[11px] text-muted-foreground whitespace-nowrap">
                       {staff.role}
                     </span>
                   </div>
