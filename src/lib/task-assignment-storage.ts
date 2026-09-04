@@ -214,10 +214,14 @@ export function getDueDateUrgency(dueDateStr?: string): {
 /**
  * Client storage operations
  */
-export function getAllStoredAssignments(): Record<
-  string,
-  { assignee?: TaskAssignee | null; dueDate?: string }
-> {
+export interface StoredTaskRecord {
+  assignee?: TaskAssignee | null;
+  dueDate?: string;
+  status?: string;
+  isResolved?: boolean;
+}
+
+export function getAllStoredAssignments(): Record<string, StoredTaskRecord> {
   if (typeof window === "undefined") return {};
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -229,14 +233,14 @@ export function getAllStoredAssignments(): Record<
 
 export function getStoredTaskAssignment(
   taskId: string
-): { assignee?: TaskAssignee | null; dueDate?: string } | null {
+): StoredTaskRecord | null {
   const all = getAllStoredAssignments();
   return all[taskId] || null;
 }
 
 export function saveStoredTaskAssignment(
   taskId: string,
-  data: { assignee?: TaskAssignee | null; dueDate?: string }
+  data: StoredTaskRecord
 ): void {
   if (typeof window === "undefined") return;
   try {

@@ -28,6 +28,7 @@ import {
   RiShieldCheckLine,
   RiUpload2Line,
   RiMore2Line,
+  RiCheckLine,
 } from "@remixicon/react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
@@ -43,7 +44,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -55,6 +58,7 @@ import { SortIcon } from "@/components/ui/sort-icon";
 import { escapeCsvField } from "@/lib/csv-utils";
 import { TaskAssigneeSelector } from "@/components/tasks/TaskAssigneeSelector";
 import { TaskDueDatePicker } from "@/components/tasks/TaskDueDatePicker";
+import { TaskStatusSelector, type TaskStatusValue } from "@/components/tasks/TaskStatusSelector";
 import {
   TaskAssignee,
   getDefaultAssigneeForTask,
@@ -423,10 +427,43 @@ export default function ComplianceCentrePage() {
               ? formatDateDisplay(t.dueDate)
               : getDefaultDueDateForTask(riskLevel));
 
+          const resolvedFromStore =
+            typeof stored?.isResolved === "boolean" ? stored.isResolved : isCompleted;
+          const statusFromStore =
+            stored?.status ||
+            (resolvedFromStore
+              ? "RESOLVED"
+              : riskLevel === "HIGH"
+              ? "REQUIRED ASAP"
+              : "UNDER REVIEW");
+
+          const effectiveIsResolved =
+            statusFromStore === "RESOLVED" || resolvedFromStore;
+          const effectiveRiskLevel: "HIGH" | "MEDIUM" | "LOW" =
+            statusFromStore === "REQUIRED ASAP"
+              ? "HIGH"
+              : statusFromStore === "UNDER REVIEW"
+              ? "MEDIUM"
+              : riskLevel;
+
+          const effectiveStatusBg =
+            statusFromStore === "RESOLVED"
+              ? "bg-[#E3F7EC]"
+              : statusFromStore === "REQUIRED ASAP"
+              ? "bg-[#FFEBEC]"
+              : "bg-[#FFFAEB]";
+
+          const effectiveStatusColor =
+            statusFromStore === "RESOLVED"
+              ? "text-[#0B4627]"
+              : statusFromStore === "REQUIRED ASAP"
+              ? "text-[#681219]"
+              : "text-[#624C18]";
+
           return {
             id: taskId,
-            iconBg,
-            iconColor,
+            iconBg: effectiveStatusBg,
+            iconColor: effectiveStatusColor,
             title: t.title || "Complete RTW check",
             subtitle:
               t.description ||
@@ -436,28 +473,16 @@ export default function ComplianceCentrePage() {
             caseId: t.caseNumber ? `#${t.caseNumber}` : (t.caseId ? `#${t.caseId}` : "—"),
             avatarUrl: t.avatarUrl || undefined,
             avatarText: initials,
-            status: isCompleted
-              ? "RESOLVED"
-              : riskLevel === "HIGH"
-              ? "REQUIRED ASAP"
-              : "UNDER REVIEW",
-            statusBg: isCompleted
-              ? "bg-[#E3F7EC]"
-              : riskLevel === "HIGH"
-              ? "bg-[#FFEBEC]"
-              : "bg-[#FFFAEB]",
-            statusColor: isCompleted
-              ? "text-[#0B4627]"
-              : riskLevel === "HIGH"
-              ? "text-[#681219]"
-              : "text-[#624C18]",
+            status: statusFromStore,
+            statusBg: effectiveStatusBg,
+            statusColor: effectiveStatusColor,
             dueDate,
-            hasWarningIcon: riskLevel === "HIGH" && !isCompleted,
-            riskLevel,
+            hasWarningIcon: effectiveRiskLevel === "HIGH" && !effectiveIsResolved,
+            riskLevel: effectiveRiskLevel,
             potentialImpact:
               t.impact ||
               "Mandatory worker rights disclosure and documentation record for UKVI sponsor trail.",
-            isResolved: isCompleted,
+            isResolved: effectiveIsResolved,
             assignee,
           };
         });
@@ -654,10 +679,13 @@ export default function ComplianceCentrePage() {
                 status: "RESOLVED",
                 statusBg: "bg-[#E3F7EC]",
                 statusColor: "text-[#0B4627]",
+                iconBg: "bg-[#E3F7EC]",
+                iconColor: "text-[#0B4627]",
               }
             : t
         )
       );
+      saveStoredTaskAssignment(taskId, { status: "RESOLVED", isResolved: true });
       if (!taskId.startsWith("task-")) {
         await apiClient.patch(`${ENDPOINTS.tasks.base}/${taskId}`, {
           body: JSON.stringify({ isCompleted: true, status: "RESOLVED" }),
@@ -674,10 +702,12 @@ export default function ComplianceCentrePage() {
   const handleUnresolveTask = async (taskId: string) => {
     const prevTasks = [...tasks];
     try {
+      let restoredStatus = "UNDER REVIEW";
       setTasks((prev) =>
         prev.map((t) => {
           if (t.id !== taskId) return t;
           const status = t.riskLevel === "HIGH" ? "REQUIRED ASAP" : "UNDER REVIEW";
+          restoredStatus = status;
           const statusBg = t.riskLevel === "HIGH" ? "bg-[#FFEBEC]" : "bg-[#FFFAEB]";
           const statusColor = t.riskLevel === "HIGH" ? "text-[#681219]" : "text-[#624C18]";
           return {
@@ -686,10 +716,13 @@ export default function ComplianceCentrePage() {
             status,
             statusBg,
             statusColor,
+            iconBg: statusBg,
+            iconColor: statusColor,
             hasWarningIcon: t.riskLevel === "HIGH",
           };
         })
       );
+      saveStoredTaskAssignment(taskId, { status: restoredStatus, isResolved: false });
       if (!taskId.startsWith("task-")) {
         await apiClient.patch(`${ENDPOINTS.tasks.base}/${taskId}`, {
           body: JSON.stringify({ isCompleted: false, status: "PENDING" }),
@@ -700,6 +733,121 @@ export default function ComplianceCentrePage() {
       console.error("Failed to unresolve task:", err);
       setTasks(prevTasks);
       toast.error("Failed to unresolve task. Please try again.");
+    }
+  };
+
+  const handleTaskStatusChange = async (
+    taskId: string,
+    newStatus: TaskStatusValue
+  ) => {
+    const isResolved = newStatus === "RESOLVED";
+    const riskLevel: "HIGH" | "MEDIUM" | "LOW" =
+      newStatus === "REQUIRED ASAP"
+        ? "HIGH"
+        : newStatus === "UNDER REVIEW"
+        ? "MEDIUM"
+        : "LOW";
+
+    const statusBg =
+      newStatus === "RESOLVED"
+        ? "bg-[#E3F7EC]"
+        : newStatus === "REQUIRED ASAP"
+        ? "bg-[#FFEBEC]"
+        : "bg-[#FFFAEB]";
+
+    const statusColor =
+      newStatus === "RESOLVED"
+        ? "text-[#0B4627]"
+        : newStatus === "REQUIRED ASAP"
+        ? "text-[#681219]"
+        : "text-[#624C18]";
+
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              status: newStatus,
+              statusBg,
+              statusColor,
+              iconBg: statusBg,
+              iconColor: statusColor,
+              isResolved,
+              riskLevel,
+              hasWarningIcon: newStatus === "REQUIRED ASAP",
+            }
+          : t
+      )
+    );
+
+    saveStoredTaskAssignment(taskId, {
+      status: newStatus,
+      isResolved,
+    });
+
+    if (!taskId.startsWith("task-")) {
+      try {
+        await apiClient.patch(`${ENDPOINTS.tasks.base}/${taskId}`, {
+          body: JSON.stringify({
+            isCompleted: isResolved,
+            status:
+              newStatus === "RESOLVED"
+                ? "RESOLVED"
+                : newStatus === "REQUIRED ASAP"
+                ? "CRUCIAL"
+                : "UNDER_REVIEW",
+          }),
+        });
+      } catch (err) {
+        console.warn("Failed to update task status on backend:", err);
+      }
+    }
+
+    if (newStatus === "RESOLVED") {
+      toast.success("Task marked as resolved");
+    } else if (newStatus === "REQUIRED ASAP") {
+      toast.warning("Task status set to Required ASAP");
+    } else {
+      toast.warning("Task status set to Under review");
+    }
+  };
+
+  const handleMigrantStatusChange = (
+    migrantId: string,
+    newStatus: "COMPLIANT" | "UNDER REVIEW" | "ACTION NEEDED"
+  ) => {
+    const statusBg =
+      newStatus === "COMPLIANT"
+        ? "bg-[#E3F7EC]"
+        : newStatus === "UNDER REVIEW"
+        ? "bg-[#FFFAEB]"
+        : "bg-[#FFEBEC]";
+    const statusColor =
+      newStatus === "COMPLIANT"
+        ? "text-[#0B4627]"
+        : newStatus === "UNDER REVIEW"
+        ? "text-[#624C18]"
+        : "text-[#681219]";
+
+    setMigrantsData((prev) =>
+      prev.map((m) =>
+        m.id === migrantId
+          ? {
+              ...m,
+              status: newStatus,
+              statusBg,
+              statusColor,
+            }
+          : m
+      )
+    );
+
+    if (newStatus === "COMPLIANT") {
+      toast.success("Migrant status updated to Compliant");
+    } else if (newStatus === "UNDER REVIEW") {
+      toast.warning("Migrant status updated to Under Review");
+    } else {
+      toast.warning("Migrant status updated to Action Needed");
     }
   };
 
@@ -1460,12 +1608,18 @@ export default function ComplianceCentrePage() {
                       </div>
 
                       {/* Status Badge (Col-span-2) */}
-                      <div className="col-span-2 flex items-center">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-label-xs font-medium leading-[12px] ${t.statusBg} ${t.statusColor}`}
-                        >
-                          {formatTitleCase(t.status)}
-                        </span>
+                      <div
+                        className="col-span-2 flex items-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <TaskStatusSelector
+                          status={t.status}
+                          statusBg={t.statusBg}
+                          statusColor={t.statusColor}
+                          onChangeStatus={(newStatus) =>
+                            handleTaskStatusChange(t.id, newStatus)
+                          }
+                        />
                       </div>
 
                       {/* Due Date & Actions (Col-span-2) */}
@@ -1536,6 +1690,27 @@ export default function ComplianceCentrePage() {
 
                                 <DropdownMenuSeparator className="my-1 border-t border-border" />
 
+                                {t.status !== "UNDER REVIEW" && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleTaskStatusChange(t.id, "UNDER REVIEW")}
+                                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                                  >
+                                    <span className="size-2 rounded-full bg-warning-dark shrink-0" />
+                                    <span>Set as Under review</span>
+                                  </DropdownMenuItem>
+                                )}
+                                {t.status !== "REQUIRED ASAP" && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleTaskStatusChange(t.id, "REQUIRED ASAP")}
+                                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                                  >
+                                    <span className="size-2 rounded-full bg-error-dark shrink-0" />
+                                    <span>Set as Required ASAP</span>
+                                  </DropdownMenuItem>
+                                )}
+
+                                <DropdownMenuSeparator className="my-1 border-t border-border" />
+
                                 <DropdownMenuItem
                                   onClick={() => router.push(`/cases/${t.caseId}`)}
                                   className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
@@ -1570,7 +1745,7 @@ export default function ComplianceCentrePage() {
                           </p>
                         </div>
 
-                        {/* Assignee & Due Date Quick Detail */}
+                        {/* Assignee, Due Date & Status Quick Detail */}
                         <div className="flex items-center gap-4 bg-card px-4 py-2 rounded-card border border-border">
                           <div className="flex flex-col gap-0.5 text-left">
                             <span className="text-label-xs font-medium text-muted-foreground">
@@ -1590,6 +1765,22 @@ export default function ComplianceCentrePage() {
                             <span className="text-paragraph-sm font-medium text-foreground">
                               {t.dueDate || "No deadline"}
                             </span>
+                          </div>
+
+                          <div className="w-px h-8 bg-border" />
+
+                          <div className="flex flex-col gap-0.5 text-left" onClick={(e) => e.stopPropagation()}>
+                            <span className="text-label-xs font-medium text-muted-foreground">
+                              Status
+                            </span>
+                            <TaskStatusSelector
+                              status={t.status}
+                              statusBg={t.statusBg}
+                              statusColor={t.statusColor}
+                              onChangeStatus={(newStatus) =>
+                                handleTaskStatusChange(t.id, newStatus)
+                              }
+                            />
                           </div>
                         </div>
 
@@ -1787,12 +1978,92 @@ export default function ComplianceCentrePage() {
                   </div>
 
                   {/* Status Badge */}
-                  <div className="col-span-2 flex items-center">
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-[12px] ${m.statusBg} ${m.statusColor}`}
-                    >
-                      {m.status}
-                    </span>
+                  <div
+                    className="col-span-2 flex items-center"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="xs"
+                            onClick={(e) => e.stopPropagation()}
+                            className={`h-5 rounded-full px-2 py-0.5 inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-[0.02em] leading-[12px] whitespace-nowrap shrink-0 cursor-pointer transition-all hover:opacity-85 border-0 shadow-none ${m.statusBg} ${m.statusColor}`}
+                          >
+                            <span>{m.status}</span>
+                            <RiArrowDownSLine className="size-3 opacity-60 shrink-0 ml-0.5" />
+                          </Button>
+                        }
+                      />
+                      <DropdownMenuContent
+                        align="start"
+                        className="w-[200px] p-1.5 rounded-card bg-popover text-popover-foreground border-border shadow-card-large flex flex-col gap-0.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <DropdownMenuGroup>
+                          <DropdownMenuLabel className="text-label-xs font-medium text-muted-foreground px-2 py-1">
+                            Change migrant status
+                          </DropdownMenuLabel>
+                          <DropdownMenuSeparator className="my-1 border-t border-border" />
+                          <DropdownMenuItem
+                            onClick={() => handleMigrantStatusChange(m.id, "COMPLIANT")}
+                            className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-button cursor-pointer transition-colors ${
+                              m.status === "COMPLIANT"
+                                ? "bg-neutral-100 font-medium"
+                                : "hover:bg-neutral-100/70"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="size-2 rounded-full bg-success-dark shrink-0" />
+                              <span className="text-label-sm font-medium text-foreground">
+                                Compliant
+                              </span>
+                            </div>
+                            {m.status === "COMPLIANT" && (
+                              <RiCheckLine className="size-4 text-foreground shrink-0" />
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleMigrantStatusChange(m.id, "UNDER REVIEW")}
+                            className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-button cursor-pointer transition-colors ${
+                              m.status === "UNDER REVIEW"
+                                ? "bg-neutral-100 font-medium"
+                                : "hover:bg-neutral-100/70"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="size-2 rounded-full bg-warning-dark shrink-0" />
+                              <span className="text-label-sm font-medium text-foreground">
+                                Under Review
+                              </span>
+                            </div>
+                            {m.status === "UNDER REVIEW" && (
+                              <RiCheckLine className="size-4 text-foreground shrink-0" />
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleMigrantStatusChange(m.id, "ACTION NEEDED")}
+                            className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-button cursor-pointer transition-colors ${
+                              m.status === "ACTION NEEDED"
+                                ? "bg-neutral-100 font-medium"
+                                : "hover:bg-neutral-100/70"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="size-2 rounded-full bg-error-dark shrink-0" />
+                              <span className="text-label-sm font-medium text-foreground">
+                                Action Needed
+                              </span>
+                            </div>
+                            {m.status === "ACTION NEEDED" && (
+                              <RiCheckLine className="size-4 text-foreground shrink-0" />
+                            )}
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
 
                   {/* Next RTW Date */}
