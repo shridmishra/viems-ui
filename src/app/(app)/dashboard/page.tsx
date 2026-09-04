@@ -431,6 +431,7 @@ export default function DashboardPage() {
   // ── Missing Documents & Tasks Filtering ──────────────────────────────────
   const missingDocsTasks = React.useMemo(() => {
     return tasksList.filter((t) => {
+      if (!t) return false;
       if (Array.isArray(t.name) && t.name.length > 0) return true;
       const title = String(t.title || "").toLowerCase();
       return title.includes("doc") || title.includes("upload") || title.includes("msd") || title.includes("passport");
@@ -439,40 +440,50 @@ export default function DashboardPage() {
 
   const displayedTasks = React.useMemo(() => {
     const list = activeTaskTab === "missing" ? missingDocsTasks : tasksList;
-    return list.map((t, idx) => {
-      const migrantName = formatFullName(t.firstName, t.lastName) || (typeof t.name === "string" ? formatTitleCase(t.name) : "") || "Migrant";
-      let title = t.title;
-      if (!title && Array.isArray(t.name) && t.name.length > 0) {
-        title = `Upload ${t.name.map((n) => n.title || n.value).join(", ")}`;
-      } else if (!title) {
-        title = "Complete RTW check";
-      }
-
-      let dotColor = "bg-[#335CFF]";
-      const p = Number(t.priority);
-      if (p === 3 || String(t.priority).toLowerCase() === "high") {
-        dotColor = "bg-[#FB3748]";
-      } else if (p === 2 || String(t.priority).toLowerCase() === "medium") {
-        dotColor = "bg-[#F6B51E]";
-      }
-
-      let dueDateFormatted = "Soon";
-      if (t.dueDate || t.creation_date) {
-        const d = new Date(t.dueDate || t.creation_date!);
-        if (!isNaN(d.getTime())) {
-          dueDateFormatted = `${d.getDate()} ${MONTH_NAMES_SHORT[d.getMonth()]}`;
+    return (list || [])
+      .filter((t): t is RawTaskItem => Boolean(t))
+      .map((t, idx) => {
+        const migrantName = formatFullName(t.firstName, t.lastName) || (typeof t.name === "string" ? formatTitleCase(t.name) : "") || "Migrant";
+        let title = typeof t.title === "string" && t.title.trim() ? t.title.trim() : "";
+        if (!title && Array.isArray(t.name) && t.name.length > 0) {
+          const docNames = t.name
+            .map((n: any) => {
+              if (!n) return "";
+              if (typeof n === "string") return n.trim();
+              if (typeof n === "object") return (n.title || n.value || n.name || "").trim();
+              return String(n);
+            })
+            .filter(Boolean);
+          title = docNames.length > 0 ? `Upload ${docNames.join(", ")}` : "Upload missing documents";
+        } else if (!title) {
+          title = "Complete RTW check";
         }
-      }
 
-      return {
-        id: t.id || idx,
-        caseId: t.caseId,
-        title,
-        owner: migrantName,
-        due: dueDateFormatted,
-        dotColor,
-      };
-    });
+        let dotColor = "bg-[#335CFF]";
+        const p = Number(t.priority);
+        if (p === 3 || String(t.priority).toLowerCase() === "high") {
+          dotColor = "bg-[#FB3748]";
+        } else if (p === 2 || String(t.priority).toLowerCase() === "medium") {
+          dotColor = "bg-[#F6B51E]";
+        }
+
+        let dueDateFormatted = "Soon";
+        if (t.dueDate || t.creation_date) {
+          const d = new Date(t.dueDate || t.creation_date!);
+          if (!isNaN(d.getTime())) {
+            dueDateFormatted = `${d.getDate()} ${MONTH_NAMES_SHORT[d.getMonth()]}`;
+          }
+        }
+
+        return {
+          id: t.id || idx,
+          caseId: t.caseId,
+          title,
+          owner: migrantName,
+          due: dueDateFormatted,
+          dotColor,
+        };
+      });
   }, [activeTaskTab, tasksList, missingDocsTasks]);
 
   // ── Real Leave To Remain Alerts ──────────────────────────────────────────
