@@ -695,7 +695,7 @@ export default function ComplianceCentrePage() {
           body: JSON.stringify({ isCompleted: false, status: "PENDING" }),
         });
       }
-      toast.info("Task marked as unresolved");
+      toast.warning("Task marked as unresolved");
     } catch (err) {
       console.error("Failed to unresolve task:", err);
       setTasks(prevTasks);

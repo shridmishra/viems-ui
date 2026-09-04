@@ -338,11 +338,11 @@ export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
         formData.append("completed", String(nextState));
         formData.append("status", nextState ? "completed" : "pending");
         await apiClient.patch(`${ENDPOINTS.tasks.base}/${taskId}`, { body: formData });
-        toast.success(
-          nextState
-            ? `"${targetTask.title}" marked as complete`
-            : `"${targetTask.title}" marked as pending`
-        );
+        if (nextState) {
+          toast.success(`"${targetTask.title}" marked as complete`);
+        } else {
+          toast.warning(`"${targetTask.title}" marked as unresolved`);
+        }
       } catch (err) {
         console.warn("Failed to update task on backend:", err);
         setTasks((prev) =>
@@ -351,11 +351,11 @@ export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
         toast.error(`Failed to update task "${targetTask.title}". Please try again.`);
       }
     } else {
-      toast.success(
-        nextState
-          ? `"${targetTask.title}" marked as complete`
-          : `"${targetTask.title}" marked as pending`
-      );
+      if (nextState) {
+        toast.success(`"${targetTask.title}" marked as complete`);
+      } else {
+        toast.warning(`"${targetTask.title}" marked as unresolved`);
+      }
     }
   };
 
