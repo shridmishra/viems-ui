@@ -17,7 +17,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   TaskAssignee,
@@ -65,12 +64,17 @@ export function TaskAssigneeSelector({
               size="sm"
               className={`h-7 px-2 py-0.5 rounded-button border-border bg-card hover:bg-neutral-100/70 text-foreground transition-all flex items-center gap-1.5 cursor-pointer max-w-[170px] ${className}`}
             >
-              <Avatar className="size-4 rounded-full">
-                {assignee.avatarUrl && <AvatarImage src={assignee.avatarUrl} alt={assignee.name} />}
-                <AvatarFallback className="text-[9px] font-semibold bg-neutral-200 text-neutral-800">
+              {assignee.avatarUrl ? (
+                <img
+                  src={assignee.avatarUrl}
+                  alt={assignee.name}
+                  className="size-4.5 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <div className="size-4.5 rounded-full bg-[#EBEBEB] text-[#171717] flex items-center justify-center font-medium text-[9px] leading-none shrink-0 select-none">
                   {assignee.avatarText}
-                </AvatarFallback>
-              </Avatar>
+                </div>
+              )}
               <span className="text-[12px] font-medium truncate max-w-[95px] text-left">
                 {compact ? assignee.name.split(" ")[0] : assignee.name}
               </span>
@@ -108,12 +112,17 @@ export function TaskAssigneeSelector({
                 className="flex items-center justify-between px-2.5 py-1.5 rounded-button cursor-pointer hover:bg-neutral-100 transition-colors w-full gap-2"
               >
                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                  <Avatar className="size-6 rounded-full shrink-0">
-                    {staff.avatarUrl && <AvatarImage src={staff.avatarUrl} alt={staff.name} />}
-                    <AvatarFallback className="text-[10px] font-semibold bg-neutral-200 text-neutral-800">
+                  {staff.avatarUrl ? (
+                    <img
+                      src={staff.avatarUrl}
+                      alt={staff.name}
+                      className="size-6 rounded-full object-cover shrink-0"
+                    />
+                  ) : (
+                    <div className="size-6 rounded-full bg-[#EBEBEB] text-[#171717] flex items-center justify-center font-medium text-[10px] leading-none shrink-0 select-none">
                       {staff.avatarText}
-                    </AvatarFallback>
-                  </Avatar>
+                    </div>
+                  )}
                   <div className="flex flex-col min-w-0 flex-1">
                     <span className="text-[13px] font-medium text-foreground whitespace-nowrap">
                       {staff.name}
