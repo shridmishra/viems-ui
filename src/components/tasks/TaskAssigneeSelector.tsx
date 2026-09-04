@@ -6,7 +6,6 @@ import {
   RiCheckLine,
   RiArrowDownSLine,
   RiCloseCircleLine,
-  RiUserLine,
 } from "@remixicon/react";
 import { toast } from "sonner";
 import {
@@ -96,8 +95,8 @@ export function TaskAssigneeSelector({
         className="w-[260px] min-w-[260px] p-1.5 rounded-card bg-popover text-popover-foreground border-border shadow-card-large"
       >
         <DropdownMenuGroup>
-          <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-2 py-1">
-            Assign Accountability
+          <DropdownMenuLabel className="text-label-xs font-medium text-muted-foreground px-2 py-1">
+            Assign accountability
           </DropdownMenuLabel>
 
           {STANDARD_STAFF_MEMBERS.map((staff) => {

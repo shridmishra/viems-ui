@@ -11,6 +11,9 @@ import {
   RiUpload2Line,
   RiArrowUpDownLine,
   RiFilter3Line,
+  RiFocus2Line,
+  RiShieldCheckLine,
+  RiCalendarEventLine,
 } from "@remixicon/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +26,8 @@ import {
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { ENDPOINTS } from "@/lib/api-endpoints";
+import { CaseActionModal, CaseActionRow } from "../../components/CaseActionModal";
+import { TourGapScheduleModal } from "../../components/TourGapScheduleModal";
 import {
   TaskAssignee,
   getDefaultAssigneeForTask,
@@ -55,8 +60,8 @@ interface RawTaskPayload {
   status?: string;
   isCompleted?: boolean;
   completed?: boolean;
-  employee?: any;
-  assignee?: any;
+  employee?: TaskAssignee | null;
+  assignee?: TaskAssignee | null;
   dueDate?: string;
 }
 
@@ -87,7 +92,7 @@ function isTaskStatus(st: string): st is TaskItem["status"] {
   return (VALID_STATUSES as readonly string[]).includes(st);
 }
 
-export function getSafeString(val: any, fallback = ""): string {
+export function getSafeString(val: unknown, fallback = ""): string {
   if (val === null || val === undefined) return fallback;
   if (typeof val === "string") return val;
   if (typeof val === "number") return String(val);
@@ -96,7 +101,8 @@ export function getSafeString(val: any, fallback = ""): string {
     return validItems.length > 0 ? validItems.join(", ") : fallback;
   }
   if (typeof val === "object") {
-    const candidate = val.name ?? val.title ?? val.value ?? val.label;
+    const obj = val as Record<string, unknown>;
+    const candidate = obj.name ?? obj.title ?? obj.value ?? obj.label;
     if (candidate !== undefined && candidate !== null) {
       const res = getSafeString(candidate, "");
       if (res) return res;
@@ -145,11 +151,24 @@ const DEFAULT_CASE_TASKS: Omit<TaskItem, "id" | "isCompleted">[] = [
   },
 ];
 
-export function TasksTab({ caseId }: { caseId?: string }) {
+interface TasksTabProps {
+  caseId?: string;
+  migrantName?: string;
+  migrant?: Record<string, unknown> | null;
+}
+
+export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
   const [tasks, setTasks] = React.useState<TaskItem[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [assigneeFilter, setAssigneeFilter] = React.useState<string>("ALL");
   const [sortByDueDate, setSortByDueDate] = React.useState<"asc" | "desc" | null>(null);
+
+  // Modal states
+  const [actionModalOpen, setActionModalOpen] = React.useState(false);
+  const [actionModalRow, setActionModalRow] = React.useState<CaseActionRow | null>(null);
+  const [activeTaskIdForModal, setActiveTaskIdForModal] = React.useState<string | null>(null);
+  const [tourGapModalOpen, setTourGapModalOpen] = React.useState(false);
+  const [tourGapTaskId, setTourGapTaskId] = React.useState<string | null>(null);
 
   const mapRawTask = React.useCallback((t: RawTaskPayload, i: number): TaskItem => {
     const rawCat = getSafeString(t.category, "General");
@@ -231,7 +250,7 @@ export function TasksTab({ caseId }: { caseId?: string }) {
             setTasks(defaults);
           }
         }
-      } catch (err) {
+      } catch {
         if (!isCancelled) {
           // Fallback to standard tasks to ensure UI remains functional
           const defaults: TaskItem[] = DEFAULT_CASE_TASKS.map((dt, idx) =>
@@ -366,11 +385,58 @@ export function TasksTab({ caseId }: { caseId?: string }) {
     }
   };
 
-  const handleResolve = (task: TaskItem) => {
-    toast.info(`Resolving "${task.title}"`, {
-      description: "Action initiated for task",
+  const handleOpenTaskActionModal = (task: TaskItem, customAction?: string) => {
+    const isTourGap =
+      task.title.toLowerCase().includes("tour gap") ||
+      task.title.toLowerCase().includes("schedule validation");
+
+    if (isTourGap && (!customAction || customAction === "Resolve")) {
+      setTourGapTaskId(task.id);
+      setTourGapModalOpen(true);
+      return;
+    }
+
+    const isRtw =
+      (customAction || task.title).toLowerCase().includes("rtw") ||
+      (customAction || task.title).toLowerCase().includes("right to work");
+
+    const resolvedMigrantName: string =
+      migrantName ||
+      (typeof migrant?.name === "string" ? migrant.name : "") ||
+      "Migrant Dossier";
+    const resolvedCaseId = caseId || "001";
+
+    let action = customAction;
+    if (!action) {
+      if (isRtw) action = "Complete RTW check";
+      else action = "Upload documents";
+    }
+
+    const avatarText =
+      (typeof migrant?.avatarText === "string" ? migrant.avatarText : "") ||
+      (resolvedMigrantName
+        ? resolvedMigrantName
+            .split(" ")
+            .filter(Boolean)
+            .map((w: string) => w[0]?.toUpperCase() || "")
+            .slice(0, 2)
+            .join("")
+        : "MD");
+
+    const avatarUrl =
+      typeof migrant?.avatarUrl === "string" ? migrant.avatarUrl : undefined;
+
+    setActionModalRow({
+      id: caseId,
+      caseId: resolvedCaseId,
+      name: resolvedMigrantName,
+      avatarText,
+      avatarUrl,
+      action: action,
+      actionColor: "blue",
     });
-    handleToggleComplete(task.id);
+    setActiveTaskIdForModal(task.id);
+    setActionModalOpen(true);
   };
 
   // Filter and sort tasks
@@ -406,52 +472,52 @@ export function TasksTab({ caseId }: { caseId?: string }) {
 
       {/* ─── Top 4 Stat Summary Cards (Exact Figma Spec Frame 107) ─────────── */}
       <div className="flex items-center gap-2 w-full">
-        {/* TOTAL TASKS */}
-        <div className="bg-[#EFEBFF] rounded-[8px] p-[12px_16px] flex justify-between items-start h-[70px] flex-1 relative">
-          <div className="flex flex-col gap-[2px]">
-            <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#171717] leading-[12px]">
-              TOTAL TASKS
+        {/* Total tasks */}
+        <div className="bg-[#EFEBFF] rounded-card p-lg flex justify-between items-start h-[70px] flex-1 relative">
+          <div className="flex flex-col gap-xxs">
+            <span className="text-label-xs font-medium text-foreground leading-none">
+              Total tasks
             </span>
-            <span className="font-aeonik-medium text-[24px] font-medium text-[#351A75] leading-[32px]">
+            <span className="font-aeonik-medium text-h5-title text-[#351A75]">
               {stats.total}
             </span>
           </div>
           <RiFileTextLine className="size-5 text-[#5C5C5C] shrink-0 absolute top-2 right-4" />
         </div>
 
-        {/* COMPLETED TASKS */}
-        <div className="bg-[#E3F7EC] rounded-[8px] p-[12px_16px] flex justify-between items-start h-[70px] flex-1 relative">
-          <div className="flex flex-col gap-[2px]">
-            <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#171717] leading-[12px]">
-              COMPLETED TASKS
+        {/* Completed tasks */}
+        <div className="bg-[#E3F7EC] rounded-card p-lg flex justify-between items-start h-[70px] flex-1 relative">
+          <div className="flex flex-col gap-xxs">
+            <span className="text-label-xs font-medium text-foreground leading-none">
+              Completed tasks
             </span>
-            <span className="font-aeonik-medium text-[24px] font-medium text-[#0B4627] leading-[32px]">
+            <span className="font-aeonik-medium text-h5-title text-[#0B4627]">
               {stats.completed}
             </span>
           </div>
           <RiCheckboxCircleLine className="size-5 text-[#5C5C5C] shrink-0 absolute top-2 right-4" />
         </div>
 
-        {/* CRUCIAL (REQUIRED) */}
-        <div className="bg-[#FFEBEC] rounded-[8px] p-[12px_16px] flex justify-between items-start h-[70px] flex-1 relative">
-          <div className="flex flex-col gap-[2px]">
-            <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#171717] leading-[12px]">
-              CRUCIAL (REQUIRED)
+        {/* Crucial (required) */}
+        <div className="bg-[#FFEBEC] rounded-card p-lg flex justify-between items-start h-[70px] flex-1 relative">
+          <div className="flex flex-col gap-xxs">
+            <span className="text-label-xs font-medium text-foreground leading-none">
+              Crucial (required)
             </span>
-            <span className="font-aeonik-medium text-[24px] font-medium text-[#681219] leading-[32px]">
+            <span className="font-aeonik-medium text-h5-title text-[#681219]">
               {stats.crucial}
             </span>
           </div>
           <RiAlertLine className="size-5 text-[#681219] shrink-0 absolute top-2 right-4" />
         </div>
 
-        {/* UNDER REVIEW */}
-        <div className="bg-[#FFFAEB] rounded-[8px] p-[12px_16px] flex justify-between items-start h-[70px] flex-1 relative">
-          <div className="flex flex-col gap-[2px]">
-            <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#171717] leading-[12px]">
-              UNDER REVIEW
+        {/* Under review */}
+        <div className="bg-[#FFFAEB] rounded-card p-lg flex justify-between items-start h-[70px] flex-1 relative">
+          <div className="flex flex-col gap-xxs">
+            <span className="text-label-xs font-medium text-foreground leading-none">
+              Under review
             </span>
-            <span className="font-aeonik-medium text-[24px] font-medium text-[#624C18] leading-[32px]">
+            <span className="font-aeonik-medium text-h5-title text-[#624C18]">
               {stats.underReview}
             </span>
           </div>
@@ -463,7 +529,7 @@ export function TasksTab({ caseId }: { caseId?: string }) {
       <div className="flex items-center justify-between gap-4 p-3 bg-white border border-border rounded-card shadow-2xs">
         {/* Left: Owner filter pills */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mr-1">
+          <div className="flex items-center gap-1 text-label-xs font-medium text-muted-foreground mr-1">
             <RiFilter3Line className="size-3.5" />
             <span>Owner:</span>
           </div>
@@ -479,7 +545,7 @@ export function TasksTab({ caseId }: { caseId?: string }) {
                 : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
             }`}
           >
-            All Staff ({tasks.length})
+            All staff ({tasks.length})
           </Button>
 
           <Button
@@ -663,8 +729,8 @@ export function TasksTab({ caseId }: { caseId?: string }) {
                           <Button
                             type="button"
                             size="sm"
-                            onClick={() => handleResolve(task)}
-                            className="h-7 px-3 bg-neutral-900 hover:bg-neutral-800 text-white text-[12px] font-medium rounded-button cursor-pointer"
+                            onClick={() => handleOpenTaskActionModal(task)}
+                            className="h-7 px-3 bg-neutral-900 hover:bg-neutral-800 text-white text-label-xs font-medium rounded-button cursor-pointer"
                           >
                             Resolve
                           </Button>
@@ -677,7 +743,7 @@ export function TasksTab({ caseId }: { caseId?: string }) {
                               <Button
                                 type="button"
                                 variant="ghost"
-                                size="icon-sm"
+                                size="icon-xs"
                                 className="size-7 rounded-button text-muted-foreground hover:text-foreground hover:bg-neutral-100 cursor-pointer"
                               >
                                 <RiMore2Line className="size-4 shrink-0" />
@@ -686,40 +752,68 @@ export function TasksTab({ caseId }: { caseId?: string }) {
                           />
                           <DropdownMenuContent
                             align="end"
-                            className="w-[200px] p-1.5 rounded-card bg-white border border-neutral-200 shadow-card-large text-[13px]"
+                            className="w-[220px] p-1.5 rounded-card bg-popover text-popover-foreground border-border shadow-card-large flex flex-col gap-0.5 text-paragraph-sm"
                           >
+                            {!task.isCompleted && (
+                              <DropdownMenuItem
+                                onClick={() => handleOpenTaskActionModal(task)}
+                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                              >
+                                <RiFocus2Line className="size-4 text-muted-foreground shrink-0" />
+                                <span>Resolve</span>
+                              </DropdownMenuItem>
+                            )}
+
+                            <DropdownMenuItem
+                              onClick={() => handleOpenTaskActionModal(task, "Upload documents")}
+                              className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                            >
+                              <RiUpload2Line className="size-4 text-muted-foreground shrink-0" />
+                              <span>Upload documents</span>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              onClick={() => handleOpenTaskActionModal(task, "Complete RTW check")}
+                              className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                            >
+                              <RiShieldCheckLine className="size-4 text-muted-foreground shrink-0" />
+                              <span>Complete RTW check</span>
+                            </DropdownMenuItem>
+
+                            {(task.title.toLowerCase().includes("tour gap") ||
+                              task.title.toLowerCase().includes("schedule")) && (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setTourGapTaskId(task.id);
+                                  setTourGapModalOpen(true);
+                                }}
+                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                              >
+                                <RiCalendarEventLine className="size-4 text-muted-foreground shrink-0" />
+                                <span>Tour gap schedule</span>
+                              </DropdownMenuItem>
+                            )}
+
+                            <DropdownMenuSeparator className="my-1 border-t border-border" />
+
                             <DropdownMenuItem
                               onClick={() => handleToggleComplete(task.id)}
-                              className="flex items-center gap-2.5 px-3 py-2 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                              className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
                             >
-                              <RiCheckboxCircleLine className="size-4 text-muted-foreground" />
+                              <RiCheckboxCircleLine className="size-4 text-muted-foreground shrink-0" />
                               <span>{task.isCompleted ? "Mark as pending" : "Mark as complete"}</span>
                             </DropdownMenuItem>
 
                             <DropdownMenuItem
                               onClick={() =>
-                                toast.info(`Upload documents for "${task.title}"`, {
-                                  description: "Opening upload dialog...",
-                                })
-                              }
-                              className="flex items-center gap-2.5 px-3 py-2 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
-                            >
-                              <RiUpload2Line className="size-4 text-muted-foreground" />
-                              <span>Upload documents</span>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuSeparator className="my-1 border-t border-neutral-100" />
-
-                            <DropdownMenuItem
-                              onClick={() =>
-                                toast.info(`Task Accountability`, {
+                                toast.info("Task accountability", {
                                   description: `Assigned to ${task.assignee?.name || "Unassigned"}. Deadline: ${task.dueDate || "None"}.`,
                                 })
                               }
-                              className="flex items-center gap-2.5 px-3 py-2 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                              className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
                             >
-                              <RiInformationLine className="size-4 text-muted-foreground" />
-                              <span>More information</span>
+                              <RiInformationLine className="size-4 text-muted-foreground shrink-0" />
+                              <span>Task details</span>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -732,6 +826,31 @@ export function TasksTab({ caseId }: { caseId?: string }) {
           );
         })}
       </div>
+
+      {/* Case Action Modal */}
+      <CaseActionModal
+        open={actionModalOpen}
+        onOpenChange={setActionModalOpen}
+        row={actionModalRow}
+        onSuccess={() => {
+          if (activeTaskIdForModal) {
+            handleToggleComplete(activeTaskIdForModal);
+          }
+        }}
+      />
+
+      {/* Tour Gap Schedule Modal */}
+      <TourGapScheduleModal
+        open={tourGapModalOpen}
+        onOpenChange={setTourGapModalOpen}
+        caseId={caseId}
+        migrantName={migrantName || (typeof migrant?.name === "string" ? migrant.name : undefined)}
+        onSaveSchedule={() => {
+          if (tourGapTaskId) {
+            handleToggleComplete(tourGapTaskId);
+          }
+        }}
+      />
     </div>
   );
 }

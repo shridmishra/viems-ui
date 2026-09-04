@@ -31,7 +31,6 @@ interface TaskDueDatePickerProps {
 export function TaskDueDatePicker({
   dueDate,
   onChange,
-  compact = false,
   disabled = false,
   className = "",
 }: TaskDueDatePickerProps) {
@@ -105,8 +104,8 @@ export function TaskDueDatePicker({
         <div className="flex items-center justify-between px-1 pb-1 border-b border-border">
           <div className="flex items-center gap-1.5">
             <RiCalendarEventLine className="size-4 text-muted-foreground" />
-            <span className="text-[12px] font-semibold text-foreground uppercase tracking-wider">
-              Set Task Due Date
+            <span className="text-label-sm font-medium text-foreground">
+              Set due date
             </span>
           </div>
           {dueDate && (
@@ -115,7 +114,7 @@ export function TaskDueDatePicker({
               variant="ghost"
               size="sm"
               onClick={() => handleSelectDate(undefined)}
-              className="h-6 px-1.5 text-[11px] text-destructive hover:bg-destructive/10 rounded-compact flex items-center gap-1 cursor-pointer"
+              className="h-6 px-1.5 text-label-xs text-destructive hover:bg-destructive/10 rounded-compact flex items-center gap-1 cursor-pointer"
             >
               <RiCloseLine className="size-3" />
               <span>Clear</span>
@@ -130,7 +129,7 @@ export function TaskDueDatePicker({
             variant="outline"
             size="sm"
             onClick={() => handleQuickPreset(0, "Today")}
-            className="h-7 text-[11px] font-medium rounded-compact border-border hover:bg-neutral-100"
+            className="h-7 text-label-xs font-medium rounded-button border-border hover:bg-neutral-100"
           >
             Today
           </Button>
@@ -139,7 +138,7 @@ export function TaskDueDatePicker({
             variant="outline"
             size="sm"
             onClick={() => handleQuickPreset(1, "Tomorrow")}
-            className="h-7 text-[11px] font-medium rounded-compact border-border hover:bg-neutral-100"
+            className="h-7 text-label-xs font-medium rounded-button border-border hover:bg-neutral-100"
           >
             Tomorrow
           </Button>
@@ -148,7 +147,7 @@ export function TaskDueDatePicker({
             variant="outline"
             size="sm"
             onClick={() => handleQuickPreset(3, "In 3 Days")}
-            className="h-7 text-[11px] font-medium rounded-compact border-border hover:bg-neutral-100"
+            className="h-7 text-label-xs font-medium rounded-button border-border hover:bg-neutral-100"
           >
             In 3 Days
           </Button>
@@ -157,7 +156,7 @@ export function TaskDueDatePicker({
             variant="outline"
             size="sm"
             onClick={() => handleQuickPreset(7, "Next Week")}
-            className="h-7 text-[11px] font-medium rounded-compact border-border hover:bg-neutral-100"
+            className="h-7 text-label-xs font-medium rounded-button border-border hover:bg-neutral-100"
           >
             1 Week
           </Button>
@@ -166,7 +165,7 @@ export function TaskDueDatePicker({
             variant="outline"
             size="sm"
             onClick={() => handleQuickPreset(14, "In 2 Weeks")}
-            className="h-7 text-[11px] font-medium rounded-compact border-border hover:bg-neutral-100 col-span-2"
+            className="h-7 text-label-xs font-medium rounded-button border-border hover:bg-neutral-100 col-span-2"
           >
             2 Weeks (14 Days)
           </Button>

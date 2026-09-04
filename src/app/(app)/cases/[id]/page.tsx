@@ -1009,7 +1009,7 @@ export default function MigrantOverviewPage() {
         ) : activeTab === "Documents" ? (
           <DocumentsTab caseId={id} />
         ) : activeTab === "Tasks" ? (
-          <TasksTab caseId={id} />
+          <TasksTab caseId={id} migrantName={migrant?.name} migrant={migrant} />
         ) : activeTab === "Timeline" ? (
           <TimelineTab id={id} />
         ) : activeTab === "Compliance" ? (

@@ -24,6 +24,10 @@ import {
   RiRefreshLine,
   RiArrowLeftDoubleLine,
   RiArrowRightDoubleLine,
+  RiFocus2Line,
+  RiShieldCheckLine,
+  RiUpload2Line,
+  RiMore2Line,
 } from "@remixicon/react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
@@ -43,6 +47,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { CaseActionModal, CaseActionRow } from "../cases/components/CaseActionModal";
+import { TourGapScheduleModal } from "../cases/components/TourGapScheduleModal";
 
 // Sort icon component matching Figma expand-up-down-fill
 import { SortIcon } from "@/components/ui/sort-icon";
@@ -106,6 +112,50 @@ export default function ComplianceCentrePage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const [migrantPage, setMigrantPage] = React.useState(1);
   const [migrantPageSize, setMigrantPageSize] = React.useState(10);
+
+  // Modal states for priority tasks
+  const [actionModalOpen, setActionModalOpen] = React.useState(false);
+  const [actionModalRow, setActionModalRow] = React.useState<CaseActionRow | null>(null);
+  const [activeTaskIdForModal, setActiveTaskIdForModal] = React.useState<string | null>(null);
+  const [tourGapModalOpen, setTourGapModalOpen] = React.useState(false);
+  const [tourGapCaseId, setTourGapCaseId] = React.useState<string | undefined>(undefined);
+  const [tourGapMigrantName, setTourGapMigrantName] = React.useState<string | undefined>(undefined);
+
+  const handleOpenTaskActionModal = (task: TaskItem, customAction?: string) => {
+    const isTourGap =
+      task.title.toLowerCase().includes("tour gap") ||
+      task.title.toLowerCase().includes("schedule");
+
+    if (isTourGap && (!customAction || customAction === "Resolve")) {
+      setActiveTaskIdForModal(task.id);
+      setTourGapCaseId(task.caseId);
+      setTourGapMigrantName(task.migrantName);
+      setTourGapModalOpen(true);
+      return;
+    }
+
+    const isRtw =
+      (customAction || task.title).toLowerCase().includes("rtw") ||
+      (customAction || task.title).toLowerCase().includes("right to work");
+
+    let action = customAction;
+    if (!action) {
+      if (isRtw) action = "Complete RTW check";
+      else action = "Upload documents";
+    }
+
+    setActionModalRow({
+      id: task.caseId,
+      caseId: task.caseId,
+      name: task.migrantName,
+      avatarText: task.avatarText,
+      avatarUrl: task.avatarUrl,
+      action: action,
+      actionColor: "blue",
+    });
+    setActiveTaskIdForModal(task.id);
+    setActionModalOpen(true);
+  };
 
   // Sorting state for Priority Tasks
   const [taskSortCol, setTaskSortCol] = React.useState<string | null>(null);
@@ -1197,90 +1247,98 @@ export default function ComplianceCentrePage() {
           </div>
 
           {/* Filter Pills Segmented Control */}
-          <div className="inline-flex items-center gap-1 bg-[#EBEBEB] rounded-full p-1 h-7 w-fit">
-            <button
+          <div className="inline-flex items-center gap-1 bg-neutral-200/60 rounded-full p-1 h-7 w-fit">
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={() => handleTaskFilterChange("ALL")}
-              className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none flex items-center justify-center transition-all cursor-pointer border-0 ${
+              className={`h-5 px-2.5 rounded-full text-label-xs font-medium leading-none flex items-center justify-center transition-all cursor-pointer border-0 ${
                 selectedTaskFilter === "ALL"
-                  ? "bg-white text-[#171717] shadow-x-small"
-                  : "bg-transparent text-[#5C5C5C] hover:text-[#171717]"
+                  ? "bg-card text-foreground shadow-x-small hover:bg-card hover:text-foreground"
+                  : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-neutral-100"
               }`}
             >
-              ALL ({tasks.length})
-            </button>
-            <button
+              All ({tasks.length})
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={() => handleTaskFilterChange("HIGH")}
-              className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
+              className={`h-5 px-2.5 rounded-full text-label-xs font-medium leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
                 selectedTaskFilter === "HIGH"
-                  ? "bg-white text-[#171717] shadow-x-small"
-                  : "bg-transparent text-[#5C5C5C] hover:text-[#171717]"
+                  ? "bg-card text-foreground shadow-x-small hover:bg-card hover:text-foreground"
+                  : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-neutral-100"
               }`}
             >
               <span className="size-1.5 rounded-full bg-[#FB3748] shrink-0" />
-              <span>HIGH ({highCount})</span>
-            </button>
-            <button
+              <span>High ({highCount})</span>
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={() => handleTaskFilterChange("MEDIUM")}
-              className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
+              className={`h-5 px-2.5 rounded-full text-label-xs font-medium leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
                 selectedTaskFilter === "MEDIUM"
-                  ? "bg-white text-[#171717] shadow-x-small"
-                  : "bg-transparent text-[#5C5C5C] hover:text-[#171717]"
+                  ? "bg-card text-foreground shadow-x-small hover:bg-card hover:text-foreground"
+                  : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-neutral-100"
               }`}
             >
               <span className="size-1.5 rounded-full bg-[#F6B51E] shrink-0" />
-              <span>MEDIUM ({mediumCount})</span>
-            </button>
-            <button
+              <span>Medium ({mediumCount})</span>
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={() => handleTaskFilterChange("LOW")}
-              className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
+              className={`h-5 px-2.5 rounded-full text-label-xs font-medium leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
                 selectedTaskFilter === "LOW"
-                  ? "bg-white text-[#171717] shadow-x-small"
-                  : "bg-transparent text-[#5C5C5C] hover:text-[#171717]"
+                  ? "bg-card text-foreground shadow-x-small hover:bg-card hover:text-foreground"
+                  : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-neutral-100"
               }`}
             >
               <span className="size-1.5 rounded-full bg-[#7B7B7B] shrink-0" />
-              <span>LOW ({lowCount})</span>
-            </button>
+              <span>Low ({lowCount})</span>
+            </Button>
           </div>
 
           {/* Tasks Table */}
           <div className="w-full flex flex-col gap-2 mt-1">
-            {/* Table Header Row - Height 36px, background #F5F5F5 */}
-            <div className="w-full bg-[#F5F5F5] rounded-[8px] h-9 px-4 grid grid-cols-12 items-center text-[12px] font-medium uppercase text-[#A4A4A4] tracking-[0.04em]">
+            {/* Table Header Row */}
+            <div className="w-full bg-neutral-50 rounded-button h-9 px-4 grid grid-cols-12 items-center text-label-xs font-medium text-muted-foreground">
               <div
                 onClick={() => handleTaskSort("document")}
-                className="col-span-4 flex items-center gap-1.5 cursor-pointer hover:text-[#171717] transition-colors"
+                className="col-span-4 flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors"
               >
-                <span>DOCUMENT</span>
+                <span>Document</span>
                 <SortIcon active={taskSortCol === "document"} direction={taskSortDir} />
               </div>
               <div
                 onClick={() => handleTaskSort("migrant")}
-                className="col-span-2 flex items-center gap-1.5 cursor-pointer hover:text-[#171717] transition-colors"
+                className="col-span-2 flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors"
               >
-                <span>MIGRANT</span>
+                <span>Migrant</span>
                 <SortIcon active={taskSortCol === "migrant"} direction={taskSortDir} />
               </div>
               <div className="col-span-2 flex items-center gap-1.5">
-                <span>ASSIGNEE</span>
+                <span>Assignee</span>
               </div>
               <div
                 onClick={() => handleTaskSort("status")}
-                className="col-span-2 flex items-center gap-1.5 cursor-pointer hover:text-[#171717] transition-colors"
+                className="col-span-2 flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors"
               >
-                <span>STATUS</span>
+                <span>Status</span>
                 <SortIcon active={taskSortCol === "status"} direction={taskSortDir} />
               </div>
               <div className="col-span-2 flex items-center justify-between pl-2">
                 <div
                   onClick={() => handleTaskSort("dueDate")}
-                  className="flex items-center gap-1.5 cursor-pointer hover:text-[#171717] transition-colors"
+                  className="flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors"
                 >
-                  <span>DUE DATE</span>
+                  <span>Due date</span>
                   <SortIcon active={taskSortCol === "dueDate"} direction={taskSortDir} />
                 </div>
               </div>
@@ -1360,13 +1418,13 @@ export default function ComplianceCentrePage() {
                       {/* Status Badge (Col-span-2) */}
                       <div className="col-span-2 flex items-center">
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-[12px] ${t.statusBg} ${t.statusColor}`}
+                          className={`px-2 py-0.5 rounded-full text-label-xs font-medium leading-[12px] ${t.statusBg} ${t.statusColor}`}
                         >
-                          {t.status}
+                          {formatTitleCase(t.status)}
                         </span>
                       </div>
 
-                      {/* Due Date & Expand Button (Col-span-2) */}
+                      {/* Due Date & Actions (Col-span-2) */}
                       <div className="col-span-2 flex items-center justify-between pl-2">
                         <div
                           className="flex items-center gap-1.5"
@@ -1378,46 +1436,104 @@ export default function ComplianceCentrePage() {
                           />
                         </div>
 
-                        <div className="size-6 rounded-[6px] flex items-center justify-center text-[#5C5C5C] hover:bg-neutral-100 transition-colors">
-                          {isExpanded ? (
-                            <RiArrowUpSLine className="size-5 text-[#5C5C5C]" />
-                          ) : (
-                            <RiArrowDownSLine className="size-5 text-[#5C5C5C]" />
-                          )}
+                        <div className="flex items-center gap-1">
+                          {/* Row Action Three-dots Menu */}
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger
+                                render={
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    className="size-6 rounded-button text-muted-foreground hover:text-foreground hover:bg-neutral-100 cursor-pointer"
+                                  >
+                                    <RiMore2Line className="size-4 shrink-0" />
+                                  </Button>
+                                }
+                              />
+                              <DropdownMenuContent
+                                align="end"
+                                className="w-[200px] p-1.5 rounded-card bg-popover text-popover-foreground border-border shadow-card-large flex flex-col gap-0.5 text-paragraph-sm"
+                              >
+                                <DropdownMenuItem
+                                  onClick={() => handleOpenTaskActionModal(t)}
+                                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                                >
+                                  <RiFocus2Line className="size-4 text-muted-foreground shrink-0" />
+                                  <span>Resolve</span>
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem
+                                  onClick={() => handleOpenTaskActionModal(t, "Upload documents")}
+                                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                                >
+                                  <RiUpload2Line className="size-4 text-muted-foreground shrink-0" />
+                                  <span>Upload documents</span>
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem
+                                  onClick={() => handleOpenTaskActionModal(t, "Complete RTW check")}
+                                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                                >
+                                  <RiShieldCheckLine className="size-4 text-muted-foreground shrink-0" />
+                                  <span>Run RTW check</span>
+                                </DropdownMenuItem>
+
+                                <DropdownMenuSeparator className="my-1 border-t border-border" />
+
+                                <DropdownMenuItem
+                                  onClick={() => router.push(`/cases/${t.caseId}`)}
+                                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                                >
+                                  <RiUserLine className="size-4 text-muted-foreground shrink-0" />
+                                  <span>View case</span>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+
+                          <div className="size-6 rounded-button flex items-center justify-center text-muted-foreground hover:bg-neutral-100 transition-colors">
+                            {isExpanded ? (
+                              <RiArrowUpSLine className="size-5 text-muted-foreground" />
+                            ) : (
+                              <RiArrowDownSLine className="size-5 text-muted-foreground" />
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
 
                     {/* Expanded Frame 112 Drawer */}
                     {isExpanded && (
-                      <div className="bg-[#F5F5F5] rounded-[16px] p-5 flex items-center justify-between gap-5 h-auto transition-all animate-in fade-in-50 duration-150">
+                      <div className="bg-neutral-50 rounded-card p-5 flex items-center justify-between gap-5 h-auto transition-all animate-in fade-in-50 duration-150">
                         <div className="flex flex-col gap-1 max-w-[500px]">
-                          <span className="text-[12px] font-medium text-[#171717] uppercase tracking-[0.04em] leading-[16px]">
-                            POTENTIAL IMPACT
+                          <span className="text-label-xs font-medium text-foreground leading-[16px]">
+                            Potential impact
                           </span>
-                          <p className="text-[13px] leading-[20px] font-normal text-[#5C5C5C] tracking-[-0.006em]">
+                          <p className="text-paragraph-sm font-normal text-muted-foreground tracking-[-0.006em]">
                             {t.potentialImpact}
                           </p>
                         </div>
 
                         {/* Assignee & Due Date Quick Detail */}
-                        <div className="flex items-center gap-4 bg-white px-4 py-2 rounded-card border border-neutral-200">
+                        <div className="flex items-center gap-4 bg-card px-4 py-2 rounded-card border border-border">
                           <div className="flex flex-col gap-0.5 text-left">
-                            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                              Assigned Staff
+                            <span className="text-label-xs font-medium text-muted-foreground">
+                              Assigned staff
                             </span>
-                            <span className="text-[13px] font-medium text-foreground">
+                            <span className="text-paragraph-sm font-medium text-foreground">
                               {t.assignee?.name || "Unassigned"}
                             </span>
                           </div>
 
-                          <div className="w-px h-8 bg-neutral-200" />
+                          <div className="w-px h-8 bg-border" />
 
                           <div className="flex flex-col gap-0.5 text-left">
-                            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                            <span className="text-label-xs font-medium text-muted-foreground">
                               Deadline
                             </span>
-                            <span className="text-[13px] font-medium text-foreground">
+                            <span className="text-paragraph-sm font-medium text-foreground">
                               {t.dueDate || "No deadline"}
                             </span>
                           </div>
@@ -1427,10 +1543,10 @@ export default function ComplianceCentrePage() {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleResolveTask(t.id);
+                            handleOpenTaskActionModal(t);
                           }}
                           disabled={t.isResolved}
-                          className="bg-[#262626] hover:bg-[#383838] text-white text-[14px] font-medium px-4 h-8 rounded-[8px] shrink-0 cursor-pointer border-0 transition-colors"
+                          className="bg-neutral-900 hover:bg-neutral-800 text-white text-label-xs font-medium px-4 h-8 rounded-button shrink-0 cursor-pointer border-0 transition-colors"
                         >
                           {t.isResolved ? "Resolved" : "Resolve"}
                         </Button>
@@ -1801,6 +1917,31 @@ export default function ComplianceCentrePage() {
           )}
         </div>
       </div>
+
+      {/* Case Action Modal for Priority Tasks */}
+      <CaseActionModal
+        open={actionModalOpen}
+        onOpenChange={setActionModalOpen}
+        row={actionModalRow}
+        onSuccess={() => {
+          if (activeTaskIdForModal) {
+            handleResolveTask(activeTaskIdForModal);
+          }
+        }}
+      />
+
+      {/* Tour Gap Schedule Modal */}
+      <TourGapScheduleModal
+        open={tourGapModalOpen}
+        onOpenChange={setTourGapModalOpen}
+        caseId={tourGapCaseId}
+        migrantName={tourGapMigrantName}
+        onSaveSchedule={() => {
+          if (activeTaskIdForModal) {
+            handleResolveTask(activeTaskIdForModal);
+          }
+        }}
+      />
     </div>
   );
 }
