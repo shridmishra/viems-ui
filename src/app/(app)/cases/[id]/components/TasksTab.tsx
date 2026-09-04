@@ -439,6 +439,18 @@ export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
     setActionModalOpen(true);
   };
 
+  const handleResolveButtonClick = (task: TaskItem) => {
+    const isTourGap =
+      task.title.toLowerCase().includes("tour gap") ||
+      task.title.toLowerCase().includes("schedule validation");
+
+    if (isTourGap) {
+      handleOpenTaskActionModal(task, "Resolve");
+    } else {
+      handleToggleComplete(task.id);
+    }
+  };
+
   // Filter and sort tasks
   const displayedTasks = React.useMemo(() => {
     let result = [...tasks];
@@ -729,7 +741,7 @@ export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
                           <Button
                             type="button"
                             size="sm"
-                            onClick={() => handleOpenTaskActionModal(task)}
+                            onClick={() => handleResolveButtonClick(task)}
                             className="h-7 px-3 bg-neutral-900 hover:bg-neutral-800 text-white text-label-xs font-medium rounded-button cursor-pointer"
                           >
                             Resolve
@@ -756,7 +768,7 @@ export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
                           >
                             {!task.isCompleted && (
                               <DropdownMenuItem
-                                onClick={() => handleOpenTaskActionModal(task)}
+                                onClick={() => handleResolveButtonClick(task)}
                                 className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
                               >
                                 <RiFocus2Line className="size-4 text-muted-foreground shrink-0" />

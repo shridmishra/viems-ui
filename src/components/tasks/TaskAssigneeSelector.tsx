@@ -52,6 +52,8 @@ export function TaskAssigneeSelector({
     setOpen(false);
   };
 
+  const widthClass = compact ? "w-[100px]" : "w-[140px]";
+
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger
@@ -62,33 +64,38 @@ export function TaskAssigneeSelector({
               type="button"
               variant="outline"
               size="sm"
-              className={`h-7 px-2 py-0.5 rounded-button border-border bg-card hover:bg-neutral-100/70 text-foreground transition-all flex items-center gap-1.5 cursor-pointer max-w-[170px] ${className}`}
+              className={`h-7 ${widthClass} px-2 py-0.5 rounded-button border-border bg-card hover:bg-neutral-100/70 text-foreground transition-all flex items-center justify-between cursor-pointer shrink-0 ${className}`}
             >
-              {assignee.avatarUrl ? (
-                <img
-                  src={assignee.avatarUrl}
-                  alt={assignee.name}
-                  className="size-4.5 rounded-full object-cover shrink-0"
-                />
-              ) : (
-                <div className="size-4.5 rounded-full bg-[#EBEBEB] text-[#171717] flex items-center justify-center font-medium text-[9px] leading-none shrink-0 select-none">
-                  {assignee.avatarText}
-                </div>
-              )}
-              <span className="text-[12px] font-medium truncate max-w-[95px] text-left">
-                {compact ? assignee.name.split(" ")[0] : assignee.name}
-              </span>
-              <RiArrowDownSLine className="size-3 text-muted-foreground shrink-0" />
+              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                {assignee.avatarUrl ? (
+                  <img
+                    src={assignee.avatarUrl}
+                    alt={assignee.name}
+                    className="size-4.5 rounded-full object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="size-4.5 rounded-full bg-[#EBEBEB] text-[#171717] flex items-center justify-center font-medium text-[9px] leading-none shrink-0 select-none">
+                    {assignee.avatarText}
+                  </div>
+                )}
+                <span className="text-[12px] font-medium truncate text-left">
+                  {compact ? assignee.name.split(" ")[0] : assignee.name}
+                </span>
+              </div>
+              <RiArrowDownSLine className="size-3 text-muted-foreground shrink-0 ml-1" />
             </Button>
           ) : (
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className={`h-7 px-2 py-0.5 rounded-button border-dashed border-border bg-transparent hover:bg-neutral-100/50 text-muted-foreground hover:text-foreground transition-all flex items-center gap-1 cursor-pointer ${className}`}
+              className={`h-7 ${widthClass} px-2 py-0.5 rounded-button border-dashed border-border bg-transparent hover:bg-neutral-100/50 text-muted-foreground hover:text-foreground transition-all flex items-center justify-between cursor-pointer shrink-0 ${className}`}
             >
-              <RiUserAddLine className="size-3.5 text-muted-foreground" />
-              <span className="text-[12px] font-medium">Assign</span>
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <RiUserAddLine className="size-3.5 shrink-0" />
+                <span className="text-[12px] font-medium">Assign</span>
+              </div>
+              <RiArrowDownSLine className="size-3 text-muted-foreground shrink-0 ml-1" />
             </Button>
           )
         }

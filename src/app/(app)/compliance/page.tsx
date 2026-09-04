@@ -157,6 +157,18 @@ export default function ComplianceCentrePage() {
     setActionModalOpen(true);
   };
 
+  const handleResolveButtonClick = (task: TaskItem) => {
+    const isTourGap =
+      task.title.toLowerCase().includes("tour gap") ||
+      task.title.toLowerCase().includes("schedule");
+
+    if (isTourGap) {
+      handleOpenTaskActionModal(task, "Resolve");
+    } else {
+      handleResolveTask(task.id);
+    }
+  };
+
   // Sorting state for Priority Tasks
   const [taskSortCol, setTaskSortCol] = React.useState<string | null>(null);
   const [taskSortDir, setTaskSortDir] = React.useState<"asc" | "desc">("asc");
@@ -1457,7 +1469,7 @@ export default function ComplianceCentrePage() {
                                 className="w-[200px] p-1.5 rounded-card bg-popover text-popover-foreground border-border shadow-card-large flex flex-col gap-0.5 text-paragraph-sm"
                               >
                                 <DropdownMenuItem
-                                  onClick={() => handleOpenTaskActionModal(t)}
+                                  onClick={() => handleResolveButtonClick(t)}
                                   className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
                                 >
                                   <RiFocus2Line className="size-4 text-muted-foreground shrink-0" />
@@ -1543,7 +1555,7 @@ export default function ComplianceCentrePage() {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleOpenTaskActionModal(t);
+                            handleResolveButtonClick(t);
                           }}
                           disabled={t.isResolved}
                           className="bg-neutral-900 hover:bg-neutral-800 text-white text-label-xs font-medium px-4 h-8 rounded-button shrink-0 cursor-pointer border-0 transition-colors"
