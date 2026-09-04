@@ -30,10 +30,25 @@ import {
 } from "@/lib/task-assignment-storage";
 
 // ─── Donut Chart Component ──────────────────────────────────
-function ComplianceDonutChart({ percentage = 100 }: { percentage?: number }) {
+function ComplianceDonutChart({
+  percentage = 100,
+  isNotAssessed = false,
+}: {
+  percentage?: number;
+  isNotAssessed?: boolean;
+}) {
   const radius = 24;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (percentage / 100) * circumference;
+  const safePercentage = isNotAssessed ? 0 : Math.min(100, Math.max(0, percentage));
+  const offset = circumference - (safePercentage / 100) * circumference;
+
+  const strokeColor = isNotAssessed
+    ? "#EBEBEB"
+    : safePercentage >= 80
+    ? "#1FC16B"
+    : safePercentage >= 50
+    ? "#F6B51E"
+    : "#FB3748";
 
   return (
     <div className="relative size-[60px] shrink-0">
@@ -48,25 +63,21 @@ function ComplianceDonutChart({ percentage = 100 }: { percentage?: number }) {
           strokeWidth="6"
         />
         {/* Progress fill */}
-        <circle
-          cx="30"
-          cy="30"
-          r={radius}
-          fill="none"
-          stroke="#1FC16B"
-          strokeWidth="6"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          className="transition-all duration-500 ease-out"
-        />
+        {!isNotAssessed && (
+          <circle
+            cx="30"
+            cy="30"
+            r={radius}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="6"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            className="transition-all duration-500 ease-out"
+          />
+        )}
       </svg>
-      {/* Centered percentage text */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className="font-aeonik-medium text-[14px] font-medium text-[#171717] leading-none">
-          {percentage}%
-        </span>
-      </div>
     </div>
   );
 }
@@ -361,7 +372,7 @@ export function ComplianceTab({
           </span>
 
           <div className="flex flex-col items-center gap-1 my-auto">
-            <ComplianceDonutChart percentage={healthScore} />
+            <ComplianceDonutChart percentage={healthScore} isNotAssessed={isNotAssessed} />
             <span className="font-aeonik-medium text-[24px] font-medium text-[#171717] leading-[32px] mt-1">
               {isNotAssessed ? "N/A" : `${healthScore}%`}
             </span>

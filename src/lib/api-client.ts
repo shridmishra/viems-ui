@@ -138,8 +138,8 @@ function toErrorMessage(val: any): string {
     const parsedMsg = toErrorMessage(errorData);
     const errorMessage = parsedMsg || `Request failed with status ${response.status}`;
 
-    if (response.status >= 500) {
-      console.warn(`[api-client] Backend unavailable ${response.status} (${url}), returning fallback response`);
+    if (response.status >= 500 && method.toUpperCase() === "GET") {
+      console.warn(`[api-client] Backend unavailable ${response.status} (${url}), returning fallback response for GET`);
       return ({ data: [], count: 0 } as unknown) as T;
     }
 

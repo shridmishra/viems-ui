@@ -48,9 +48,12 @@ export function TaskDueDatePicker({
 
   const handleSelectDate = (date: Date | undefined) => {
     if (date) {
-      const formatted = formatDateDisplay(date);
-      onChange(formatted);
-      toast.success(`Due date updated to ${formatted}`);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const isoStr = `${year}-${month}-${day}`;
+      onChange(isoStr);
+      toast.success(`Due date updated to ${formatDateDisplay(date)}`);
     } else {
       onChange(null);
       toast.info("Due date removed");
@@ -61,17 +64,20 @@ export function TaskDueDatePicker({
   const handleQuickPreset = (daysFromNow: number, label: string) => {
     const target = new Date();
     target.setDate(target.getDate() + daysFromNow);
-    const formatted = formatDateDisplay(target);
-    onChange(formatted);
-    toast.success(`Due date set to ${label} (${formatted})`);
+    const year = target.getFullYear();
+    const month = String(target.getMonth() + 1).padStart(2, "0");
+    const day = String(target.getDate()).padStart(2, "0");
+    const isoStr = `${year}-${month}-${day}`;
+    onChange(isoStr);
+    toast.success(`Due date set to ${label} (${formatDateDisplay(target)})`);
     setIsOpen(false);
   };
 
   const badgeStyle = urgency.isOverdue
-    ? "bg-[#FFEBEC] text-[#FB3748] border-[#FECDCA]"
+    ? "bg-error-light text-error-dark border-error-light"
     : urgency.isDueSoon
-    ? "bg-[#FFFAEB] text-[#B45309] border-[#FEDF89]"
-    : "bg-neutral-50 text-[#5C5C5C] border-border";
+    ? "bg-warning-light text-warning-dark border-warning-light"
+    : "bg-neutral-50 text-neutral-600 border-border";
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -85,7 +91,7 @@ export function TaskDueDatePicker({
             className={`h-7 px-2 py-0.5 rounded-button border text-[12px] font-medium transition-all flex items-center gap-1.5 cursor-pointer ${badgeStyle} ${className}`}
           >
             {urgency.isOverdue ? (
-              <RiTimeLine className="size-3.5 shrink-0 text-[#FB3748]" />
+              <RiTimeLine className="size-3.5 shrink-0 text-error-dark" />
             ) : (
               <RiCalendarLine className="size-3.5 shrink-0 opacity-80" />
             )}

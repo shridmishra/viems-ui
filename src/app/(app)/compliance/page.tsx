@@ -77,6 +77,7 @@ interface TaskItem {
   subtitle: string;
   migrantName: string;
   caseId: string;
+  rawCaseId?: string;
   avatarUrl?: string;
   avatarText: string;
   status: string;
@@ -130,9 +131,11 @@ export default function ComplianceCentrePage() {
       task.title.toLowerCase().includes("tour gap") ||
       task.title.toLowerCase().includes("schedule");
 
+    const cleanCaseId = task.rawCaseId || task.caseId.replace(/^#/, "");
+
     if (isTourGap && (!customAction || customAction === "Resolve")) {
       setActiveTaskIdForModal(task.id);
-      setTourGapCaseId(task.caseId);
+      setTourGapCaseId(cleanCaseId || task.caseId);
       setTourGapMigrantName(task.migrantName);
       setTourGapModalOpen(true);
       return;
@@ -149,7 +152,7 @@ export default function ComplianceCentrePage() {
     }
 
     setActionModalRow({
-      id: task.caseId,
+      id: cleanCaseId || task.id,
       caseId: task.caseId,
       name: task.migrantName,
       avatarText: task.avatarText,
@@ -240,14 +243,22 @@ export default function ComplianceCentrePage() {
           ? casesRes.value
           : (casesRes.value as any)?.data ?? [];
 
-        if (rawCases.length === 0) {
+        const isDemoEnabled = process.env.NEXT_PUBLIC_ENABLE_DEMO_DATA === "true";
+
+        if (rawCases.length === 0 && isDemoEnabled) {
           rawCases = [
-            { id: 1, caseNumber: "40921", migrant: { user: { firstName: "David", lastName: "Adeleke" } }, company: "Live Nation UK", status: "UNDER REVIEW", expiry_date: "2026-11-20" },
-            { id: 2, caseNumber: "40922", migrant: { user: { firstName: "Priya", lastName: "Patel" } }, company: "AEG Presents", status: "ACTION NEEDED", expiry_date: "2026-06-15" },
-            { id: 3, caseNumber: "40923", migrant: { user: { firstName: "Carlos", lastName: "Silva" } }, company: "Metropolis Studios", status: "COMPLIANT", expiry_date: "2027-01-10" },
-            { id: 4, caseNumber: "40924", migrant: { user: { firstName: "Amina", lastName: "Diallo" } }, company: "Warp Records", status: "COMPLIANT", expiry_date: "2026-09-30" },
+            { id: 1, caseNumber: "40921", migrant: { user: { firstName: "David", lastName: "Adeleke" } }, company: "Live Nation UK", status: "UNDER REVIEW", visaExpiryDate: "2026-11-20" },
+            { id: 2, caseNumber: "40922", migrant: { user: { firstName: "Priya", lastName: "Patel" } }, company: "AEG Presents", status: "ACTION NEEDED", visaExpiryDate: "2026-06-15" },
+            { id: 3, caseNumber: "40923", migrant: { user: { firstName: "Carlos", lastName: "Silva" } }, company: "Metropolis Studios", status: "COMPLIANT", visaExpiryDate: "2027-01-10" },
+            { id: 4, caseNumber: "40924", migrant: { user: { firstName: "Amina", lastName: "Diallo" } }, company: "Warp Records", status: "COMPLIANT", visaExpiryDate: "2026-09-30" },
           ];
         }
+
+        let savedOverrides: Record<string, "COMPLIANT" | "UNDER REVIEW" | "ACTION NEEDED"> = {};
+        try {
+          const raw = localStorage.getItem("viems_migrant_status_overrides");
+          if (raw) savedOverrides = JSON.parse(raw);
+        } catch {}
 
         const mappedMigrants: MigrantComplianceRow[] = rawCases.map((c: any, i: number) => {
           const migrantName =
@@ -277,6 +288,21 @@ export default function ComplianceCentrePage() {
             statusColor = "text-[#F6B51E]";
           }
 
+          const migrantId = String(c.id || `migrant-${i + 1}`);
+          if (savedOverrides[migrantId]) {
+            status = savedOverrides[migrantId];
+            if (status === "ACTION NEEDED") {
+              statusBg = "bg-[#FFEBEC]";
+              statusColor = "text-[#FB3748]";
+            } else if (status === "UNDER REVIEW") {
+              statusBg = "bg-[#FFFAEB]";
+              statusColor = "text-[#F6B51E]";
+            } else {
+              statusBg = "bg-[#E3F7EC]";
+              statusColor = "text-[#0B4627]";
+            }
+          }
+
           const expiry = c.visaExpiryDate || c.expiryDate || c.cosExpiryDate;
           const nextRtw = expiry
             ? new Date(expiry).toLocaleDateString("en-GB", {
@@ -289,7 +315,7 @@ export default function ComplianceCentrePage() {
           const docCount = c.filesCount || (c.files ? c.files.length : (i % 3 === 0 ? 12 : 11));
 
           return {
-            id: String(c.id || `migrant-${i + 1}`),
+            id: migrantId,
             caseId,
             name: migrantName,
             company: c.company || c.sponsor || "TechCorp UK Ltd",
@@ -313,7 +339,8 @@ export default function ComplianceCentrePage() {
             : (tasksRes.value as any)?.data ?? [];
         }
 
-        if (rawTasks.length === 0) {
+        const isDemoEnabled = process.env.NEXT_PUBLIC_ENABLE_DEMO_DATA === "true";
+        if (rawTasks.length === 0 && isDemoEnabled) {
           rawTasks = [
             {
               id: "task-comp-1",
@@ -427,6 +454,10 @@ export default function ComplianceCentrePage() {
               ? formatDateDisplay(t.dueDate)
               : getDefaultDueDateForTask(riskLevel));
 
+          const rawCaseNum = t.caseNumber || t.caseId || "";
+          const rawCaseId = String(rawCaseNum).replace(/^#/, "");
+          const caseId = rawCaseId ? `#${rawCaseId}` : "—";
+
           const resolvedFromStore =
             typeof stored?.isResolved === "boolean" ? stored.isResolved : isCompleted;
           const statusFromStore =
@@ -435,15 +466,17 @@ export default function ComplianceCentrePage() {
               ? "RESOLVED"
               : riskLevel === "HIGH"
               ? "REQUIRED ASAP"
-              : "UNDER REVIEW");
+              : riskLevel === "MEDIUM"
+              ? "UNDER REVIEW"
+              : "PENDING");
 
           const effectiveIsResolved =
             statusFromStore === "RESOLVED" || resolvedFromStore;
           const effectiveRiskLevel: "HIGH" | "MEDIUM" | "LOW" =
             statusFromStore === "REQUIRED ASAP"
               ? "HIGH"
-              : statusFromStore === "UNDER REVIEW"
-              ? "MEDIUM"
+              : statusFromStore === "RESOLVED"
+              ? "LOW"
               : riskLevel;
 
           const effectiveStatusBg =
@@ -470,7 +503,8 @@ export default function ComplianceCentrePage() {
               t.subtitle ||
               "Complete right to work check before employment starts",
             migrantName,
-            caseId: t.caseNumber ? `#${t.caseNumber}` : (t.caseId ? `#${t.caseId}` : "—"),
+            caseId,
+            rawCaseId: rawCaseId || undefined,
             avatarUrl: t.avatarUrl || undefined,
             avatarText: initials,
             status: statusFromStore,
@@ -504,9 +538,7 @@ export default function ComplianceCentrePage() {
       prev.map((t) => (t.id === taskId ? { ...t, assignee: newAssignee } : t))
     );
     saveStoredTaskAssignment(taskId, { assignee: newAssignee });
-    const empId = newAssignee
-      ? parseInt(newAssignee.id.replace("staff-", ""), 10) || null
-      : null;
+    const empId = newAssignee?.employeeId ?? null;
     syncTaskAssignmentToBackend(taskId, { employeeId: empId });
   }, []);
 
@@ -669,6 +701,7 @@ export default function ComplianceCentrePage() {
 
   const handleResolveTask = async (taskId: string) => {
     const prevTasks = [...tasks];
+    const prevStored = getStoredTaskAssignment(taskId);
     try {
       setTasks((prev) =>
         prev.map((t) =>
@@ -695,12 +728,14 @@ export default function ComplianceCentrePage() {
     } catch (err) {
       console.error("Failed to resolve task:", err);
       setTasks(prevTasks);
+      if (prevStored) saveStoredTaskAssignment(taskId, prevStored);
       toast.error("Failed to resolve task. Please try again.");
     }
   };
 
   const handleUnresolveTask = async (taskId: string) => {
     const prevTasks = [...tasks];
+    const prevStored = getStoredTaskAssignment(taskId);
     try {
       let restoredStatus = "UNDER REVIEW";
       setTasks((prev) =>
@@ -732,6 +767,7 @@ export default function ComplianceCentrePage() {
     } catch (err) {
       console.error("Failed to unresolve task:", err);
       setTasks(prevTasks);
+      if (prevStored) saveStoredTaskAssignment(taskId, prevStored);
       toast.error("Failed to unresolve task. Please try again.");
     }
   };
@@ -740,6 +776,8 @@ export default function ComplianceCentrePage() {
     taskId: string,
     newStatus: TaskStatusValue
   ) => {
+    const prevTasks = [...tasks];
+    const prevStored = getStoredTaskAssignment(taskId);
     const isResolved = newStatus === "RESOLVED";
     const riskLevel: "HIGH" | "MEDIUM" | "LOW" =
       newStatus === "REQUIRED ASAP"
@@ -800,6 +838,10 @@ export default function ComplianceCentrePage() {
         });
       } catch (err) {
         console.warn("Failed to update task status on backend:", err);
+        setTasks(prevTasks);
+        if (prevStored) saveStoredTaskAssignment(taskId, prevStored);
+        toast.error("Failed to update task status. Please try again.");
+        return;
       }
     }
 
@@ -841,6 +883,13 @@ export default function ComplianceCentrePage() {
           : m
       )
     );
+
+    try {
+      const raw = localStorage.getItem("viems_migrant_status_overrides");
+      const currentOverrides = raw ? JSON.parse(raw) : {};
+      currentOverrides[migrantId] = newStatus;
+      localStorage.setItem("viems_migrant_status_overrides", JSON.stringify(currentOverrides));
+    } catch {}
 
     if (newStatus === "COMPLIANT") {
       toast.success("Migrant status updated to Compliant");
@@ -1502,33 +1551,65 @@ export default function ComplianceCentrePage() {
             {/* Table Header Row */}
             <div className="w-full bg-neutral-50 rounded-button h-9 px-4 grid grid-cols-12 items-center text-label-xs font-medium text-muted-foreground">
               <div
+                role="button"
+                tabIndex={0}
                 onClick={() => handleTaskSort("document")}
-                className="col-span-4 flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleTaskSort("document");
+                  }
+                }}
+                className="col-span-4 flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors select-none"
               >
                 <span>Document</span>
                 <SortIcon active={taskSortCol === "document"} direction={taskSortDir} />
               </div>
               <div
+                role="button"
+                tabIndex={0}
                 onClick={() => handleTaskSort("migrant")}
-                className="col-span-2 flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleTaskSort("migrant");
+                  }
+                }}
+                className="col-span-2 flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors select-none"
               >
                 <span>Migrant</span>
                 <SortIcon active={taskSortCol === "migrant"} direction={taskSortDir} />
               </div>
-              <div className="col-span-2 flex items-center gap-1.5">
+              <div className="col-span-2 flex items-center gap-1.5 select-none">
                 <span>Assignee</span>
               </div>
               <div
+                role="button"
+                tabIndex={0}
                 onClick={() => handleTaskSort("status")}
-                className="col-span-2 flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleTaskSort("status");
+                  }
+                }}
+                className="col-span-2 flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors select-none"
               >
                 <span>Status</span>
                 <SortIcon active={taskSortCol === "status"} direction={taskSortDir} />
               </div>
               <div className="col-span-2 flex items-center justify-between pl-2">
                 <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleTaskSort("dueDate")}
-                  className="flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleTaskSort("dueDate");
+                    }
+                  }}
+                  className="flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors select-none"
                 >
                   <span>Due date</span>
                   <SortIcon active={taskSortCol === "dueDate"} direction={taskSortDir} />
@@ -1712,7 +1793,7 @@ export default function ComplianceCentrePage() {
                                 <DropdownMenuSeparator className="my-1 border-t border-border" />
 
                                 <DropdownMenuItem
-                                  onClick={() => router.push(`/cases/${t.caseId}`)}
+                                  onClick={() => router.push(`/cases/${t.rawCaseId || t.caseId.replace(/^#/, "")}`)}
                                   className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
                                 >
                                   <RiUserLine className="size-4 text-muted-foreground shrink-0" />

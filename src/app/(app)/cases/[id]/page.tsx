@@ -555,45 +555,52 @@ export default function MigrantOverviewPage() {
       const detail = mapBackendCaseToDetail(combined);
       setMigrant(detail);
     } catch (err) {
-      console.warn("Failed to fetch case detail, falling back to demo case:", err);
-      const fallbackCombined = {
-        id: id || "1",
-        caseNumber: id ? `4092${id}` : "40921",
-        status: "IN PROGRESS",
-        company: "Live Nation UK",
-        creation_date: "2026-03-01",
-        migrant: {
+      console.warn("Failed to fetch case detail:", err);
+      const isDemoEnabled = process.env.NEXT_PUBLIC_ENABLE_DEMO_DATA === "true";
+      if (isDemoEnabled) {
+        const fallbackCombined = {
           id: id || "1",
-          name: "David Adeleke",
-          user: {
-            email: "david.adeleke@example.com",
-            personalInfo: {
-              firstName: "David",
-              lastName: "Adeleke",
-              gender: "Male",
-              dob: "1992-11-21",
-              country: "Nigeria",
+          caseNumber: id ? `4092${id}` : "40921",
+          status: "IN PROGRESS",
+          company: "Live Nation UK",
+          creation_date: "2026-03-01",
+          migrant: {
+            id: id || "1",
+            name: "David Adeleke",
+            user: {
+              email: "david.adeleke@example.com",
+              personalInfo: {
+                firstName: "David",
+                lastName: "Adeleke",
+                gender: "Male",
+                dob: "1992-11-21",
+                country: "Nigeria",
+              },
+            },
+            contacts: {
+              address_line_1: "42 Park Lane",
+              city: "London",
+              state: "Greater London",
+              zip_code: "W1K 1PN",
+              country: "United Kingdom",
+              phone_1: "+44 7700 900077",
+              contact_email: "david.adeleke@example.com",
+            },
+            passport: {
+              passportNumber: "A12345678",
+              issueDate: "2020-05-15",
+              expiryDate: "2030-05-15",
             },
           },
-          contacts: {
-            address_line_1: "42 Park Lane",
-            city: "London",
-            state: "Greater London",
-            zip_code: "W1K 1PN",
-            country: "United Kingdom",
-            phone_1: "+44 7700 900077",
-            contact_email: "david.adeleke@example.com",
-          },
-          passport: {
-            passportNumber: "A12345678",
-            issueDate: "2020-05-15",
-            expiryDate: "2030-05-15",
-          },
-        },
-      };
-      setRawMigrantData(fallbackCombined.migrant);
-      const detail = mapBackendCaseToDetail(fallbackCombined);
-      setMigrant(detail);
+        };
+        setRawMigrantData(fallbackCombined.migrant);
+        const detail = mapBackendCaseToDetail(fallbackCombined);
+        setMigrant(detail);
+      } else {
+        setRawMigrantData(null);
+        setMigrant(null);
+        toast.error("Failed to load case profile. Please try again.");
+      }
     } finally {
       setLoading(false);
     }

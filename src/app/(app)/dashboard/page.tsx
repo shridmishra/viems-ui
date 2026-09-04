@@ -181,6 +181,8 @@ interface DashboardStats {
   leave: { expiring7Days: number; expiring14Days: number };
 }
 
+export type TaskDocumentItem = string | { value?: string; title?: string; name?: string };
+
 interface RawTaskItem {
   id: number;
   caseId?: number;
@@ -189,7 +191,7 @@ interface RawTaskItem {
   firstName?: string;
   lastName?: string;
   priority?: number | string;
-  name?: Array<{ value: string; title: string }> | string;
+  name?: TaskDocumentItem[] | string;
   title?: string;
   creation_date?: string;
   dueDate?: string;
@@ -447,7 +449,7 @@ export default function DashboardPage() {
         let title = typeof t.title === "string" && t.title.trim() ? t.title.trim() : "";
         if (!title && Array.isArray(t.name) && t.name.length > 0) {
           const docNames = t.name
-            .map((n: any) => {
+            .map((n) => {
               if (!n) return "";
               if (typeof n === "string") return n.trim();
               if (typeof n === "object") return (n.title || n.value || n.name || "").trim();
@@ -459,12 +461,12 @@ export default function DashboardPage() {
           title = "Complete RTW check";
         }
 
-        let dotColor = "bg-[#335CFF]";
+        let dotColor = "bg-brand-medium";
         const p = Number(t.priority);
         if (p === 3 || String(t.priority).toLowerCase() === "high") {
-          dotColor = "bg-[#FB3748]";
+          dotColor = "bg-error-dark";
         } else if (p === 2 || String(t.priority).toLowerCase() === "medium") {
-          dotColor = "bg-[#F6B51E]";
+          dotColor = "bg-warning-dark";
         }
 
         let dueDateFormatted = "Soon";

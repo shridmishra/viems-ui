@@ -10,6 +10,7 @@ export interface TaskAssignee {
   avatarText: string;
   avatarUrl?: string;
   role: string;
+  employeeId?: number;
 }
 
 export const STANDARD_STAFF_MEMBERS: TaskAssignee[] = [
@@ -19,6 +20,7 @@ export const STANDARD_STAFF_MEMBERS: TaskAssignee[] = [
     email: "nathan@viems.io",
     avatarText: "NC",
     role: "SMS & CoS Specialist",
+    employeeId: 1,
   },
   {
     id: "staff-harman",
@@ -26,6 +28,7 @@ export const STANDARD_STAFF_MEMBERS: TaskAssignee[] = [
     email: "harman@viems.io",
     avatarText: "HP",
     role: "Itinerary & Compliance Lead",
+    employeeId: 2,
   },
   {
     id: "staff-rakesh",
@@ -33,6 +36,7 @@ export const STANDARD_STAFF_MEMBERS: TaskAssignee[] = [
     email: "rakesh@viems.io",
     avatarText: "RP",
     role: "Right to Work Lead",
+    employeeId: 3,
   },
   {
     id: "staff-priya",
@@ -40,6 +44,7 @@ export const STANDARD_STAFF_MEMBERS: TaskAssignee[] = [
     email: "priya@viems.io",
     avatarText: "PS",
     role: "Senior Case Manager",
+    employeeId: 4,
   },
   {
     id: "staff-alex",
@@ -47,6 +52,7 @@ export const STANDARD_STAFF_MEMBERS: TaskAssignee[] = [
     email: "alex@viems.io",
     avatarText: "AM",
     role: "Immigration Officer",
+    employeeId: 5,
   },
 ];
 
@@ -114,7 +120,7 @@ export function getDefaultAssigneeForTask(title: string = "", category: string =
 }
 
 /**
- * Generates sensible default due date based on status / priority.
+ * Generates sensible default due date based on status / priority in ISO format (YYYY-MM-DD).
  */
 export function getDefaultDueDateForTask(
   statusOrPriority: string = "general",
@@ -131,7 +137,10 @@ export function getDefaultDueDateForTask(
     d.setDate(d.getDate() + 14);
   }
 
-  return formatDateDisplay(d);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 /**
@@ -268,9 +277,14 @@ export function saveStoredTaskAssignment(
 export async function syncTaskAssignmentToBackend(
   taskId: string | number,
   payload: { employeeId?: number | null; dueDate?: string; priority?: number }
-): Promise<void> {
-  const numericId = typeof taskId === "number" ? taskId : parseInt(taskId, 10);
-  if (isNaN(numericId) || numericId <= 0) return;
+): Promise<boolean> {
+  const numericId =
+    typeof taskId === "number"
+      ? taskId
+      : typeof taskId === "string" && /^\d+$/.test(taskId.trim())
+      ? parseInt(taskId.trim(), 10)
+      : NaN;
+  if (isNaN(numericId) || numericId <= 0) return false;
 
   try {
     const formData = new FormData();
@@ -285,8 +299,10 @@ export async function syncTaskAssignmentToBackend(
     }
 
     await apiClient.patch(`${ENDPOINTS.tasks.base}/${numericId}`, { body: formData });
+    return true;
   } catch (err) {
     // If backend endpoint is unavailable or errors, localStorage ensures smooth UI state
     console.debug("Backend task patch skipped or failed, fallback to client state:", err);
+    return false;
   }
 }

@@ -31,6 +31,7 @@ import { CaseActionModal, CaseActionRow } from "../../components/CaseActionModal
 import { TourGapScheduleModal } from "../../components/TourGapScheduleModal";
 import {
   TaskAssignee,
+  STANDARD_STAFF_MEMBERS,
   getDefaultAssigneeForTask,
   getDefaultDueDateForTask,
   getStoredTaskAssignment,
@@ -176,7 +177,12 @@ export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
     const cat: TaskItem["category"] = isTaskCategory(rawCat) ? rawCat : "General";
     const rawStatus = getSafeString(t.status) || (t.isCompleted || t.completed ? "completed" : "general");
     const st: TaskItem["status"] = isTaskStatus(rawStatus) ? rawStatus : (t.isCompleted || t.completed ? "completed" : "general");
-    const hasBackendId = t.id !== undefined && t.id !== null;
+    const hasBackendId =
+      typeof t.id === "number"
+        ? Number.isFinite(t.id) && t.id > 0
+        : typeof t.id === "string"
+        ? /^\d+$/.test(t.id.trim()) && Number(t.id.trim()) > 0
+        : false;
     const safeTitle = getSafeString(t.title) || getSafeString(t.name) || "Task";
     const safeDesc = getSafeString(t.description, "");
     const taskId = String(t.id ?? `task-${caseId || "0"}-${i}`);
@@ -367,9 +373,7 @@ export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
 
     const target = tasks.find((t) => t.id === taskId);
     if (target?.hasBackendId) {
-      const empId = newAssignee
-        ? parseInt(newAssignee.id.replace("staff-", ""), 10) || null
-        : null;
+      const empId = newAssignee?.employeeId ?? null;
       await syncTaskAssignmentToBackend(taskId, { employeeId: empId });
     }
   };
@@ -466,8 +470,13 @@ export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
 
     if (sortByDueDate) {
       result.sort((a, b) => {
-        const timeA = a.dueDate ? new Date(a.dueDate).getTime() : 0;
-        const timeB = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+        const timeA = a.dueDate ? new Date(a.dueDate).getTime() : NaN;
+        const timeB = b.dueDate ? new Date(b.dueDate).getTime() : NaN;
+        const hasA = !isNaN(timeA);
+        const hasB = !isNaN(timeB);
+        if (!hasA && !hasB) return 0;
+        if (!hasA) return 1;
+        if (!hasB) return -1;
         return sortByDueDate === "asc" ? timeA - timeB : timeB - timeA;
       });
     }
@@ -478,7 +487,7 @@ export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
   return (
     <div className="w-full flex flex-col gap-6 font-sans animate-fade-in text-left">
       {error && (
-        <div className="bg-[#FFEBEC] border border-[#FECDCA] rounded-button p-4 text-[14px] text-[#FB3748] flex items-center justify-between">
+        <div className="bg-error-light border border-error-light rounded-button p-4 text-[14px] text-error-dark flex items-center justify-between">
           <span>{error}</span>
         </div>
       )}
@@ -561,75 +570,35 @@ export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
             All staff ({tasks.length})
           </Button>
 
-          <Button
-            type="button"
-            variant={assigneeFilter === "staff-nathan" ? "primary-neutral" : "ghost"}
-            size="sm"
-            onClick={() => setAssigneeFilter("staff-nathan")}
-            className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
-              assigneeFilter === "staff-nathan"
-                ? "bg-neutral-900 text-white hover:bg-neutral-800 hover:text-white"
-                : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
-            }`}
-          >
-            Nathan (CoS)
-          </Button>
-
-          <Button
-            type="button"
-            variant={assigneeFilter === "staff-harman" ? "primary-neutral" : "ghost"}
-            size="sm"
-            onClick={() => setAssigneeFilter("staff-harman")}
-            className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
-              assigneeFilter === "staff-harman"
-                ? "bg-neutral-900 text-white hover:bg-neutral-800 hover:text-white"
-                : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
-            }`}
-          >
-            Harman (Itinerary)
-          </Button>
-
-          <Button
-            type="button"
-            variant={assigneeFilter === "staff-rakesh" ? "primary-neutral" : "ghost"}
-            size="sm"
-            onClick={() => setAssigneeFilter("staff-rakesh")}
-            className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
-              assigneeFilter === "staff-rakesh"
-                ? "bg-neutral-900 text-white hover:bg-neutral-800 hover:text-white"
-                : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
-            }`}
-          >
-            Rakesh (RTW)
-          </Button>
-
-          <Button
-            type="button"
-            variant={assigneeFilter === "staff-priya" ? "primary-neutral" : "ghost"}
-            size="sm"
-            onClick={() => setAssigneeFilter("staff-priya")}
-            className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
-              assigneeFilter === "staff-priya"
-                ? "bg-neutral-900 text-white hover:bg-neutral-800 hover:text-white"
-                : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
-            }`}
-          >
-            Priya (Legal)
-          </Button>
-
-          <Button
-            type="button"
-            variant={assigneeFilter === "staff-alex" ? "primary-neutral" : "ghost"}
-            size="sm"
-            onClick={() => setAssigneeFilter("staff-alex")}
-            className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
-              assigneeFilter === "staff-alex"
-                ? "bg-neutral-900 text-white hover:bg-neutral-800 hover:text-white"
-                : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
-            }`}
-          >
-            Alex (Officer)
-          </Button>
+          {STANDARD_STAFF_MEMBERS.map((staff) => {
+            const roleLabel =
+              staff.id === "staff-nathan"
+                ? "CoS"
+                : staff.id === "staff-harman"
+                ? "Itinerary"
+                : staff.id === "staff-rakesh"
+                ? "RTW"
+                : staff.id === "staff-priya"
+                ? "Legal"
+                : "Officer";
+            const firstName = staff.name.split(" ")[0];
+            return (
+              <Button
+                key={staff.id}
+                type="button"
+                variant={assigneeFilter === staff.id ? "primary-neutral" : "ghost"}
+                size="sm"
+                onClick={() => setAssigneeFilter(staff.id)}
+                className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
+                  assigneeFilter === staff.id
+                    ? "bg-neutral-900 text-white hover:bg-neutral-800 hover:text-white"
+                    : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
+                }`}
+              >
+                {firstName} ({roleLabel})
+              </Button>
+            );
+          })}
         </div>
 
         {/* Right: Sort by Due Date */}
