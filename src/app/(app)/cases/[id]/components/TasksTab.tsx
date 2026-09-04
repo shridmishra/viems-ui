@@ -470,12 +470,12 @@ export function TasksTab({ caseId }: { caseId?: string }) {
 
           <Button
             type="button"
-            variant="ghost"
+            variant={assigneeFilter === "ALL" ? "primary-neutral" : "ghost"}
             size="sm"
             onClick={() => setAssigneeFilter("ALL")}
             className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
               assigneeFilter === "ALL"
-                ? "bg-neutral-900 text-white hover:bg-neutral-800"
+                ? "bg-neutral-900 text-white hover:bg-neutral-800 hover:text-white"
                 : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
             }`}
           >
@@ -484,12 +484,12 @@ export function TasksTab({ caseId }: { caseId?: string }) {
 
           <Button
             type="button"
-            variant="ghost"
+            variant={assigneeFilter === "staff-nathan" ? "primary-neutral" : "ghost"}
             size="sm"
             onClick={() => setAssigneeFilter("staff-nathan")}
             className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
               assigneeFilter === "staff-nathan"
-                ? "bg-neutral-900 text-white hover:bg-neutral-800"
+                ? "bg-neutral-900 text-white hover:bg-neutral-800 hover:text-white"
                 : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
             }`}
           >
@@ -498,12 +498,12 @@ export function TasksTab({ caseId }: { caseId?: string }) {
 
           <Button
             type="button"
-            variant="ghost"
+            variant={assigneeFilter === "staff-harman" ? "primary-neutral" : "ghost"}
             size="sm"
             onClick={() => setAssigneeFilter("staff-harman")}
             className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
               assigneeFilter === "staff-harman"
-                ? "bg-neutral-900 text-white hover:bg-neutral-800"
+                ? "bg-neutral-900 text-white hover:bg-neutral-800 hover:text-white"
                 : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
             }`}
           >
@@ -512,12 +512,12 @@ export function TasksTab({ caseId }: { caseId?: string }) {
 
           <Button
             type="button"
-            variant="ghost"
+            variant={assigneeFilter === "staff-rakesh" ? "primary-neutral" : "ghost"}
             size="sm"
             onClick={() => setAssigneeFilter("staff-rakesh")}
             className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
               assigneeFilter === "staff-rakesh"
-                ? "bg-neutral-900 text-white hover:bg-neutral-800"
+                ? "bg-neutral-900 text-white hover:bg-neutral-800 hover:text-white"
                 : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
             }`}
           >
@@ -526,12 +526,12 @@ export function TasksTab({ caseId }: { caseId?: string }) {
 
           <Button
             type="button"
-            variant="ghost"
+            variant={assigneeFilter === "staff-priya" ? "primary-neutral" : "ghost"}
             size="sm"
             onClick={() => setAssigneeFilter("staff-priya")}
             className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
               assigneeFilter === "staff-priya"
-                ? "bg-neutral-900 text-white hover:bg-neutral-800"
+                ? "bg-neutral-900 text-white hover:bg-neutral-800 hover:text-white"
                 : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
             }`}
           >
@@ -540,12 +540,12 @@ export function TasksTab({ caseId }: { caseId?: string }) {
 
           <Button
             type="button"
-            variant="ghost"
+            variant={assigneeFilter === "staff-alex" ? "primary-neutral" : "ghost"}
             size="sm"
             onClick={() => setAssigneeFilter("staff-alex")}
             className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
               assigneeFilter === "staff-alex"
-                ? "bg-neutral-900 text-white hover:bg-neutral-800"
+                ? "bg-neutral-900 text-white hover:bg-neutral-800 hover:text-white"
                 : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
             }`}
           >
