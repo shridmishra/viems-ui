@@ -14,6 +14,7 @@ import {
   RiFocus2Line,
   RiShieldCheckLine,
   RiCalendarEventLine,
+  RiRefreshLine,
 } from "@remixicon/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -737,7 +738,17 @@ export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
                           onChange={(date) => handleDueDateChange(task.id, date)}
                         />
 
-                        {!task.isCompleted && (
+                        {task.isCompleted ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleComplete(task.id)}
+                            className="h-7 px-2.5 border-border hover:bg-neutral-100 text-muted-foreground hover:text-foreground text-label-xs font-medium rounded-button cursor-pointer"
+                          >
+                            Unresolve
+                          </Button>
+                        ) : (
                           <Button
                             type="button"
                             size="sm"
@@ -766,7 +777,15 @@ export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
                             align="end"
                             className="w-[220px] p-1.5 rounded-card bg-popover text-popover-foreground border-border shadow-card-large flex flex-col gap-0.5 text-paragraph-sm"
                           >
-                            {!task.isCompleted && (
+                            {task.isCompleted ? (
+                              <DropdownMenuItem
+                                onClick={() => handleToggleComplete(task.id)}
+                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                              >
+                                <RiRefreshLine className="size-4 text-muted-foreground shrink-0" />
+                                <span>Unresolve</span>
+                              </DropdownMenuItem>
+                            ) : (
                               <DropdownMenuItem
                                 onClick={() => handleResolveButtonClick(task)}
                                 className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
@@ -807,14 +826,6 @@ export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
                             )}
 
                             <DropdownMenuSeparator className="my-1 border-t border-border" />
-
-                            <DropdownMenuItem
-                              onClick={() => handleToggleComplete(task.id)}
-                              className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
-                            >
-                              <RiCheckboxCircleLine className="size-4 text-muted-foreground shrink-0" />
-                              <span>{task.isCompleted ? "Mark as pending" : "Mark as complete"}</span>
-                            </DropdownMenuItem>
 
                             <DropdownMenuItem
                               onClick={() =>

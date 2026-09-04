@@ -671,6 +671,38 @@ export default function ComplianceCentrePage() {
     }
   };
 
+  const handleUnresolveTask = async (taskId: string) => {
+    const prevTasks = [...tasks];
+    try {
+      setTasks((prev) =>
+        prev.map((t) => {
+          if (t.id !== taskId) return t;
+          const status = t.riskLevel === "HIGH" ? "REQUIRED ASAP" : "UNDER REVIEW";
+          const statusBg = t.riskLevel === "HIGH" ? "bg-[#FFEBEC]" : "bg-[#FFFAEB]";
+          const statusColor = t.riskLevel === "HIGH" ? "text-[#681219]" : "text-[#624C18]";
+          return {
+            ...t,
+            isResolved: false,
+            status,
+            statusBg,
+            statusColor,
+            hasWarningIcon: t.riskLevel === "HIGH",
+          };
+        })
+      );
+      if (!taskId.startsWith("task-")) {
+        await apiClient.patch(`${ENDPOINTS.tasks.base}/${taskId}`, {
+          body: JSON.stringify({ isCompleted: false, status: "PENDING" }),
+        });
+      }
+      toast.info("Task marked as unresolved");
+    } catch (err) {
+      console.error("Failed to unresolve task:", err);
+      setTasks(prevTasks);
+      toast.error("Failed to unresolve task. Please try again.");
+    }
+  };
+
   const handleExportSummary = (migrant: MigrantComplianceRow) => {
     try {
       const migrantName = migrant.name || "—";
@@ -1468,13 +1500,23 @@ export default function ComplianceCentrePage() {
                                 align="end"
                                 className="w-[200px] p-1.5 rounded-card bg-popover text-popover-foreground border-border shadow-card-large flex flex-col gap-0.5 text-paragraph-sm"
                               >
-                                <DropdownMenuItem
-                                  onClick={() => handleResolveButtonClick(t)}
-                                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
-                                >
-                                  <RiFocus2Line className="size-4 text-muted-foreground shrink-0" />
-                                  <span>Resolve</span>
-                                </DropdownMenuItem>
+                                {t.isResolved ? (
+                                  <DropdownMenuItem
+                                    onClick={() => handleUnresolveTask(t.id)}
+                                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                                  >
+                                    <RiRefreshLine className="size-4 text-muted-foreground shrink-0" />
+                                    <span>Unresolve</span>
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem
+                                    onClick={() => handleResolveButtonClick(t)}
+                                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                                  >
+                                    <RiFocus2Line className="size-4 text-muted-foreground shrink-0" />
+                                    <span>Resolve</span>
+                                  </DropdownMenuItem>
+                                )}
 
                                 <DropdownMenuItem
                                   onClick={() => handleOpenTaskActionModal(t, "Upload documents")}
@@ -1551,17 +1593,30 @@ export default function ComplianceCentrePage() {
                           </div>
                         </div>
 
-                        <Button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleResolveButtonClick(t);
-                          }}
-                          disabled={t.isResolved}
-                          className="bg-neutral-900 hover:bg-neutral-800 text-white text-label-xs font-medium px-4 h-8 rounded-button shrink-0 cursor-pointer border-0 transition-colors"
-                        >
-                          {t.isResolved ? "Resolved" : "Resolve"}
-                        </Button>
+                        {t.isResolved ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUnresolveTask(t.id);
+                            }}
+                            className="text-label-xs font-medium px-3.5 h-8 rounded-button shrink-0 cursor-pointer border-border hover:bg-neutral-100 text-foreground transition-colors"
+                          >
+                            Unresolve
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleResolveButtonClick(t);
+                            }}
+                            className="bg-neutral-900 hover:bg-neutral-800 text-white text-label-xs font-medium px-4 h-8 rounded-button shrink-0 cursor-pointer border-0 transition-colors"
+                          >
+                            Resolve
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>
