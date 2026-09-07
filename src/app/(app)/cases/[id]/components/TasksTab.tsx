@@ -29,6 +29,7 @@ import { apiClient } from "@/lib/api-client";
 import { ENDPOINTS } from "@/lib/api-endpoints";
 import { CaseActionModal, CaseActionRow } from "../../components/CaseActionModal";
 import { TourGapScheduleModal } from "../../components/TourGapScheduleModal";
+import { UnionRateModal } from "../../components/UnionRateModal";
 import {
   TaskAssignee,
   STANDARD_STAFF_MEMBERS,
@@ -171,6 +172,8 @@ export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
   const [activeTaskIdForModal, setActiveTaskIdForModal] = React.useState<string | null>(null);
   const [tourGapModalOpen, setTourGapModalOpen] = React.useState(false);
   const [tourGapTaskId, setTourGapTaskId] = React.useState<string | null>(null);
+  const [unionRateModalOpen, setUnionRateModalOpen] = React.useState(false);
+  const [unionRateTaskId, setUnionRateTaskId] = React.useState<string | null>(null);
 
   const mapRawTask = React.useCallback((t: RawTaskPayload, i: number): TaskItem => {
     const rawCat = getSafeString(t.category, "General");
@@ -398,6 +401,17 @@ export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
     if (isTourGap && (!customAction || customAction === "Resolve")) {
       setTourGapTaskId(task.id);
       setTourGapModalOpen(true);
+      return;
+    }
+
+    const isUnionRate =
+      task.title.toLowerCase().includes("union minimum") ||
+      task.title.toLowerCase().includes("salary clearance") ||
+      task.title.toLowerCase().includes("union rate");
+
+    if (isUnionRate && (!customAction || customAction === "Review" || customAction === "Verify")) {
+      setUnionRateTaskId(task.id);
+      setUnionRateModalOpen(true);
       return;
     }
 
@@ -794,6 +808,20 @@ export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
                               </DropdownMenuItem>
                             )}
 
+                            {(task.title.toLowerCase().includes("union") ||
+                              task.title.toLowerCase().includes("salary")) && (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setUnionRateTaskId(task.id);
+                                  setUnionRateModalOpen(true);
+                                }}
+                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                              >
+                                <RiShieldCheckLine className="size-4 text-muted-foreground shrink-0" />
+                                <span>Verify union rate &amp; salary</span>
+                              </DropdownMenuItem>
+                            )}
+
                             <DropdownMenuSeparator className="my-1 border-t border-border" />
 
                             <DropdownMenuItem
@@ -840,6 +868,24 @@ export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
         onSaveSchedule={() => {
           if (tourGapTaskId) {
             handleToggleComplete(tourGapTaskId);
+          }
+        }}
+      />
+
+      {/* Union Rate Modal */}
+      <UnionRateModal
+        open={unionRateModalOpen}
+        onOpenChange={setUnionRateModalOpen}
+        caseId={caseId}
+        migrantName={migrantName || (typeof migrant?.name === "string" ? migrant.name : undefined)}
+        initialSalary={typeof migrant?.salary === "string" || typeof migrant?.salary === "number" ? migrant.salary : ""}
+        initialJobTitle={typeof migrant?.role === "string" ? migrant.role : typeof migrant?.jobTitle === "string" ? migrant.jobTitle : ""}
+        onSuccess={() => {
+          if (unionRateTaskId) {
+            const target = tasks.find((t) => t.id === unionRateTaskId);
+            if (target && !target.isCompleted) {
+              handleToggleComplete(unionRateTaskId);
+            }
           }
         }}
       />
