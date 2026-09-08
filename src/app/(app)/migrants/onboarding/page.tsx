@@ -25,9 +25,11 @@ import {
   RiCloseLine,
   RiAddLine,
   RiAlertFill,
+  RiAlertLine,
   RiInformationLine,
 } from "@remixicon/react";
 import { toast } from "sonner";
+import { validateRemuneration, formatCurrency } from "@/lib/union-rates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -126,11 +128,22 @@ export default function MigrantOnboardingPage() {
     contractType: "Full-time",
     hoursPerWeek: "40",
     annualSalary: "£48,000/year",
+    unionScale: "EQUITY",
     workAddressLine1: "Royal Albert Hall",
     workAddressLine2: "Kensington Gore",
     workCity: "London",
     workPostCode: "SW7 2AP",
   });
+
+  const unionValidation = React.useMemo(() => {
+    return validateRemuneration({
+      union: form.unionScale || "EQUITY",
+      jobTitle: form.jobTitle,
+      amount: form.annualSalary,
+      period: "ANNUAL",
+      hoursPerWeek: form.hoursPerWeek,
+    });
+  }, [form.unionScale, form.jobTitle, form.annualSalary, form.hoursPerWeek]);
 
   const [extraAddresses, setExtraAddresses] = React.useState<
     Array<{ id: string; addressLine1: string; addressLine2: string; city: string; postCode: string }>
@@ -1202,11 +1215,82 @@ export default function MigrantOnboardingPage() {
                   type="text"
                   value={form.annualSalary}
                   onChange={(e) => handleChange("annualSalary", e.target.value)}
-                  placeholder="€"
+                  placeholder="£"
                   className="h-10 rounded-[10px] border-[#EBEBEB] bg-white px-3 text-[14px] text-[#171717] focus-visible:border-brand-medium shadow-xs"
                 />
               </div>
             </div>
+
+            {/* Governing Union Scale (Task 25) */}
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-[13px] font-medium text-[#171717] flex items-center gap-1">
+                <span>Governing Union Scale</span>
+                <span className="text-[11px] text-[#8C8C8C] font-normal">(Appendix Creative Worker)</span>
+              </Label>
+              <Select
+                value={form.unionScale || "EQUITY"}
+                onValueChange={(val) => handleChange("unionScale", val || "EQUITY")}
+              >
+                <SelectTrigger className="h-10 rounded-[10px] border-[#EBEBEB] bg-white px-3 text-[14px] text-[#171717] shadow-xs">
+                  <SelectValue placeholder="Select Union" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-[#EBEBEB] rounded-[12px] shadow-card-large">
+                  <SelectItem value="EQUITY">Equity (Performers, Actors, Dancers, Stage)</SelectItem>
+                  <SelectItem value="PACT">PACT (Film &amp; Television Crew)</SelectItem>
+                  <SelectItem value="BECTU">BECTU (Grip, Lighting, Sound, Technical)</SelectItem>
+                  <SelectItem value="MU">Musicians&apos; Union (MU)</SelectItem>
+                  <SelectItem value="NONE">None / Exempt</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Live Union Wage Compliance Badge */}
+            {form.annualSalary && (
+              <div
+                className={`p-3 rounded-input border flex items-center justify-between gap-3 text-paragraph-xs ${
+                  unionValidation.isCompliant
+                    ? "bg-success-light border-success-dark/20 text-success-dark"
+                    : "bg-error-light border-error-dark/20 text-error-dark"
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  {unionValidation.isCompliant ? (
+                    <RiCheckLine className="size-4 shrink-0" />
+                  ) : (
+                    <RiAlertLine className="size-4 shrink-0" />
+                  )}
+                  <span className="truncate">
+                    {unionValidation.isCompliant
+                      ? `✓ Remuneration meets ${unionValidation.unionName} agreed scale`
+                      : `⚠️ Below ${unionValidation.union} minimum (${formatCurrency(unionValidation.minimumRate, "GBP")}/${unionValidation.period.toLowerCase()} required)`}
+                  </span>
+                </div>
+
+                {!unionValidation.isCompliant && unionValidation.minimumRate > 0 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-[11px] font-semibold text-error-dark hover:bg-error-light/50 rounded-compact shrink-0"
+                    onClick={() => {
+                      const hours = Number(form.hoursPerWeek) || 37.5;
+                      const perYear =
+                        unionValidation.period === "WEEKLY"
+                          ? unionValidation.minimumRate * 52
+                          : unionValidation.period === "DAILY" ||
+                            unionValidation.period === "PER_PERFORMANCE"
+                          ? unionValidation.minimumRate * 5 * 52
+                          : unionValidation.period === "HOURLY"
+                          ? unionValidation.minimumRate * hours * 52
+                          : unionValidation.minimumRate;
+                      handleChange("annualSalary", `£${Math.round(perYear)}/year`);
+                    }}
+                  >
+                    Apply Minimum
+                  </Button>
+                )}
+              </div>
+            )}
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="workAddressLine1" className="text-[13px] font-medium text-[#171717]">

@@ -23,6 +23,7 @@ import { CompanyTab, CompanySubTab, COMPANY_SUB_TABS } from "./company-tab";
 import { DocumentsTab } from "./documents-tab";
 import { HistoryTab } from "./history-tab";
 import { TeamTab, TeamSubTab, TEAM_SUB_TABS } from "./team-tab";
+import { getTokenPayload } from "@/lib/auth";
 
 export const MAIN_TABS = ["company", "documents", "history", "team"] as const;
 export type MainTab = (typeof MAIN_TABS)[number];
@@ -69,22 +70,64 @@ function OrganisationPageContent() {
     try {
       setDownloadingReport(true);
       await new Promise((resolve) => setTimeout(resolve, 50));
+
+      let companyName = "ENT Imm";
+      let sponsorLicence = "ENT1234567";
+      let businessSector = "Creative sector / live events";
+      let registeredAddress = "18 Soho Square, London W1D 3QL";
+      let authorisingOfficer = "Alex Marin - Authorising Officer";
+
+      try {
+        const payload = getTokenPayload();
+        const userId = payload?.email || (payload as any)?.id || (payload as any)?.sub;
+        const prefix = userId ? `viems_org_${userId}_` : `viems_org_`;
+
+        const detailsRaw = localStorage.getItem(`${prefix}details`);
+        if (detailsRaw) {
+          const d = JSON.parse(detailsRaw);
+          if (d.companyName) companyName = d.companyName;
+          if (d.businessSector) businessSector = d.businessSector;
+        }
+
+        const licenceRaw = localStorage.getItem(`${prefix}licence`);
+        if (licenceRaw) {
+          const l = JSON.parse(licenceRaw);
+          if (l.sponsorLicenceNumber) sponsorLicence = l.sponsorLicenceNumber;
+        }
+
+        const addressRaw = localStorage.getItem(`${prefix}address`);
+        if (addressRaw) {
+          const a = JSON.parse(addressRaw);
+          const parts = [a.addressLine1, a.addressLine2, a.city, a.county, a.postcode, a.country].filter(Boolean);
+          if (parts.length > 0) registeredAddress = parts.join(", ");
+        }
+
+        const rolesRaw = localStorage.getItem("viems_org_ukvi_roles");
+        if (rolesRaw) {
+          const r = JSON.parse(rolesRaw);
+          if (r.authorisingOfficer) authorisingOfficer = `${r.authorisingOfficer} - Authorising Officer`;
+        }
+      } catch {
+        // Fallback to defaults
+      }
+
+      const cleanSlug = companyName.toUpperCase().replace(/[^A-Z0-9]/g, "");
       const doc = generateOrganisationComplianceReport({
-        companyName: "ENT Imm",
-        sponsorLicence: "ENT1234567",
-        businessSector: "Creative sector / live events",
-        registeredAddress: "18 Soho Square, London W1D 3QL",
-        authorisingOfficer: "Alex Marin - Authorising Officer",
+        companyName,
+        sponsorLicence,
+        businessSector,
+        registeredAddress,
+        authorisingOfficer,
         lastAuditDate: "14 May 2026",
         statusComplete: true,
-        refNumber: `OCR-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-ENTIMM-FULL`,
+        refNumber: `OCR-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${cleanSlug || "ORG"}-FULL`,
         generatedDate: `${new Date().toLocaleDateString("en-GB", {
           day: "numeric",
           month: "short",
           year: "numeric",
         })} - ${new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`,
       });
-      downloadPdf(doc, "Viems_Organisation_Compliance_Report_ENT_Imm.pdf");
+      downloadPdf(doc, `Viems_Organisation_Compliance_Report_${companyName.replace(/\s+/g, "_")}.pdf`);
       toast.success("Organisation Compliance Report downloaded.");
     } catch (err) {
       console.error("Failed to generate organisation report:", err);

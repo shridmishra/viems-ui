@@ -9,14 +9,40 @@ import {
   RiInformationLine,
   RiMore2Line,
   RiUpload2Line,
+  RiArrowUpDownLine,
+  RiFilter3Line,
+  RiFocus2Line,
+  RiShieldCheckLine,
+  RiCalendarEventLine,
+  RiRefreshLine,
 } from "@remixicon/react";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { ENDPOINTS } from "@/lib/api-endpoints";
+import { CaseActionModal, CaseActionRow } from "../../components/CaseActionModal";
+import { TourGapScheduleModal } from "../../components/TourGapScheduleModal";
+import { UnionRateModal } from "../../components/UnionRateModal";
+import {
+  TaskAssignee,
+  STANDARD_STAFF_MEMBERS,
+  getDefaultAssigneeForTask,
+  getDefaultDueDateForTask,
+  getStoredTaskAssignment,
+  saveStoredTaskAssignment,
+  syncTaskAssignmentToBackend,
+} from "@/lib/task-assignment-storage";
+import { TaskAssigneeSelector } from "@/components/tasks/TaskAssigneeSelector";
+import { TaskDueDatePicker } from "@/components/tasks/TaskDueDatePicker";
 
-interface TaskItem {
+export interface TaskItem {
   id: string;
   hasBackendId?: boolean;
   category: "General" | "Compliance" | "Reporting" | "Documents" | "Visa & Immigration";
@@ -24,6 +50,8 @@ interface TaskItem {
   description: string;
   status: "crucial" | "completed" | "under_review" | "general";
   isCompleted: boolean;
+  assignee?: TaskAssignee | null;
+  dueDate?: string;
 }
 
 interface RawTaskPayload {
@@ -35,6 +63,9 @@ interface RawTaskPayload {
   status?: string;
   isCompleted?: boolean;
   completed?: boolean;
+  employee?: TaskAssignee | null;
+  assignee?: TaskAssignee | null;
+  dueDate?: string;
 }
 
 type TasksApiResponse =
@@ -64,7 +95,7 @@ function isTaskStatus(st: string): st is TaskItem["status"] {
   return (VALID_STATUSES as readonly string[]).includes(st);
 }
 
-export function getSafeString(val: any, fallback = ""): string {
+export function getSafeString(val: unknown, fallback = ""): string {
   if (val === null || val === undefined) return fallback;
   if (typeof val === "string") return val;
   if (typeof val === "number") return String(val);
@@ -73,7 +104,8 @@ export function getSafeString(val: any, fallback = ""): string {
     return validItems.length > 0 ? validItems.join(", ") : fallback;
   }
   if (typeof val === "object") {
-    const candidate = val.name ?? val.title ?? val.value ?? val.label;
+    const obj = val as Record<string, unknown>;
+    const candidate = obj.name ?? obj.title ?? obj.value ?? obj.label;
     if (candidate !== undefined && candidate !== null) {
       const res = getSafeString(candidate, "");
       if (res) return res;
@@ -83,9 +115,106 @@ export function getSafeString(val: any, fallback = ""): string {
   return fallback;
 }
 
-export function TasksTab({ caseId }: { caseId?: string }) {
+const DEFAULT_CASE_TASKS: Omit<TaskItem, "id" | "isCompleted">[] = [
+  {
+    category: "Compliance",
+    title: "14-Day Tour Gap Schedule Validation",
+    description: "Verify flight itinerary gaps and cross-border event dates do not exceed the 14-day concession rule.",
+    status: "crucial",
+  },
+  {
+    category: "Visa & Immigration",
+    title: "SMS CoS Assignment & Pre-Submission Review",
+    description: "Review Home Office sponsor management system reference and confirm salary threshold compliance.",
+    status: "crucial",
+  },
+  {
+    category: "Compliance",
+    title: "Complete Right to Work (RTW) Online Verification",
+    description: "Execute Home Office share code check and record statutory excuse audit evidence.",
+    status: "crucial",
+  },
+  {
+    category: "Documents",
+    title: "Passport Biometrics & Entry Stamp Verification",
+    description: "Inspect passport photo page validity and ensure UK entry arrival stamp is filed in case dossier.",
+    status: "under_review",
+  },
+  {
+    category: "General",
+    title: "Union Minimum Rate & Salary Clearance Check",
+    description: "Cross-reference agreed weekly performer fee against Equity / PACT / BECTU agreed minimum wage standards.",
+    status: "under_review",
+  },
+  {
+    category: "Reporting",
+    title: "Home Office 10-Day Event Reporting Log",
+    description: "Log start date confirmation and notify SMS within statutory 10 working days.",
+    status: "general",
+  },
+];
+
+interface TasksTabProps {
+  caseId?: string;
+  migrantName?: string;
+  migrant?: Record<string, unknown> | null;
+}
+
+export function TasksTab({ caseId, migrantName, migrant }: TasksTabProps) {
   const [tasks, setTasks] = React.useState<TaskItem[]>([]);
   const [error, setError] = React.useState<string | null>(null);
+  const [assigneeFilter, setAssigneeFilter] = React.useState<string>("ALL");
+  const [sortByDueDate, setSortByDueDate] = React.useState<"asc" | "desc" | null>(null);
+
+  // Modal states
+  const [actionModalOpen, setActionModalOpen] = React.useState(false);
+  const [actionModalRow, setActionModalRow] = React.useState<CaseActionRow | null>(null);
+  const [activeTaskIdForModal, setActiveTaskIdForModal] = React.useState<string | null>(null);
+  const [tourGapModalOpen, setTourGapModalOpen] = React.useState(false);
+  const [tourGapTaskId, setTourGapTaskId] = React.useState<string | null>(null);
+  const [unionRateModalOpen, setUnionRateModalOpen] = React.useState(false);
+  const [unionRateTaskId, setUnionRateTaskId] = React.useState<string | null>(null);
+
+  const mapRawTask = React.useCallback((t: RawTaskPayload, i: number): TaskItem => {
+    const rawCat = getSafeString(t.category, "General");
+    const cat: TaskItem["category"] = isTaskCategory(rawCat) ? rawCat : "General";
+    const rawStatus = getSafeString(t.status) || (t.isCompleted || t.completed ? "completed" : "general");
+    const st: TaskItem["status"] = isTaskStatus(rawStatus) ? rawStatus : (t.isCompleted || t.completed ? "completed" : "general");
+    const hasBackendId =
+      typeof t.id === "number"
+        ? Number.isFinite(t.id) && t.id > 0
+        : typeof t.id === "string"
+        ? /^\d+$/.test(t.id.trim()) && Number(t.id.trim()) > 0
+        : false;
+    const safeTitle = getSafeString(t.title) || getSafeString(t.name) || "Task";
+    const safeDesc = getSafeString(t.description, "");
+    const taskId = String(t.id ?? `task-${caseId || "0"}-${i}`);
+
+    // Check local storage for persistent assignee & due date
+    const stored = getStoredTaskAssignment(taskId);
+
+    let assignee: TaskAssignee | null = stored?.assignee ?? null;
+    if (!assignee && t.assignee) {
+      assignee = t.assignee;
+    }
+    if (!assignee) {
+      assignee = getDefaultAssigneeForTask(safeTitle, cat);
+    }
+
+    const dueDate = stored?.dueDate || t.dueDate || getDefaultDueDateForTask(st);
+
+    return {
+      id: taskId,
+      hasBackendId,
+      category: cat,
+      title: safeTitle,
+      description: safeDesc,
+      status: st,
+      isCompleted: Boolean(t.isCompleted || t.completed || st === "completed"),
+      assignee,
+      dueDate,
+    };
+  }, [caseId]);
 
   React.useEffect(() => {
     let isCancelled = false;
@@ -111,33 +240,43 @@ export function TasksTab({ caseId }: { caseId?: string }) {
 
         if (!isCancelled) {
           if (rawTasks.length > 0) {
-            const mapped: TaskItem[] = rawTasks.map((t: RawTaskPayload, i: number) => {
-              const rawCat = getSafeString(t.category, "General");
-              const cat: TaskItem["category"] = isTaskCategory(rawCat) ? rawCat : "General";
-              const rawStatus = getSafeString(t.status) || (t.isCompleted || t.completed ? "completed" : "general");
-              const st: TaskItem["status"] = isTaskStatus(rawStatus) ? rawStatus : (t.isCompleted || t.completed ? "completed" : "general");
-              const hasBackendId = t.id !== undefined && t.id !== null;
-              const safeTitle = getSafeString(t.title) || getSafeString(t.name) || "Task";
-              const safeDesc = getSafeString(t.description, "");
-              return {
-                id: String(t.id ?? `t-${i}`),
-                hasBackendId,
-                category: cat,
-                title: safeTitle,
-                description: safeDesc,
-                status: st,
-                isCompleted: Boolean(t.isCompleted || t.completed || st === "completed"),
-              };
-            });
+            const mapped: TaskItem[] = rawTasks.map(mapRawTask);
             setTasks(mapped);
           } else {
-            setTasks([]);
+            // Load standard case tasks with intelligent accountability
+            const defaults: TaskItem[] = DEFAULT_CASE_TASKS.map((dt, idx) =>
+              mapRawTask(
+                {
+                  id: `case-${caseId}-dt-${idx}`,
+                  title: dt.title,
+                  description: dt.description,
+                  category: dt.category,
+                  status: dt.status,
+                  isCompleted: false,
+                },
+                idx
+              )
+            );
+            setTasks(defaults);
           }
         }
-      } catch (err) {
+      } catch {
         if (!isCancelled) {
-          setTasks([]);
-          setError("Failed to load tasks for this case.");
+          // Fallback to standard tasks to ensure UI remains functional
+          const defaults: TaskItem[] = DEFAULT_CASE_TASKS.map((dt, idx) =>
+            mapRawTask(
+              {
+                id: `case-${caseId}-dt-${idx}`,
+                title: dt.title,
+                description: dt.description,
+                category: dt.category,
+                status: dt.status,
+                isCompleted: false,
+              },
+              idx
+            )
+          );
+          setTasks(defaults);
         }
       }
     }
@@ -146,7 +285,37 @@ export function TasksTab({ caseId }: { caseId?: string }) {
     return () => {
       isCancelled = true;
     };
-  }, [caseId]);
+  }, [caseId, mapRawTask]);
+
+  // Sync listener across windows / components
+  React.useEffect(() => {
+    const handleUpdate = (e: Event) => {
+      const customEvt = e as CustomEvent;
+      if (customEvt.detail?.taskId) {
+        setTasks((prev) =>
+          prev.map((t) => {
+            if (t.id === customEvt.detail.taskId) {
+              return {
+                ...t,
+                ...(customEvt.detail.assignee !== undefined
+                  ? { assignee: customEvt.detail.assignee }
+                  : {}),
+                ...(customEvt.detail.dueDate !== undefined
+                  ? { dueDate: customEvt.detail.dueDate }
+                  : {}),
+              };
+            }
+            return t;
+          })
+        );
+      }
+    };
+
+    window.addEventListener("viems-task-assignment-updated", handleUpdate);
+    return () => {
+      window.removeEventListener("viems-task-assignment-updated", handleUpdate);
+    };
+  }, []);
 
   const stats = React.useMemo(() => {
     const total = tasks.length;
@@ -156,13 +325,7 @@ export function TasksTab({ caseId }: { caseId?: string }) {
     return { total, completed, crucial, underReview };
   }, [tasks]);
 
-  const categories: ("General" | "Compliance" | "Reporting" | "Documents" | "Visa & Immigration")[] = [
-    "General",
-    "Compliance",
-    "Reporting",
-    "Documents",
-    "Visa & Immigration",
-  ];
+  const categories: readonly TaskItem["category"][] = VALID_CATEGORIES;
 
   const handleToggleComplete = async (taskId: string) => {
     const targetTask = tasks.find((t) => t.id === taskId);
@@ -184,90 +347,213 @@ export function TasksTab({ caseId }: { caseId?: string }) {
         formData.append("completed", String(nextState));
         formData.append("status", nextState ? "completed" : "pending");
         await apiClient.patch(`${ENDPOINTS.tasks.base}/${taskId}`, { body: formData });
-        toast.success(
-          nextState
-            ? `"${targetTask.title}" marked as complete`
-            : `"${targetTask.title}" marked as pending`
-        );
+        if (nextState) {
+          toast.success(`"${targetTask.title}" marked as complete`);
+        } else {
+          toast.warning(`"${targetTask.title}" marked as unresolved`);
+        }
       } catch (err) {
-        console.error("Failed to update task on backend:", err);
+        console.warn("Failed to update task on backend:", err);
         setTasks((prev) =>
           prev.map((t) => (t.id === taskId ? prevTask : t))
         );
         toast.error(`Failed to update task "${targetTask.title}". Please try again.`);
       }
     } else {
-      toast.success(
-        nextState
-          ? `"${targetTask.title}" marked as complete`
-          : `"${targetTask.title}" marked as pending`
-      );
+      if (nextState) {
+        toast.success(`"${targetTask.title}" marked as complete`);
+      } else {
+        toast.warning(`"${targetTask.title}" marked as unresolved`);
+      }
     }
   };
 
-  const handleResolve = (task: TaskItem) => {
-    toast.info(`Resolving "${task.title}"`, {
-      description: "Action initiated for task",
-    });
-    handleToggleComplete(task.id);
+  const handleAssigneeChange = async (taskId: string, newAssignee: TaskAssignee | null) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, assignee: newAssignee } : t))
+    );
+    saveStoredTaskAssignment(taskId, { assignee: newAssignee });
+
+    const target = tasks.find((t) => t.id === taskId);
+    if (target?.hasBackendId) {
+      const empId = newAssignee?.employeeId ?? null;
+      await syncTaskAssignmentToBackend(taskId, { employeeId: empId });
+    }
   };
 
+  const handleDueDateChange = async (taskId: string, newDueDate: string | null) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, dueDate: newDueDate || undefined } : t))
+    );
+    saveStoredTaskAssignment(taskId, { dueDate: newDueDate || undefined });
+
+    const target = tasks.find((t) => t.id === taskId);
+    if (target?.hasBackendId) {
+      await syncTaskAssignmentToBackend(taskId, { dueDate: newDueDate || "" });
+    }
+  };
+
+  const handleOpenTaskActionModal = (task: TaskItem, customAction?: string) => {
+    const isTourGap =
+      task.title.toLowerCase().includes("tour gap") ||
+      task.title.toLowerCase().includes("schedule validation");
+
+    if (isTourGap && (!customAction || customAction === "Resolve")) {
+      setTourGapTaskId(task.id);
+      setTourGapModalOpen(true);
+      return;
+    }
+
+    const isUnionRate =
+      task.title.toLowerCase().includes("union minimum") ||
+      task.title.toLowerCase().includes("salary clearance") ||
+      task.title.toLowerCase().includes("union rate");
+
+    if (isUnionRate && (!customAction || customAction === "Review" || customAction === "Verify")) {
+      setUnionRateTaskId(task.id);
+      setUnionRateModalOpen(true);
+      return;
+    }
+
+    const isRtw =
+      (customAction || task.title).toLowerCase().includes("rtw") ||
+      (customAction || task.title).toLowerCase().includes("right to work");
+
+    const resolvedMigrantName: string =
+      migrantName ||
+      (typeof migrant?.name === "string" ? migrant.name : "") ||
+      "Migrant Dossier";
+    const resolvedCaseId = caseId || "001";
+
+    let action = customAction;
+    if (!action) {
+      if (isRtw) action = "Complete RTW check";
+      else action = "Upload documents";
+    }
+
+    const avatarText =
+      (typeof migrant?.avatarText === "string" ? migrant.avatarText : "") ||
+      (resolvedMigrantName
+        ? resolvedMigrantName
+            .split(" ")
+            .filter(Boolean)
+            .map((w: string) => w[0]?.toUpperCase() || "")
+            .slice(0, 2)
+            .join("")
+        : "MD");
+
+    const avatarUrl =
+      typeof migrant?.avatarUrl === "string" ? migrant.avatarUrl : undefined;
+
+    setActionModalRow({
+      id: caseId,
+      caseId: resolvedCaseId,
+      name: resolvedMigrantName,
+      avatarText,
+      avatarUrl,
+      action: action,
+      actionColor: "blue",
+    });
+    setActiveTaskIdForModal(task.id);
+    setActionModalOpen(true);
+  };
+
+  const handleResolveButtonClick = (task: TaskItem) => {
+    const isTourGap =
+      task.title.toLowerCase().includes("tour gap") ||
+      task.title.toLowerCase().includes("schedule validation");
+
+    if (isTourGap) {
+      handleOpenTaskActionModal(task, "Resolve");
+    } else {
+      handleToggleComplete(task.id);
+    }
+  };
+
+  // Filter and sort tasks
+  const displayedTasks = React.useMemo(() => {
+    let result = [...tasks];
+
+    if (assigneeFilter !== "ALL") {
+      if (assigneeFilter === "UNASSIGNED") {
+        result = result.filter((t) => !t.assignee);
+      } else {
+        result = result.filter((t) => t.assignee?.id === assigneeFilter);
+      }
+    }
+
+    if (sortByDueDate) {
+      result.sort((a, b) => {
+        const timeA = a.dueDate ? new Date(a.dueDate).getTime() : NaN;
+        const timeB = b.dueDate ? new Date(b.dueDate).getTime() : NaN;
+        const hasA = !isNaN(timeA);
+        const hasB = !isNaN(timeB);
+        if (!hasA && !hasB) return 0;
+        if (!hasA) return 1;
+        if (!hasB) return -1;
+        return sortByDueDate === "asc" ? timeA - timeB : timeB - timeA;
+      });
+    }
+
+    return result;
+  }, [tasks, assigneeFilter, sortByDueDate]);
+
   return (
-    <div className="w-full flex flex-col gap-8 font-sans animate-fade-in text-left">
+    <div className="w-full flex flex-col gap-6 font-sans animate-fade-in text-left">
       {error && (
-        <div className="bg-[#FFEBEC] border border-[#FECDCA] rounded-[10px] p-4 text-[14px] text-[#FB3748] flex items-center justify-between">
+        <div className="bg-error-light border border-error-light rounded-button p-4 text-[14px] text-error-dark flex items-center justify-between">
           <span>{error}</span>
         </div>
       )}
 
       {/* ─── Top 4 Stat Summary Cards (Exact Figma Spec Frame 107) ─────────── */}
       <div className="flex items-center gap-2 w-full">
-        {/* TOTAL TASKS */}
-        <div className="bg-[#EFEBFF] rounded-[8px] p-[12px_16px] flex justify-between items-start h-[70px] flex-1 relative">
-          <div className="flex flex-col gap-[2px]">
-            <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#171717] leading-[12px]">
-              TOTAL TASKS
+        {/* Total tasks */}
+        <div className="bg-[#EFEBFF] rounded-card p-lg flex justify-between items-start h-[70px] flex-1 relative">
+          <div className="flex flex-col gap-xxs">
+            <span className="text-label-xs font-medium text-foreground leading-none">
+              Total tasks
             </span>
-            <span className="font-aeonik-medium text-[24px] font-medium text-[#351A75] leading-[32px]">
+            <span className="font-aeonik-medium text-h5-title text-[#351A75]">
               {stats.total}
             </span>
           </div>
           <RiFileTextLine className="size-5 text-[#5C5C5C] shrink-0 absolute top-2 right-4" />
         </div>
 
-        {/* COMPLETED TASKS */}
-        <div className="bg-[#E3F7EC] rounded-[8px] p-[12px_16px] flex justify-between items-start h-[70px] flex-1 relative">
-          <div className="flex flex-col gap-[2px]">
-            <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#171717] leading-[12px]">
-              COMPLETED TASKS
+        {/* Completed tasks */}
+        <div className="bg-[#E3F7EC] rounded-card p-lg flex justify-between items-start h-[70px] flex-1 relative">
+          <div className="flex flex-col gap-xxs">
+            <span className="text-label-xs font-medium text-foreground leading-none">
+              Completed tasks
             </span>
-            <span className="font-aeonik-medium text-[24px] font-medium text-[#0B4627] leading-[32px]">
+            <span className="font-aeonik-medium text-h5-title text-[#0B4627]">
               {stats.completed}
             </span>
           </div>
           <RiCheckboxCircleLine className="size-5 text-[#5C5C5C] shrink-0 absolute top-2 right-4" />
         </div>
 
-        {/* CRUCIAL (REQUIRED) */}
-        <div className="bg-[#FFEBEC] rounded-[8px] p-[12px_16px] flex justify-between items-start h-[70px] flex-1 relative">
-          <div className="flex flex-col gap-[2px]">
-            <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#171717] leading-[12px]">
-              CRUCIAL (REQUIRED)
+        {/* Crucial (required) */}
+        <div className="bg-[#FFEBEC] rounded-card p-lg flex justify-between items-start h-[70px] flex-1 relative">
+          <div className="flex flex-col gap-xxs">
+            <span className="text-label-xs font-medium text-foreground leading-none">
+              Crucial (required)
             </span>
-            <span className="font-aeonik-medium text-[24px] font-medium text-[#681219] leading-[32px]">
+            <span className="font-aeonik-medium text-h5-title text-[#681219]">
               {stats.crucial}
             </span>
           </div>
           <RiAlertLine className="size-5 text-[#681219] shrink-0 absolute top-2 right-4" />
         </div>
 
-        {/* UNDER REVIEW */}
-        <div className="bg-[#FFFAEB] rounded-[8px] p-[12px_16px] flex justify-between items-start h-[70px] flex-1 relative">
-          <div className="flex flex-col gap-[2px]">
-            <span className="text-[11px] font-medium uppercase tracking-[0.02em] text-[#171717] leading-[12px]">
-              UNDER REVIEW
+        {/* Under review */}
+        <div className="bg-[#FFFAEB] rounded-card p-lg flex justify-between items-start h-[70px] flex-1 relative">
+          <div className="flex flex-col gap-xxs">
+            <span className="text-label-xs font-medium text-foreground leading-none">
+              Under review
             </span>
-            <span className="font-aeonik-medium text-[24px] font-medium text-[#624C18] leading-[32px]">
+            <span className="font-aeonik-medium text-h5-title text-[#624C18]">
               {stats.underReview}
             </span>
           </div>
@@ -275,10 +561,89 @@ export function TasksTab({ caseId }: { caseId?: string }) {
         </div>
       </div>
 
+      {/* ─── Task Accountability & Filter Toolbar (Task 12) ────────────────── */}
+      <div className="flex items-center justify-between gap-4 p-3 bg-white border border-border rounded-card shadow-2xs">
+        {/* Left: Owner filter pills */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center gap-1 text-label-xs font-medium text-muted-foreground mr-1">
+            <RiFilter3Line className="size-3.5" />
+            <span>Owner:</span>
+          </div>
+
+          <Button
+            type="button"
+            variant={assigneeFilter === "ALL" ? "primary-neutral" : "ghost"}
+            size="sm"
+            onClick={() => setAssigneeFilter("ALL")}
+            className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
+              assigneeFilter === "ALL"
+                ? "bg-neutral-900 text-white hover:bg-neutral-800 hover:text-white"
+                : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
+            }`}
+          >
+            All staff ({tasks.length})
+          </Button>
+
+          {STANDARD_STAFF_MEMBERS.map((staff) => {
+            const roleLabel =
+              staff.id === "staff-nathan"
+                ? "CoS"
+                : staff.id === "staff-harman"
+                ? "Itinerary"
+                : staff.id === "staff-rakesh"
+                ? "RTW"
+                : staff.id === "staff-priya"
+                ? "Legal"
+                : "Officer";
+            const firstName = staff.name.split(" ")[0];
+            return (
+              <Button
+                key={staff.id}
+                type="button"
+                variant={assigneeFilter === staff.id ? "primary-neutral" : "ghost"}
+                size="sm"
+                onClick={() => setAssigneeFilter(staff.id)}
+                className={`h-7 px-2.5 rounded-full text-[12px] font-medium transition-all ${
+                  assigneeFilter === staff.id
+                    ? "bg-neutral-900 text-white hover:bg-neutral-800 hover:text-white"
+                    : "text-muted-foreground hover:text-foreground hover:bg-neutral-100"
+                }`}
+              >
+                {firstName} ({roleLabel})
+              </Button>
+            );
+          })}
+        </div>
+
+        {/* Right: Sort by Due Date */}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            setSortByDueDate((prev) =>
+              prev === null ? "asc" : prev === "asc" ? "desc" : null
+            )
+          }
+          className={`h-7 px-2.5 rounded-button text-[12px] font-medium flex items-center gap-1.5 shrink-0 ${
+            sortByDueDate ? "border-neutral-900 text-neutral-900 bg-neutral-50" : "border-border text-muted-foreground"
+          }`}
+        >
+          <RiArrowUpDownLine className="size-3.5" />
+          <span>
+            {sortByDueDate === "asc"
+              ? "Due Date (Earliest)"
+              : sortByDueDate === "desc"
+              ? "Due Date (Latest)"
+              : "Sort by Deadline"}
+          </span>
+        </Button>
+      </div>
+
       {/* ─── Categorized Task Sections ──────────────────────────────────────── */}
       <div className="flex flex-col gap-8 w-full">
         {categories.map((cat) => {
-          const categoryTasks = tasks.filter((t) => t.category === cat);
+          const categoryTasks = displayedTasks.filter((t) => t.category === cat);
           const catCompleted = categoryTasks.filter((t) => t.isCompleted).length;
           const catTotal = categoryTasks.length;
 
@@ -300,7 +665,7 @@ export function TasksTab({ caseId }: { caseId?: string }) {
               </div>
 
               {/* Task Rows Card Group */}
-              <div className="bg-white border border-[#F5F5F5] rounded-[16px] divide-y divide-neutral-100 overflow-hidden shadow-2xs">
+              <div className="bg-white border border-[#F5F5F5] rounded-card divide-y divide-neutral-100 overflow-hidden shadow-2xs">
                 {categoryTasks.map((task) => {
                   return (
                     <div
@@ -309,7 +674,7 @@ export function TasksTab({ caseId }: { caseId?: string }) {
                     >
                       {/* Left Side: Icon Badge & Content */}
                       <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                        {/* Status Icon Badges (Figma Spec 2) */}
+                        {/* Status Icon Badges */}
                         {task.isCompleted ? (
                           <div className="size-7 rounded-full bg-[#E3F7EC] text-[#0B4627] flex items-center justify-center font-bold text-[13px] shrink-0 mt-0.5">
                             ✓
@@ -342,59 +707,133 @@ export function TasksTab({ caseId }: { caseId?: string }) {
                         </div>
                       </div>
 
-                      {/* Right Side: Resolve Button & Row Dropdown Menu */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        {!task.isCompleted && (
-                          <button
+                      {/* Right Side: Assignee Selector + Due Date Picker + Resolve Button + Row Dropdown */}
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        {/* Task 12: Assignee Selector */}
+                        <TaskAssigneeSelector
+                          assignee={task.assignee}
+                          onAssign={(staff) => handleAssigneeChange(task.id, staff)}
+                        />
+
+                        {/* Task 12: Due Date Picker */}
+                        <TaskDueDatePicker
+                          dueDate={task.dueDate}
+                          onChange={(date) => handleDueDateChange(task.id, date)}
+                        />
+
+                        {task.isCompleted ? (
+                          <Button
                             type="button"
-                            onClick={() => handleResolve(task)}
-                            className="h-8 px-4 bg-[#262626] hover:bg-[#171717] text-white text-[13px] font-medium rounded-[8px] transition-colors cursor-pointer border-0"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleComplete(task.id)}
+                            className="h-7 px-2.5 border-border hover:bg-neutral-100 text-muted-foreground hover:text-foreground text-label-xs font-medium rounded-button cursor-pointer"
+                          >
+                            Unresolve
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => handleResolveButtonClick(task)}
+                            className="h-7 px-3 bg-neutral-900 hover:bg-neutral-800 text-white text-label-xs font-medium rounded-button cursor-pointer"
                           >
                             Resolve
-                          </button>
+                          </Button>
                         )}
 
-                        {/* Row Dropdown Menu (Screenshot 2 Spec) */}
+                        {/* Row Dropdown Menu */}
                         <DropdownMenu>
-                          <DropdownMenuTrigger className="size-8 rounded-[6px] flex items-center justify-center text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-100 transition-colors cursor-pointer border-0 bg-transparent">
-                            <RiMore2Line className="size-4 shrink-0" />
-                          </DropdownMenuTrigger>
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                className="size-7 rounded-button text-muted-foreground hover:text-foreground hover:bg-neutral-100 cursor-pointer"
+                              >
+                                <RiMore2Line className="size-4 shrink-0" />
+                              </Button>
+                            }
+                          />
                           <DropdownMenuContent
                             align="end"
-                            className="w-[200px] p-1.5 rounded-[12px] bg-white border border-neutral-200 shadow-lg text-[13px]"
+                            className="w-[220px] p-1.5 rounded-card bg-popover text-popover-foreground border-border shadow-card-large flex flex-col gap-0.5 text-paragraph-sm"
                           >
-                            <DropdownMenuItem
-                              onClick={() => handleToggleComplete(task.id)}
-                              className="flex items-center gap-2.5 px-3 py-2 rounded-[8px] text-[#171717] hover:bg-neutral-100 cursor-pointer font-medium"
-                            >
-                              <RiCheckboxCircleLine className="size-4 text-[#5C5C5C]" />
-                              <span>{task.isCompleted ? "Mark as pending" : "Mark as complete"}</span>
-                            </DropdownMenuItem>
+                            {task.isCompleted ? (
+                              <DropdownMenuItem
+                                onClick={() => handleToggleComplete(task.id)}
+                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                              >
+                                <RiRefreshLine className="size-4 text-muted-foreground shrink-0" />
+                                <span>Unresolve</span>
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem
+                                onClick={() => handleResolveButtonClick(task)}
+                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                              >
+                                <RiFocus2Line className="size-4 text-muted-foreground shrink-0" />
+                                <span>Resolve</span>
+                              </DropdownMenuItem>
+                            )}
 
                             <DropdownMenuItem
-                              onClick={() =>
-                                toast.info(`Upload documents for "${task.title}"`, {
-                                  description: "Opening upload dialog...",
-                                })
-                              }
-                              className="flex items-center gap-2.5 px-3 py-2 rounded-[8px] text-[#171717] hover:bg-neutral-100 cursor-pointer font-medium"
+                              onClick={() => handleOpenTaskActionModal(task, "Upload documents")}
+                              className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
                             >
-                              <RiUpload2Line className="size-4 text-[#5C5C5C]" />
+                              <RiUpload2Line className="size-4 text-muted-foreground shrink-0" />
                               <span>Upload documents</span>
                             </DropdownMenuItem>
 
-                            <DropdownMenuSeparator className="my-1 border-t border-neutral-100" />
+                            <DropdownMenuItem
+                              onClick={() => handleOpenTaskActionModal(task, "Complete RTW check")}
+                              className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                            >
+                              <RiShieldCheckLine className="size-4 text-muted-foreground shrink-0" />
+                              <span>Complete RTW check</span>
+                            </DropdownMenuItem>
+
+                            {(task.title.toLowerCase().includes("tour gap") ||
+                              task.title.toLowerCase().includes("schedule")) && (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setTourGapTaskId(task.id);
+                                  setTourGapModalOpen(true);
+                                }}
+                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                              >
+                                <RiCalendarEventLine className="size-4 text-muted-foreground shrink-0" />
+                                <span>Tour gap schedule</span>
+                              </DropdownMenuItem>
+                            )}
+
+                            {(task.title.toLowerCase().includes("union") ||
+                              task.title.toLowerCase().includes("salary")) && (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setUnionRateTaskId(task.id);
+                                  setUnionRateModalOpen(true);
+                                }}
+                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                              >
+                                <RiShieldCheckLine className="size-4 text-muted-foreground shrink-0" />
+                                <span>Verify union rate &amp; salary</span>
+                              </DropdownMenuItem>
+                            )}
+
+                            <DropdownMenuSeparator className="my-1 border-t border-border" />
 
                             <DropdownMenuItem
                               onClick={() =>
-                                toast.info(`Task Details`, {
-                                  description: task.description,
+                                toast.info("Task accountability", {
+                                  description: `Assigned to ${task.assignee?.name || "Unassigned"}. Deadline: ${task.dueDate || "None"}.`,
                                 })
                               }
-                              className="flex items-center gap-2.5 px-3 py-2 rounded-[8px] text-[#171717] hover:bg-neutral-100 cursor-pointer font-medium"
+                              className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
                             >
-                              <RiInformationLine className="size-4 text-[#5C5C5C]" />
-                              <span>More information</span>
+                              <RiInformationLine className="size-4 text-muted-foreground shrink-0" />
+                              <span>Task details</span>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -408,6 +847,48 @@ export function TasksTab({ caseId }: { caseId?: string }) {
         })}
       </div>
 
+      {/* Case Action Modal */}
+      <CaseActionModal
+        open={actionModalOpen}
+        onOpenChange={setActionModalOpen}
+        row={actionModalRow}
+        onSuccess={() => {
+          if (activeTaskIdForModal) {
+            handleToggleComplete(activeTaskIdForModal);
+          }
+        }}
+      />
+
+      {/* Tour Gap Schedule Modal */}
+      <TourGapScheduleModal
+        open={tourGapModalOpen}
+        onOpenChange={setTourGapModalOpen}
+        caseId={caseId}
+        migrantName={migrantName || (typeof migrant?.name === "string" ? migrant.name : undefined)}
+        onSaveSchedule={() => {
+          if (tourGapTaskId) {
+            handleToggleComplete(tourGapTaskId);
+          }
+        }}
+      />
+
+      {/* Union Rate Modal */}
+      <UnionRateModal
+        open={unionRateModalOpen}
+        onOpenChange={setUnionRateModalOpen}
+        caseId={caseId}
+        migrantName={migrantName || (typeof migrant?.name === "string" ? migrant.name : undefined)}
+        initialSalary={typeof migrant?.salary === "string" || typeof migrant?.salary === "number" ? migrant.salary : ""}
+        initialJobTitle={typeof migrant?.role === "string" ? migrant.role : typeof migrant?.jobTitle === "string" ? migrant.jobTitle : ""}
+        onSuccess={() => {
+          if (unionRateTaskId) {
+            const target = tasks.find((t) => t.id === unionRateTaskId);
+            if (target && !target.isCompleted) {
+              handleToggleComplete(unionRateTaskId);
+            }
+          }
+        }}
+      />
     </div>
   );
 }

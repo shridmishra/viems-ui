@@ -24,6 +24,11 @@ import {
   RiRefreshLine,
   RiArrowLeftDoubleLine,
   RiArrowRightDoubleLine,
+  RiFocus2Line,
+  RiShieldCheckLine,
+  RiUpload2Line,
+  RiMore2Line,
+  RiCheckLine,
 } from "@remixicon/react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
@@ -39,14 +44,30 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { CaseActionModal, CaseActionRow } from "../cases/components/CaseActionModal";
+import { TourGapScheduleModal } from "../cases/components/TourGapScheduleModal";
 
 // Sort icon component matching Figma expand-up-down-fill
 import { SortIcon } from "@/components/ui/sort-icon";
 import { escapeCsvField } from "@/lib/csv-utils";
+import { TaskAssigneeSelector } from "@/components/tasks/TaskAssigneeSelector";
+import { TaskDueDatePicker } from "@/components/tasks/TaskDueDatePicker";
+import { TaskStatusSelector, type TaskStatusValue } from "@/components/tasks/TaskStatusSelector";
+import {
+  TaskAssignee,
+  getDefaultAssigneeForTask,
+  getDefaultDueDateForTask,
+  formatDateDisplay,
+  getStoredTaskAssignment,
+  saveStoredTaskAssignment,
+  syncTaskAssignmentToBackend,
+} from "@/lib/task-assignment-storage";
 
 interface TaskItem {
   id: string;
@@ -56,6 +77,7 @@ interface TaskItem {
   subtitle: string;
   migrantName: string;
   caseId: string;
+  rawCaseId?: string;
   avatarUrl?: string;
   avatarText: string;
   status: string;
@@ -66,6 +88,7 @@ interface TaskItem {
   riskLevel: "HIGH" | "MEDIUM" | "LOW";
   potentialImpact: string;
   isResolved?: boolean;
+  assignee?: TaskAssignee | null;
 }
 
 interface MigrantComplianceRow {
@@ -94,6 +117,64 @@ export default function ComplianceCentrePage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const [migrantPage, setMigrantPage] = React.useState(1);
   const [migrantPageSize, setMigrantPageSize] = React.useState(10);
+
+  // Modal states for priority tasks
+  const [actionModalOpen, setActionModalOpen] = React.useState(false);
+  const [actionModalRow, setActionModalRow] = React.useState<CaseActionRow | null>(null);
+  const [activeTaskIdForModal, setActiveTaskIdForModal] = React.useState<string | null>(null);
+  const [tourGapModalOpen, setTourGapModalOpen] = React.useState(false);
+  const [tourGapCaseId, setTourGapCaseId] = React.useState<string | undefined>(undefined);
+  const [tourGapMigrantName, setTourGapMigrantName] = React.useState<string | undefined>(undefined);
+
+  const handleOpenTaskActionModal = (task: TaskItem, customAction?: string) => {
+    const isTourGap =
+      task.title.toLowerCase().includes("tour gap") ||
+      task.title.toLowerCase().includes("schedule");
+
+    const cleanCaseId = task.rawCaseId || task.caseId.replace(/^#/, "");
+
+    if (isTourGap && (!customAction || customAction === "Resolve")) {
+      setActiveTaskIdForModal(task.id);
+      setTourGapCaseId(cleanCaseId || task.caseId);
+      setTourGapMigrantName(task.migrantName);
+      setTourGapModalOpen(true);
+      return;
+    }
+
+    const isRtw =
+      (customAction || task.title).toLowerCase().includes("rtw") ||
+      (customAction || task.title).toLowerCase().includes("right to work");
+
+    let action = customAction;
+    if (!action) {
+      if (isRtw) action = "Complete RTW check";
+      else action = "Upload documents";
+    }
+
+    setActionModalRow({
+      id: cleanCaseId || task.id,
+      caseId: task.caseId,
+      name: task.migrantName,
+      avatarText: task.avatarText,
+      avatarUrl: task.avatarUrl,
+      action: action,
+      actionColor: "blue",
+    });
+    setActiveTaskIdForModal(task.id);
+    setActionModalOpen(true);
+  };
+
+  const handleResolveButtonClick = (task: TaskItem) => {
+    const isTourGap =
+      task.title.toLowerCase().includes("tour gap") ||
+      task.title.toLowerCase().includes("schedule");
+
+    if (isTourGap) {
+      handleOpenTaskActionModal(task, "Resolve");
+    } else {
+      handleResolveTask(task.id);
+    }
+  };
 
   // Sorting state for Priority Tasks
   const [taskSortCol, setTaskSortCol] = React.useState<string | null>(null);
@@ -158,9 +239,26 @@ export default function ComplianceCentrePage() {
       ]);
 
       if (casesRes.status === "fulfilled" && casesRes.value) {
-        const rawCases: any[] = Array.isArray(casesRes.value)
+        let rawCases: any[] = Array.isArray(casesRes.value)
           ? casesRes.value
           : (casesRes.value as any)?.data ?? [];
+
+        const isDemoEnabled = process.env.NEXT_PUBLIC_ENABLE_DEMO_DATA === "true";
+
+        if (rawCases.length === 0 && isDemoEnabled) {
+          rawCases = [
+            { id: 1, caseNumber: "40921", migrant: { user: { firstName: "David", lastName: "Adeleke" } }, company: "Live Nation UK", status: "UNDER REVIEW", visaExpiryDate: "2026-11-20" },
+            { id: 2, caseNumber: "40922", migrant: { user: { firstName: "Priya", lastName: "Patel" } }, company: "AEG Presents", status: "ACTION NEEDED", visaExpiryDate: "2026-06-15" },
+            { id: 3, caseNumber: "40923", migrant: { user: { firstName: "Carlos", lastName: "Silva" } }, company: "Metropolis Studios", status: "COMPLIANT", visaExpiryDate: "2027-01-10" },
+            { id: 4, caseNumber: "40924", migrant: { user: { firstName: "Amina", lastName: "Diallo" } }, company: "Warp Records", status: "COMPLIANT", visaExpiryDate: "2026-09-30" },
+          ];
+        }
+
+        let savedOverrides: Record<string, "COMPLIANT" | "UNDER REVIEW" | "ACTION NEEDED"> = {};
+        try {
+          const raw = localStorage.getItem("viems_migrant_status_overrides");
+          if (raw) savedOverrides = JSON.parse(raw);
+        } catch {}
 
         const mappedMigrants: MigrantComplianceRow[] = rawCases.map((c: any, i: number) => {
           const migrantName =
@@ -180,7 +278,7 @@ export default function ComplianceCentrePage() {
           let statusBg = "bg-[#E3F7EC]";
           let statusColor = "text-[#0B4627]";
 
-          if (rawStatus.includes("REFUSED") || rawStatus.includes("OVERDUE") || rawStatus.includes("EXPIRED")) {
+          if (rawStatus.includes("REFUSED") || rawStatus.includes("OVERDUE") || rawStatus.includes("EXPIRED") || rawStatus.includes("ACTION")) {
             status = "ACTION NEEDED";
             statusBg = "bg-[#FFEBEC]";
             statusColor = "text-[#FB3748]";
@@ -188,6 +286,21 @@ export default function ComplianceCentrePage() {
             status = "UNDER REVIEW";
             statusBg = "bg-[#FFFAEB]";
             statusColor = "text-[#F6B51E]";
+          }
+
+          const migrantId = String(c.id || `migrant-${i + 1}`);
+          if (savedOverrides[migrantId]) {
+            status = savedOverrides[migrantId];
+            if (status === "ACTION NEEDED") {
+              statusBg = "bg-[#FFEBEC]";
+              statusColor = "text-[#FB3748]";
+            } else if (status === "UNDER REVIEW") {
+              statusBg = "bg-[#FFFAEB]";
+              statusColor = "text-[#F6B51E]";
+            } else {
+              statusBg = "bg-[#E3F7EC]";
+              statusColor = "text-[#0B4627]";
+            }
           }
 
           const expiry = c.visaExpiryDate || c.expiryDate || c.cosExpiryDate;
@@ -202,7 +315,7 @@ export default function ComplianceCentrePage() {
           const docCount = c.filesCount || (c.files ? c.files.length : (i % 3 === 0 ? 12 : 11));
 
           return {
-            id: String(c.id || `migrant-${i + 1}`),
+            id: migrantId,
             caseId,
             name: migrantName,
             company: c.company || c.sponsor || "TechCorp UK Ltd",
@@ -218,10 +331,79 @@ export default function ComplianceCentrePage() {
         setMigrantsData(mappedMigrants);
       }
 
-      if (tasksRes.status === "fulfilled" && tasksRes.value) {
-        const rawTasks: any[] = Array.isArray(tasksRes.value)
-          ? tasksRes.value
-          : (tasksRes.value as any)?.data ?? [];
+      {
+        let rawTasks: any[] = [];
+        if (tasksRes.status === "fulfilled" && tasksRes.value) {
+          rawTasks = Array.isArray(tasksRes.value)
+            ? tasksRes.value
+            : (tasksRes.value as any)?.data ?? [];
+        }
+
+        const isDemoEnabled = process.env.NEXT_PUBLIC_ENABLE_DEMO_DATA === "true";
+        if (rawTasks.length === 0 && isDemoEnabled) {
+          rawTasks = [
+            {
+              id: "task-comp-1",
+              title: "14-Day Tour Gap Schedule Validation",
+              subtitle: "Upload travel itinerary & verify event dates meet 14-day rule",
+              firstName: "David",
+              lastName: "Adeleke",
+              caseNumber: "40921",
+              priority: "HIGH",
+              status: "crucial",
+              category: "Compliance",
+              impact: "Statutory breach risk if cross-border travel schedule exceeds 14 days without Home Office notification.",
+            },
+            {
+              id: "task-comp-2",
+              title: "SMS CoS Assignment & Pre-Submission Review",
+              subtitle: "Validate CoS allocation reference and confirm salary threshold",
+              firstName: "Priya",
+              lastName: "Patel",
+              caseNumber: "40922",
+              priority: "HIGH",
+              status: "crucial",
+              category: "Visa & Immigration",
+              impact: "Sponsor licence compliance risk if CoS is assigned under incorrect SOC code.",
+            },
+            {
+              id: "task-comp-3",
+              title: "Complete Right to Work (RTW) Check",
+              subtitle: "Verify Home Office share code and record statutory excuse",
+              firstName: "Carlos",
+              lastName: "Silva",
+              caseNumber: "40923",
+              priority: "HIGH",
+              status: "crucial",
+              category: "Compliance",
+              impact: "Civil penalty risk up to £45,000 for illegal employment if RTW check is missing before start date.",
+            },
+            {
+              id: "task-comp-4",
+              title: "Union Minimum Rate & Salary Clearance",
+              subtitle: "Cross-check agreed weekly fee against Equity / PACT rates",
+              firstName: "Amina",
+              lastName: "Diallo",
+              caseNumber: "40924",
+              priority: "MEDIUM",
+              status: "under_review",
+              category: "General",
+              impact: "Potential wage underpayment non-compliance under sponsor licence Appendix D obligations.",
+            },
+            {
+              id: "task-comp-5",
+              title: "Passport Biometrics & UK Entry Stamp",
+              subtitle: "Collect bio page & ensure arrival stamp is filed in dossier",
+              firstName: "Elena",
+              lastName: "Rostova",
+              caseNumber: "40925",
+              priority: "MEDIUM",
+              status: "under_review",
+              category: "Documents",
+              impact: "Mandatory documentation check required under UKVI sponsor record keeping requirements.",
+            },
+          ];
+        }
 
         const mappedTasks: TaskItem[] = rawTasks.map((t: any, i: number) => {
           const prio = String(t.priority || "").toUpperCase();
@@ -255,49 +437,87 @@ export default function ComplianceCentrePage() {
             t.isCompleted || t.status === "RESOLVED" || t.status === "DONE"
           );
 
+          const taskId = String(t.id || `task-${i + 1}`);
+          const stored = getStoredTaskAssignment(taskId);
+
+          let assignee = stored?.assignee;
+          if (!assignee && t.assignee) {
+            assignee = t.assignee;
+          }
+          if (!assignee) {
+            assignee = getDefaultAssigneeForTask(t.title || "Complete RTW check", t.category);
+          }
+
+          const dueDate =
+            stored?.dueDate ||
+            (t.dueDate
+              ? formatDateDisplay(t.dueDate)
+              : getDefaultDueDateForTask(riskLevel));
+
+          const rawCaseNum = t.caseNumber || t.caseId || "";
+          const rawCaseId = String(rawCaseNum).replace(/^#/, "");
+          const caseId = rawCaseId ? `#${rawCaseId}` : "—";
+
+          const resolvedFromStore =
+            typeof stored?.isResolved === "boolean" ? stored.isResolved : isCompleted;
+          const statusFromStore =
+            stored?.status ||
+            (resolvedFromStore
+              ? "RESOLVED"
+              : riskLevel === "HIGH"
+              ? "REQUIRED ASAP"
+              : riskLevel === "MEDIUM"
+              ? "UNDER REVIEW"
+              : "PENDING");
+
+          const effectiveIsResolved =
+            statusFromStore === "RESOLVED" || resolvedFromStore;
+          const effectiveRiskLevel: "HIGH" | "MEDIUM" | "LOW" =
+            statusFromStore === "REQUIRED ASAP"
+              ? "HIGH"
+              : statusFromStore === "RESOLVED"
+              ? "LOW"
+              : riskLevel;
+
+          const effectiveStatusBg =
+            statusFromStore === "RESOLVED"
+              ? "bg-[#E3F7EC]"
+              : statusFromStore === "REQUIRED ASAP"
+              ? "bg-[#FFEBEC]"
+              : "bg-[#FFFAEB]";
+
+          const effectiveStatusColor =
+            statusFromStore === "RESOLVED"
+              ? "text-[#0B4627]"
+              : statusFromStore === "REQUIRED ASAP"
+              ? "text-[#681219]"
+              : "text-[#624C18]";
+
           return {
-            id: String(t.id || `task-${i + 1}`),
-            iconBg,
-            iconColor,
+            id: taskId,
+            iconBg: effectiveStatusBg,
+            iconColor: effectiveStatusColor,
             title: t.title || "Complete RTW check",
             subtitle:
               t.description ||
               t.subtitle ||
               "Complete right to work check before employment starts",
             migrantName,
-            caseId: t.caseNumber ? `#${t.caseNumber}` : (t.caseId ? `#${t.caseId}` : "—"),
+            caseId,
+            rawCaseId: rawCaseId || undefined,
             avatarUrl: t.avatarUrl || undefined,
             avatarText: initials,
-            status: isCompleted
-              ? "RESOLVED"
-              : riskLevel === "HIGH"
-              ? "REQUIRED ASAP"
-              : "UNDER REVIEW",
-            statusBg: isCompleted
-              ? "bg-[#E3F7EC]"
-              : riskLevel === "HIGH"
-              ? "bg-[#FFEBEC]"
-              : "bg-[#FFFAEB]",
-            statusColor: isCompleted
-              ? "text-[#0B4627]"
-              : riskLevel === "HIGH"
-              ? "text-[#681219]"
-              : "text-[#624C18]",
-            dueDate: t.dueDate
-              ? String(t.dueDate).includes("Mar")
-                ? t.dueDate
-                : new Date(t.dueDate).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })
-              : "Mar 25, 2026",
-            hasWarningIcon: riskLevel === "HIGH" && !isCompleted,
-            riskLevel,
+            status: statusFromStore,
+            statusBg: effectiveStatusBg,
+            statusColor: effectiveStatusColor,
+            dueDate,
+            hasWarningIcon: effectiveRiskLevel === "HIGH" && !effectiveIsResolved,
+            riskLevel: effectiveRiskLevel,
             potentialImpact:
               t.impact ||
               "Mandatory worker rights disclosure and documentation record for UKVI sponsor trail.",
-            isResolved: isCompleted,
+            isResolved: effectiveIsResolved,
+            assignee,
           };
         });
         setTasks(mappedTasks);
@@ -307,10 +527,57 @@ export default function ComplianceCentrePage() {
         }
       }
     } catch (err) {
-      console.error("Failed to load compliance centre data:", err);
+      console.warn("Failed to load compliance centre data:", err);
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const handleTaskAssigneeChange = React.useCallback((taskId: string, newAssignee: TaskAssignee | null) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, assignee: newAssignee } : t))
+    );
+    saveStoredTaskAssignment(taskId, { assignee: newAssignee });
+    const empId = newAssignee?.employeeId ?? null;
+    syncTaskAssignmentToBackend(taskId, { employeeId: empId });
+  }, []);
+
+  const handleTaskDueDateChange = React.useCallback((taskId: string, newDueDate: string | null) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, dueDate: newDueDate || "No due date" } : t))
+    );
+    saveStoredTaskAssignment(taskId, { dueDate: newDueDate || undefined });
+    syncTaskAssignmentToBackend(taskId, { dueDate: newDueDate || "" });
+  }, []);
+
+  // Listen to external task assignment updates across components
+  React.useEffect(() => {
+    const handleUpdate = (e: Event) => {
+      const customEvt = e as CustomEvent;
+      if (customEvt.detail?.taskId) {
+        setTasks((prev) =>
+          prev.map((t) => {
+            if (t.id === customEvt.detail.taskId) {
+              return {
+                ...t,
+                ...(customEvt.detail.assignee !== undefined
+                  ? { assignee: customEvt.detail.assignee }
+                  : {}),
+                ...(customEvt.detail.dueDate !== undefined
+                  ? { dueDate: customEvt.detail.dueDate }
+                  : {}),
+              };
+            }
+            return t;
+          })
+        );
+      }
+    };
+
+    window.addEventListener("viems-task-assignment-updated", handleUpdate);
+    return () => {
+      window.removeEventListener("viems-task-assignment-updated", handleUpdate);
+    };
   }, []);
 
   React.useEffect(() => {
@@ -434,6 +701,7 @@ export default function ComplianceCentrePage() {
 
   const handleResolveTask = async (taskId: string) => {
     const prevTasks = [...tasks];
+    const prevStored = getStoredTaskAssignment(taskId);
     try {
       setTasks((prev) =>
         prev.map((t) =>
@@ -444,10 +712,13 @@ export default function ComplianceCentrePage() {
                 status: "RESOLVED",
                 statusBg: "bg-[#E3F7EC]",
                 statusColor: "text-[#0B4627]",
+                iconBg: "bg-[#E3F7EC]",
+                iconColor: "text-[#0B4627]",
               }
             : t
         )
       );
+      saveStoredTaskAssignment(taskId, { status: "RESOLVED", isResolved: true });
       if (!taskId.startsWith("task-")) {
         await apiClient.patch(`${ENDPOINTS.tasks.base}/${taskId}`, {
           body: JSON.stringify({ isCompleted: true, status: "RESOLVED" }),
@@ -457,7 +728,175 @@ export default function ComplianceCentrePage() {
     } catch (err) {
       console.error("Failed to resolve task:", err);
       setTasks(prevTasks);
+      if (prevStored) saveStoredTaskAssignment(taskId, prevStored);
       toast.error("Failed to resolve task. Please try again.");
+    }
+  };
+
+  const handleUnresolveTask = async (taskId: string) => {
+    const prevTasks = [...tasks];
+    const prevStored = getStoredTaskAssignment(taskId);
+    try {
+      let restoredStatus = "UNDER REVIEW";
+      setTasks((prev) =>
+        prev.map((t) => {
+          if (t.id !== taskId) return t;
+          const status = t.riskLevel === "HIGH" ? "REQUIRED ASAP" : "UNDER REVIEW";
+          restoredStatus = status;
+          const statusBg = t.riskLevel === "HIGH" ? "bg-[#FFEBEC]" : "bg-[#FFFAEB]";
+          const statusColor = t.riskLevel === "HIGH" ? "text-[#681219]" : "text-[#624C18]";
+          return {
+            ...t,
+            isResolved: false,
+            status,
+            statusBg,
+            statusColor,
+            iconBg: statusBg,
+            iconColor: statusColor,
+            hasWarningIcon: t.riskLevel === "HIGH",
+          };
+        })
+      );
+      saveStoredTaskAssignment(taskId, { status: restoredStatus, isResolved: false });
+      if (!taskId.startsWith("task-")) {
+        await apiClient.patch(`${ENDPOINTS.tasks.base}/${taskId}`, {
+          body: JSON.stringify({ isCompleted: false, status: "PENDING" }),
+        });
+      }
+      toast.warning("Task marked as unresolved");
+    } catch (err) {
+      console.error("Failed to unresolve task:", err);
+      setTasks(prevTasks);
+      if (prevStored) saveStoredTaskAssignment(taskId, prevStored);
+      toast.error("Failed to unresolve task. Please try again.");
+    }
+  };
+
+  const handleTaskStatusChange = async (
+    taskId: string,
+    newStatus: TaskStatusValue
+  ) => {
+    const prevTasks = [...tasks];
+    const prevStored = getStoredTaskAssignment(taskId);
+    const isResolved = newStatus === "RESOLVED";
+    const riskLevel: "HIGH" | "MEDIUM" | "LOW" =
+      newStatus === "REQUIRED ASAP"
+        ? "HIGH"
+        : newStatus === "UNDER REVIEW"
+        ? "MEDIUM"
+        : "LOW";
+
+    const statusBg =
+      newStatus === "RESOLVED"
+        ? "bg-[#E3F7EC]"
+        : newStatus === "REQUIRED ASAP"
+        ? "bg-[#FFEBEC]"
+        : "bg-[#FFFAEB]";
+
+    const statusColor =
+      newStatus === "RESOLVED"
+        ? "text-[#0B4627]"
+        : newStatus === "REQUIRED ASAP"
+        ? "text-[#681219]"
+        : "text-[#624C18]";
+
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              status: newStatus,
+              statusBg,
+              statusColor,
+              iconBg: statusBg,
+              iconColor: statusColor,
+              isResolved,
+              riskLevel,
+              hasWarningIcon: newStatus === "REQUIRED ASAP",
+            }
+          : t
+      )
+    );
+
+    saveStoredTaskAssignment(taskId, {
+      status: newStatus,
+      isResolved,
+    });
+
+    if (!taskId.startsWith("task-")) {
+      try {
+        await apiClient.patch(`${ENDPOINTS.tasks.base}/${taskId}`, {
+          body: JSON.stringify({
+            isCompleted: isResolved,
+            status:
+              newStatus === "RESOLVED"
+                ? "RESOLVED"
+                : newStatus === "REQUIRED ASAP"
+                ? "CRUCIAL"
+                : "UNDER_REVIEW",
+          }),
+        });
+      } catch (err) {
+        console.warn("Failed to update task status on backend:", err);
+        setTasks(prevTasks);
+        if (prevStored) saveStoredTaskAssignment(taskId, prevStored);
+        toast.error("Failed to update task status. Please try again.");
+        return;
+      }
+    }
+
+    if (newStatus === "RESOLVED") {
+      toast.success("Task marked as resolved");
+    } else if (newStatus === "REQUIRED ASAP") {
+      toast.warning("Task status set to Required ASAP");
+    } else {
+      toast.warning("Task status set to Under review");
+    }
+  };
+
+  const handleMigrantStatusChange = (
+    migrantId: string,
+    newStatus: "COMPLIANT" | "UNDER REVIEW" | "ACTION NEEDED"
+  ) => {
+    const statusBg =
+      newStatus === "COMPLIANT"
+        ? "bg-[#E3F7EC]"
+        : newStatus === "UNDER REVIEW"
+        ? "bg-[#FFFAEB]"
+        : "bg-[#FFEBEC]";
+    const statusColor =
+      newStatus === "COMPLIANT"
+        ? "text-[#0B4627]"
+        : newStatus === "UNDER REVIEW"
+        ? "text-[#624C18]"
+        : "text-[#681219]";
+
+    setMigrantsData((prev) =>
+      prev.map((m) =>
+        m.id === migrantId
+          ? {
+              ...m,
+              status: newStatus,
+              statusBg,
+              statusColor,
+            }
+          : m
+      )
+    );
+
+    try {
+      const raw = localStorage.getItem("viems_migrant_status_overrides");
+      const currentOverrides = raw ? JSON.parse(raw) : {};
+      currentOverrides[migrantId] = newStatus;
+      localStorage.setItem("viems_migrant_status_overrides", JSON.stringify(currentOverrides));
+    } catch {}
+
+    if (newStatus === "COMPLIANT") {
+      toast.success("Migrant status updated to Compliant");
+    } else if (newStatus === "UNDER REVIEW") {
+      toast.warning("Migrant status updated to Under Review");
+    } else {
+      toast.warning("Migrant status updated to Action Needed");
     }
   };
 
@@ -1049,87 +1488,130 @@ export default function ComplianceCentrePage() {
           </div>
 
           {/* Filter Pills Segmented Control */}
-          <div className="inline-flex items-center gap-1 bg-[#EBEBEB] rounded-full p-1 h-7 w-fit">
-            <button
+          <div className="inline-flex items-center gap-1 bg-neutral-200/60 rounded-full p-1 h-7 w-fit">
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={() => handleTaskFilterChange("ALL")}
-              className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none flex items-center justify-center transition-all cursor-pointer border-0 ${
+              className={`h-5 px-2.5 rounded-full text-label-xs font-medium leading-none flex items-center justify-center transition-all cursor-pointer border-0 ${
                 selectedTaskFilter === "ALL"
-                  ? "bg-white text-[#171717] shadow-x-small"
-                  : "bg-transparent text-[#5C5C5C] hover:text-[#171717]"
+                  ? "bg-card text-foreground shadow-x-small hover:bg-card hover:text-foreground"
+                  : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-neutral-100"
               }`}
             >
-              ALL ({tasks.length})
-            </button>
-            <button
+              All ({tasks.length})
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={() => handleTaskFilterChange("HIGH")}
-              className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
+              className={`h-5 px-2.5 rounded-full text-label-xs font-medium leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
                 selectedTaskFilter === "HIGH"
-                  ? "bg-white text-[#171717] shadow-x-small"
-                  : "bg-transparent text-[#5C5C5C] hover:text-[#171717]"
+                  ? "bg-card text-foreground shadow-x-small hover:bg-card hover:text-foreground"
+                  : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-neutral-100"
               }`}
             >
               <span className="size-1.5 rounded-full bg-[#FB3748] shrink-0" />
-              <span>HIGH ({highCount})</span>
-            </button>
-            <button
+              <span>High ({highCount})</span>
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={() => handleTaskFilterChange("MEDIUM")}
-              className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
+              className={`h-5 px-2.5 rounded-full text-label-xs font-medium leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
                 selectedTaskFilter === "MEDIUM"
-                  ? "bg-white text-[#171717] shadow-x-small"
-                  : "bg-transparent text-[#5C5C5C] hover:text-[#171717]"
+                  ? "bg-card text-foreground shadow-x-small hover:bg-card hover:text-foreground"
+                  : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-neutral-100"
               }`}
             >
               <span className="size-1.5 rounded-full bg-[#F6B51E] shrink-0" />
-              <span>MEDIUM ({mediumCount})</span>
-            </button>
-            <button
+              <span>Medium ({mediumCount})</span>
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={() => handleTaskFilterChange("LOW")}
-              className={`h-5 px-2.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
+              className={`h-5 px-2.5 rounded-full text-label-xs font-medium leading-none transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
                 selectedTaskFilter === "LOW"
-                  ? "bg-white text-[#171717] shadow-x-small"
-                  : "bg-transparent text-[#5C5C5C] hover:text-[#171717]"
+                  ? "bg-card text-foreground shadow-x-small hover:bg-card hover:text-foreground"
+                  : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-neutral-100"
               }`}
             >
               <span className="size-1.5 rounded-full bg-[#7B7B7B] shrink-0" />
-              <span>LOW ({lowCount})</span>
-            </button>
+              <span>Low ({lowCount})</span>
+            </Button>
           </div>
 
           {/* Tasks Table */}
           <div className="w-full flex flex-col gap-2 mt-1">
-            {/* Table Header Row - Height 36px, background #F5F5F5 */}
-            <div className="w-full bg-[#F5F5F5] rounded-[8px] h-9 px-4 grid grid-cols-12 items-center text-[12px] font-medium uppercase text-[#A4A4A4] tracking-[0.04em]">
+            {/* Table Header Row */}
+            <div className="w-full bg-neutral-50 rounded-button h-9 px-4 grid grid-cols-12 items-center text-label-xs font-medium text-muted-foreground">
               <div
+                role="button"
+                tabIndex={0}
                 onClick={() => handleTaskSort("document")}
-                className="col-span-5 flex items-center gap-1.5 cursor-pointer hover:text-[#171717] transition-colors"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleTaskSort("document");
+                  }
+                }}
+                className="col-span-4 flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors select-none"
               >
-                <span>DOCUMENT</span>
+                <span>Document</span>
                 <SortIcon active={taskSortCol === "document"} direction={taskSortDir} />
               </div>
               <div
+                role="button"
+                tabIndex={0}
                 onClick={() => handleTaskSort("migrant")}
-                className="col-span-3 flex items-center gap-1.5 cursor-pointer hover:text-[#171717] transition-colors"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleTaskSort("migrant");
+                  }
+                }}
+                className="col-span-2 flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors select-none"
               >
-                <span>MIGRANT</span>
+                <span>Migrant</span>
                 <SortIcon active={taskSortCol === "migrant"} direction={taskSortDir} />
               </div>
+              <div className="col-span-2 flex items-center gap-1.5 select-none">
+                <span>Assignee</span>
+              </div>
               <div
+                role="button"
+                tabIndex={0}
                 onClick={() => handleTaskSort("status")}
-                className="col-span-2 flex items-center gap-1.5 cursor-pointer hover:text-[#171717] transition-colors"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleTaskSort("status");
+                  }
+                }}
+                className="col-span-2 flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors select-none"
               >
-                <span>STATUS</span>
+                <span>Status</span>
                 <SortIcon active={taskSortCol === "status"} direction={taskSortDir} />
               </div>
               <div className="col-span-2 flex items-center justify-between pl-2">
                 <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleTaskSort("dueDate")}
-                  className="flex items-center gap-1.5 cursor-pointer hover:text-[#171717] transition-colors"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleTaskSort("dueDate");
+                    }
+                  }}
+                  className="flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors select-none"
                 >
-                  <span>DUE DATE</span>
+                  <span>Due date</span>
                   <SortIcon active={taskSortCol === "dueDate"} direction={taskSortDir} />
                 </div>
               </div>
@@ -1154,8 +1636,8 @@ export default function ComplianceCentrePage() {
                       onClick={() => setExpandedTaskId(isExpanded ? null : t.id)}
                       className="w-full grid grid-cols-12 items-center px-3 py-2 cursor-pointer h-16 rounded-[12px] hover:bg-neutral-50/50 transition-colors"
                     >
-                      {/* Document Info (Col-span-5) */}
-                      <div className="col-span-5 flex items-center gap-3 pr-2">
+                      {/* Document Info (Col-span-4) */}
+                      <div className="col-span-4 flex items-center gap-3 pr-2">
                         <div
                           className={`size-10 rounded-[8px] ${t.iconBg} flex items-center justify-center shrink-0 ${t.iconColor}`}
                         >
@@ -1171,81 +1653,242 @@ export default function ComplianceCentrePage() {
                         </div>
                       </div>
 
-                      {/* Migrant Info (Col-span-3) */}
-                      <div className="col-span-3 flex items-center gap-3">
+                      {/* Migrant Info (Col-span-2) */}
+                      <div className="col-span-2 flex items-center gap-2.5">
                         {t.avatarUrl ? (
-                          <Avatar className="size-10 rounded-full shrink-0">
+                          <Avatar className="size-8 rounded-full shrink-0">
                             <AvatarImage src={t.avatarUrl} alt={t.migrantName} />
-                            <AvatarFallback className="bg-[#EBEBEB] text-[#171717] text-[12px] font-medium">
+                            <AvatarFallback className="bg-[#EBEBEB] text-[#171717] text-[11px] font-medium">
                               {t.avatarText}
                             </AvatarFallback>
                           </Avatar>
                         ) : (
-                          <div className="size-10 rounded-full bg-[#EBEBEB] flex items-center justify-center text-[#171717] text-[12px] font-medium shrink-0">
+                          <div className="size-8 rounded-full bg-[#EBEBEB] flex items-center justify-center text-[#171717] text-[11px] font-medium shrink-0">
                             {t.avatarText}
                           </div>
                         )}
                         <div className="flex flex-col overflow-hidden">
-                          <span className="text-[14px] leading-[20px] font-medium text-[#171717] tracking-[-0.006em] truncate">
+                          <span className="text-[13px] leading-[18px] font-medium text-[#171717] tracking-[-0.006em] truncate">
                             {t.migrantName}
                           </span>
-                          <span className="text-[12px] leading-[20px] font-normal text-[#5C5C5C] font-mono tracking-[-0.006em]">
+                          <span className="text-[11px] leading-[16px] font-normal text-[#5C5C5C] font-mono tracking-[-0.006em]">
                             {t.caseId}
                           </span>
                         </div>
                       </div>
 
-                      {/* Status Badge (Col-span-2) */}
-                      <div className="col-span-2 flex items-center">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-[12px] ${t.statusBg} ${t.statusColor}`}
-                        >
-                          {t.status}
-                        </span>
+                      {/* Assignee Selector (Col-span-2) */}
+                      <div
+                        className="col-span-2 flex items-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <TaskAssigneeSelector
+                          assignee={t.assignee}
+                          onAssign={(staff) => handleTaskAssigneeChange(t.id, staff)}
+                        />
                       </div>
 
-                      {/* Due Date & Expand Button (Col-span-2) */}
+                      {/* Status Badge (Col-span-2) */}
+                      <div
+                        className="col-span-2 flex items-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <TaskStatusSelector
+                          status={t.status}
+                          statusBg={t.statusBg}
+                          statusColor={t.statusColor}
+                          onChangeStatus={(newStatus) =>
+                            handleTaskStatusChange(t.id, newStatus)
+                          }
+                        />
+                      </div>
+
+                      {/* Due Date & Actions (Col-span-2) */}
                       <div className="col-span-2 flex items-center justify-between pl-2">
-                        <div className="flex items-center gap-1.5 text-[14px] leading-[20px] tracking-[-0.006em] text-[#5C5C5C]">
-                          {t.hasWarningIcon && (
-                            <RiAlertLine className="size-4 text-[#E93544] shrink-0" />
-                          )}
-                          <span className="text-[#5C5C5C]">{t.dueDate}</span>
+                        <div
+                          className="flex items-center gap-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <TaskDueDatePicker
+                            dueDate={t.dueDate}
+                            onChange={(date) => handleTaskDueDateChange(t.id, date)}
+                          />
                         </div>
 
-                        <div className="size-6 rounded-[6px] flex items-center justify-center text-[#5C5C5C] hover:bg-neutral-100 transition-colors">
-                          {isExpanded ? (
-                            <RiArrowUpSLine className="size-5 text-[#5C5C5C]" />
-                          ) : (
-                            <RiArrowDownSLine className="size-5 text-[#5C5C5C]" />
-                          )}
+                        <div className="flex items-center gap-1">
+                          {/* Row Action Three-dots Menu */}
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger
+                                render={
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    className="size-6 rounded-button text-muted-foreground hover:text-foreground hover:bg-neutral-100 cursor-pointer"
+                                  >
+                                    <RiMore2Line className="size-4 shrink-0" />
+                                  </Button>
+                                }
+                              />
+                              <DropdownMenuContent
+                                align="end"
+                                className="w-[200px] p-1.5 rounded-card bg-popover text-popover-foreground border-border shadow-card-large flex flex-col gap-0.5 text-paragraph-sm"
+                              >
+                                {t.isResolved ? (
+                                  <DropdownMenuItem
+                                    onClick={() => handleUnresolveTask(t.id)}
+                                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                                  >
+                                    <RiRefreshLine className="size-4 text-muted-foreground shrink-0" />
+                                    <span>Unresolve</span>
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem
+                                    onClick={() => handleResolveButtonClick(t)}
+                                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                                  >
+                                    <RiFocus2Line className="size-4 text-muted-foreground shrink-0" />
+                                    <span>Resolve</span>
+                                  </DropdownMenuItem>
+                                )}
+
+                                <DropdownMenuItem
+                                  onClick={() => handleOpenTaskActionModal(t, "Upload documents")}
+                                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                                >
+                                  <RiUpload2Line className="size-4 text-muted-foreground shrink-0" />
+                                  <span>Upload documents</span>
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem
+                                  onClick={() => handleOpenTaskActionModal(t, "Complete RTW check")}
+                                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                                >
+                                  <RiShieldCheckLine className="size-4 text-muted-foreground shrink-0" />
+                                  <span>Run RTW check</span>
+                                </DropdownMenuItem>
+
+                                <DropdownMenuSeparator className="my-1 border-t border-border" />
+
+                                {t.status !== "UNDER REVIEW" && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleTaskStatusChange(t.id, "UNDER REVIEW")}
+                                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                                  >
+                                    <span className="size-2 rounded-full bg-warning-dark shrink-0" />
+                                    <span>Set as Under review</span>
+                                  </DropdownMenuItem>
+                                )}
+                                {t.status !== "REQUIRED ASAP" && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleTaskStatusChange(t.id, "REQUIRED ASAP")}
+                                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                                  >
+                                    <span className="size-2 rounded-full bg-error-dark shrink-0" />
+                                    <span>Set as Required ASAP</span>
+                                  </DropdownMenuItem>
+                                )}
+
+                                <DropdownMenuSeparator className="my-1 border-t border-border" />
+
+                                <DropdownMenuItem
+                                  onClick={() => router.push(`/cases/${t.rawCaseId || t.caseId.replace(/^#/, "")}`)}
+                                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-button text-foreground hover:bg-neutral-100 cursor-pointer font-medium"
+                                >
+                                  <RiUserLine className="size-4 text-muted-foreground shrink-0" />
+                                  <span>View case</span>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+
+                          <div className="size-6 rounded-button flex items-center justify-center text-muted-foreground hover:bg-neutral-100 transition-colors">
+                            {isExpanded ? (
+                              <RiArrowUpSLine className="size-5 text-muted-foreground" />
+                            ) : (
+                              <RiArrowDownSLine className="size-5 text-muted-foreground" />
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
 
                     {/* Expanded Frame 112 Drawer */}
                     {isExpanded && (
-                      <div className="bg-[#F5F5F5] rounded-[16px] p-5 flex items-center justify-between gap-5 h-[84px] transition-all animate-in fade-in-50 duration-150">
-                        <div className="flex flex-col gap-1 max-w-[700px]">
-                          <span className="text-[12px] font-medium text-[#171717] uppercase tracking-[0.04em] leading-[16px]">
-                            POTENTIAL IMPACT
+                      <div className="bg-neutral-50 rounded-card p-5 flex items-center justify-between gap-5 h-auto transition-all animate-in fade-in-50 duration-150">
+                        <div className="flex flex-col gap-1 max-w-[500px]">
+                          <span className="text-label-xs font-medium text-foreground leading-[16px]">
+                            Potential impact
                           </span>
-                          <p className="text-[13px] leading-[20px] font-normal text-[#5C5C5C] tracking-[-0.006em]">
+                          <p className="text-paragraph-sm font-normal text-muted-foreground tracking-[-0.006em]">
                             {t.potentialImpact}
                           </p>
                         </div>
 
-                        <Button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleResolveTask(t.id);
-                          }}
-                          disabled={t.isResolved}
-                          className="bg-[#262626] hover:bg-[#383838] text-white text-[14px] font-medium px-4 h-8 rounded-[8px] shrink-0 cursor-pointer border-0 transition-colors"
-                        >
-                          {t.isResolved ? "Resolved" : "Resolve"}
-                        </Button>
+                        {/* Assignee, Due Date & Status Quick Detail */}
+                        <div className="flex items-center gap-4 bg-card px-4 py-2 rounded-card border border-border">
+                          <div className="flex flex-col gap-0.5 text-left">
+                            <span className="text-label-xs font-medium text-muted-foreground">
+                              Assigned staff
+                            </span>
+                            <span className="text-paragraph-sm font-medium text-foreground">
+                              {t.assignee?.name || "Unassigned"}
+                            </span>
+                          </div>
+
+                          <div className="w-px h-8 bg-border" />
+
+                          <div className="flex flex-col gap-0.5 text-left">
+                            <span className="text-label-xs font-medium text-muted-foreground">
+                              Deadline
+                            </span>
+                            <span className="text-paragraph-sm font-medium text-foreground">
+                              {t.dueDate || "No deadline"}
+                            </span>
+                          </div>
+
+                          <div className="w-px h-8 bg-border" />
+
+                          <div className="flex flex-col gap-0.5 text-left" onClick={(e) => e.stopPropagation()}>
+                            <span className="text-label-xs font-medium text-muted-foreground">
+                              Status
+                            </span>
+                            <TaskStatusSelector
+                              status={t.status}
+                              statusBg={t.statusBg}
+                              statusColor={t.statusColor}
+                              onChangeStatus={(newStatus) =>
+                                handleTaskStatusChange(t.id, newStatus)
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        {t.isResolved ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUnresolveTask(t.id);
+                            }}
+                            className="text-label-xs font-medium px-3.5 h-8 rounded-button shrink-0 cursor-pointer border-border hover:bg-neutral-100 text-foreground transition-colors"
+                          >
+                            Unresolve
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleResolveButtonClick(t);
+                            }}
+                            className="bg-neutral-900 hover:bg-neutral-800 text-white text-label-xs font-medium px-4 h-8 rounded-button shrink-0 cursor-pointer border-0 transition-colors"
+                          >
+                            Resolve
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1416,12 +2059,92 @@ export default function ComplianceCentrePage() {
                   </div>
 
                   {/* Status Badge */}
-                  <div className="col-span-2 flex items-center">
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[11px] font-medium uppercase tracking-[0.02em] leading-[12px] ${m.statusBg} ${m.statusColor}`}
-                    >
-                      {m.status}
-                    </span>
+                  <div
+                    className="col-span-2 flex items-center"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="xs"
+                            onClick={(e) => e.stopPropagation()}
+                            className={`h-5 rounded-full px-2 py-0.5 inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-[0.02em] leading-[12px] whitespace-nowrap shrink-0 cursor-pointer transition-all hover:opacity-85 border-0 shadow-none ${m.statusBg} ${m.statusColor}`}
+                          >
+                            <span>{m.status}</span>
+                            <RiArrowDownSLine className="size-3 opacity-60 shrink-0 ml-0.5" />
+                          </Button>
+                        }
+                      />
+                      <DropdownMenuContent
+                        align="start"
+                        className="w-[200px] p-1.5 rounded-card bg-popover text-popover-foreground border-border shadow-card-large flex flex-col gap-0.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <DropdownMenuGroup>
+                          <DropdownMenuLabel className="text-label-xs font-medium text-muted-foreground px-2 py-1">
+                            Change migrant status
+                          </DropdownMenuLabel>
+                          <DropdownMenuSeparator className="my-1 border-t border-border" />
+                          <DropdownMenuItem
+                            onClick={() => handleMigrantStatusChange(m.id, "COMPLIANT")}
+                            className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-button cursor-pointer transition-colors ${
+                              m.status === "COMPLIANT"
+                                ? "bg-neutral-100 font-medium"
+                                : "hover:bg-neutral-100/70"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="size-2 rounded-full bg-success-dark shrink-0" />
+                              <span className="text-label-sm font-medium text-foreground">
+                                Compliant
+                              </span>
+                            </div>
+                            {m.status === "COMPLIANT" && (
+                              <RiCheckLine className="size-4 text-foreground shrink-0" />
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleMigrantStatusChange(m.id, "UNDER REVIEW")}
+                            className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-button cursor-pointer transition-colors ${
+                              m.status === "UNDER REVIEW"
+                                ? "bg-neutral-100 font-medium"
+                                : "hover:bg-neutral-100/70"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="size-2 rounded-full bg-warning-dark shrink-0" />
+                              <span className="text-label-sm font-medium text-foreground">
+                                Under Review
+                              </span>
+                            </div>
+                            {m.status === "UNDER REVIEW" && (
+                              <RiCheckLine className="size-4 text-foreground shrink-0" />
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleMigrantStatusChange(m.id, "ACTION NEEDED")}
+                            className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-button cursor-pointer transition-colors ${
+                              m.status === "ACTION NEEDED"
+                                ? "bg-neutral-100 font-medium"
+                                : "hover:bg-neutral-100/70"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="size-2 rounded-full bg-error-dark shrink-0" />
+                              <span className="text-label-sm font-medium text-foreground">
+                                Action Needed
+                              </span>
+                            </div>
+                            {m.status === "ACTION NEEDED" && (
+                              <RiCheckLine className="size-4 text-foreground shrink-0" />
+                            )}
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
 
                   {/* Next RTW Date */}
@@ -1613,6 +2336,31 @@ export default function ComplianceCentrePage() {
           )}
         </div>
       </div>
+
+      {/* Case Action Modal for Priority Tasks */}
+      <CaseActionModal
+        open={actionModalOpen}
+        onOpenChange={setActionModalOpen}
+        row={actionModalRow}
+        onSuccess={() => {
+          if (activeTaskIdForModal) {
+            handleResolveTask(activeTaskIdForModal);
+          }
+        }}
+      />
+
+      {/* Tour Gap Schedule Modal */}
+      <TourGapScheduleModal
+        open={tourGapModalOpen}
+        onOpenChange={setTourGapModalOpen}
+        caseId={tourGapCaseId}
+        migrantName={tourGapMigrantName}
+        onSaveSchedule={() => {
+          if (activeTaskIdForModal) {
+            handleResolveTask(activeTaskIdForModal);
+          }
+        }}
+      />
     </div>
   );
 }

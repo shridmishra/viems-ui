@@ -93,7 +93,7 @@ export function NotificationsPopover() {
         setNotifications([]);
       }
     } catch (err) {
-      console.error("Failed to fetch notification logs:", err);
+      console.warn("Failed to fetch notification logs:", err);
       setNotifications([]);
     } finally {
       setLoading(false);

@@ -13,6 +13,7 @@ import {
   RiDownload2Line,
 } from "@remixicon/react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/lib/api-client";
 import { ENDPOINTS } from "@/lib/api-endpoints";
 import { toast } from "sonner";
@@ -22,39 +23,63 @@ import {
 } from "@/lib/pdf-report-generator";
 import { formatFullName } from "@/lib/utils";
 import { TourGapCheckerCard } from "../../components/TourGapCheckerCard";
+import { UnionRateCheckerCard } from "../../components/UnionRateCheckerCard";
+import { UnionRateModal } from "../../components/UnionRateModal";
 import { CurtailmentLetterModal } from "../../components/CurtailmentLetterModal";
+import {
+  TaskAssignee,
+  getDefaultAssigneeForTask,
+  getStoredTaskAssignment,
+} from "@/lib/task-assignment-storage";
 
 // ─── Donut Chart Component ──────────────────────────────────
-function ComplianceDonutChart({ percentage = 100 }: { percentage?: number }) {
+function ComplianceDonutChart({
+  percentage = 100,
+  isNotAssessed = false,
+}: {
+  percentage?: number;
+  isNotAssessed?: boolean;
+}) {
   const radius = 24;
   const circumference = 2 * Math.PI * radius;
-  const clamped = Math.max(0, Math.min(100, percentage));
-  const offset = circumference - (clamped / 100) * circumference;
+  const safePercentage = isNotAssessed ? 0 : Math.min(100, Math.max(0, percentage));
+  const offset = circumference - (safePercentage / 100) * circumference;
 
-  const strokeColor = clamped >= 80 ? "#10B981" : clamped >= 50 ? "#F6B51E" : "#FB3748";
+  const strokeColor = isNotAssessed
+    ? "#EBEBEB"
+    : safePercentage >= 80
+    ? "#1FC16B"
+    : safePercentage >= 50
+    ? "#F6B51E"
+    : "#FB3748";
 
   return (
-    <div className="relative size-[67px] flex items-center justify-center shrink-0">
-      <svg width="67" height="67" viewBox="0 0 67 67" className="rotate-[-90deg]">
+    <div className="relative size-[60px] shrink-0">
+      <svg className="size-full -rotate-90" viewBox="0 0 60 60">
+        {/* Background track */}
         <circle
-          cx="33.5"
-          cy="33.5"
+          cx="30"
+          cy="30"
           r={radius}
           fill="none"
           stroke="#EBEBEB"
-          strokeWidth="8"
+          strokeWidth="6"
         />
-        <circle
-          cx="33.5"
-          cy="33.5"
-          r={radius}
-          fill="none"
-          stroke={strokeColor}
-          strokeWidth="8"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-        />
+        {/* Progress fill */}
+        {!isNotAssessed && (
+          <circle
+            cx="30"
+            cy="30"
+            r={radius}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="6"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            className="transition-all duration-500 ease-out"
+          />
+        )}
       </svg>
     </div>
   );
@@ -88,6 +113,7 @@ interface PriorityTaskItem {
   statusText: string;
   statusColor: string;
   dueDate: string;
+  assignee?: TaskAssignee | null;
 }
 
 export function ComplianceTab({
@@ -105,6 +131,8 @@ export function ComplianceTab({
   const [error, setError] = React.useState<string | null>(null);
   const [exportingDossier, setExportingDossier] = React.useState(false);
   const [curtailmentModalOpen, setCurtailmentModalOpen] = React.useState(false);
+  const [unionModalOpen, setUnionModalOpen] = React.useState(false);
+  const [unionClearance, setUnionClearance] = React.useState<any>(null);
 
   const handleExportDossier = async () => {
     try {
@@ -211,6 +239,18 @@ export function ComplianceTab({
       }
     }
 
+    if (typeof window !== "undefined" && caseId) {
+      setUnionClearance(null);
+      try {
+        const stored = localStorage.getItem(`union_rate_${caseId}`);
+        if (stored) {
+          setUnionClearance(JSON.parse(stored));
+        }
+      } catch (err) {
+        console.warn("Failed to parse stored union clearance:", err);
+      }
+    }
+
     loadComplianceData();
     return () => {
       isCancelled = true;
@@ -284,15 +324,20 @@ export function ComplianceTab({
             getSafeString(t.name) ||
             "Pending Compliance Action";
 
+          const taskId = String(t.id || `pt-${idx}`);
+          const stored = getStoredTaskAssignment(taskId);
+          const assignee = stored?.assignee || getDefaultAssigneeForTask(safeTitle);
+
           return {
-            id: String(t.id || `pt-${idx}`),
+            id: taskId,
             title: safeTitle,
             priority,
-            badgeBg: isHigh ? "bg-[#FFEBEC]" : isMed ? "bg-[#FFFAEB]" : "bg-[#F5F5F5]",
-            badgeText: isHigh ? "text-[#681219]" : isMed ? "text-[#624C18]" : "text-[#5C5C5C]",
+            badgeBg: isHigh ? "bg-error-light" : isMed ? "bg-warning-light" : "bg-neutral-100",
+            badgeText: isHigh ? "text-error-dark" : isMed ? "text-warning-dark" : "text-neutral-600",
             statusText: isHigh ? "Needs attention" : "Pending action",
-            statusColor: isHigh ? "text-[#FB3748]" : isMed ? "text-[#E6A819]" : "text-[#5C5C5C]",
+            statusColor: isHigh ? "text-error-dark" : isMed ? "text-warning-dark" : "text-neutral-600",
             dueDate: taskDueDate,
+            assignee,
           };
         });
     }
@@ -344,7 +389,7 @@ export function ComplianceTab({
           </span>
 
           <div className="flex flex-col items-center gap-1 my-auto">
-            <ComplianceDonutChart percentage={healthScore} />
+            <ComplianceDonutChart percentage={healthScore} isNotAssessed={isNotAssessed} />
             <span className="font-aeonik-medium text-[24px] font-medium text-[#171717] leading-[32px] mt-1">
               {isNotAssessed ? "N/A" : `${healthScore}%`}
             </span>
@@ -544,19 +589,29 @@ export function ComplianceTab({
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
+                      {task.assignee && (
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-800 text-[11px] font-medium">
+                          <span className="size-4 rounded-full bg-neutral-200 text-[9px] font-bold flex items-center justify-center">
+                            {task.assignee.avatarText}
+                          </span>
+                          <span className="truncate max-w-[80px]">{task.assignee.name.split(" ")[0]}</span>
+                        </div>
+                      )}
                       <div className={`flex items-center gap-1 text-[14px] font-medium ${task.statusColor}`}>
                         <RiCalendarLine className={`size-4 ${task.statusColor}`} />
                         <span>{task.statusText}</span>
                       </div>
                       <span className="text-[13px] text-[#5C5C5C]">{task.dueDate}</span>
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon-xs"
                         onClick={() => onNavigateTab && onNavigateTab("Tasks")}
                         aria-label={`View task details for ${task.title}`}
                         className="size-6 rounded-full bg-[#F5F5F5] hover:bg-neutral-200 flex items-center justify-center text-[#5C5C5C] hover:text-[#171717] transition-colors border-0 cursor-pointer"
                       >
                         <RiArrowRightSLine className="size-4" />
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ))
@@ -606,17 +661,12 @@ export function ComplianceTab({
                   {highCount} high • {medCount} medium
                 </span>
               </div>
-              <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider ${
-                  highCount > 0
-                    ? "bg-[#FFEBEC] text-[#FB3748]"
-                    : medCount > 0
-                    ? "bg-[#FFFAEB] text-[#B45309]"
-                    : "bg-[#E3F7EC] text-[#0B4627]"
-                }`}
+              <Badge
+                variant={highCount > 0 ? "destructive" : medCount > 0 ? "warning" : "success"}
+                withDot
               >
                 {highCount > 0 ? "HIGH" : medCount > 0 ? "MEDIUM" : "LOW"}
-              </span>
+              </Badge>
             </div>
 
             {/* Risk Items */}
@@ -697,6 +747,15 @@ export function ComplianceTab({
         migrantName={caseData?.name || caseData?.migrant?.name}
       />
 
+      {/* ─── Union Rate Integration & Wage Compliance (Task 25) ── */}
+      <UnionRateCheckerCard
+        caseId={id}
+        migrantName={caseData?.name || caseData?.migrant?.name}
+        agreedSalary={caseData?.personal?.jobPay || caseData?.cos?.salary || caseData?.employment?.grossSalary}
+        jobTitle={caseData?.personal?.jobTitle || caseData?.cos?.jobTitle || caseData?.jobInfo?.jobTitle}
+        onClearanceUpdated={(res) => setUnionClearance(res)}
+      />
+
       {/* ─── Compliance Breakdown Section ──────────────────────────────────── */}
       <div className="flex flex-col gap-3 w-full">
         <h3 className="font-aeonik-medium text-[20px] leading-[32px] text-[#171717]">
@@ -721,11 +780,9 @@ export function ComplianceTab({
           <div className="px-4 py-3.5 flex items-center justify-between text-[14px]">
             <span className="w-1/3 font-medium text-[#171717]">Right to work</span>
             <div className="w-1/3">
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                highCount > 0 ? "bg-[#FFEBEC] text-[#FB3748]" : "bg-[#E3F7EC] text-[#0B4627]"
-              }`}>
+              <Badge variant={highCount > 0 ? "destructive" : "success"} withDot>
                 {highCount > 0 ? "AT RISK" : "COMPLIANT"}
-              </span>
+              </Badge>
             </div>
             <div className="w-1/3 flex items-center justify-end gap-2 text-[13px] text-[#5C5C5C]">
               <span>Within 28 days</span>
@@ -736,9 +793,9 @@ export function ComplianceTab({
           <div className="px-4 py-3.5 flex items-center justify-between text-[14px]">
             <span className="w-1/3 font-medium text-[#171717]">Contact details</span>
             <div className="w-1/3">
-              <span className="px-2 py-0.5 rounded-full bg-[#E3F7EC] text-[#0B4627] text-[10px] font-bold uppercase tracking-wider">
+              <Badge variant="success" withDot>
                 COMPLIANT
-              </span>
+              </Badge>
             </div>
             <div className="w-1/3 flex items-center justify-end gap-2 text-[13px] text-[#5C5C5C]">
               <span>Verified</span>
@@ -746,15 +803,45 @@ export function ComplianceTab({
             </div>
           </div>
 
-          <div className="px-4 py-3.5 flex items-center justify-between text-[14px]">
-            <span className="w-1/3 font-medium text-[#171717]">Salary &amp; role</span>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setUnionModalOpen(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setUnionModalOpen(true);
+              }
+            }}
+            className="px-4 py-3.5 flex items-center justify-between text-[14px] cursor-pointer hover:bg-neutral-50/70 transition-colors"
+          >
+            <span className="w-1/3 font-medium text-[#171717]">Salary &amp; role (Union scale)</span>
             <div className="w-1/3">
-              <span className="px-2 py-0.5 rounded-full bg-[#E3F7EC] text-[#0B4627] text-[10px] font-bold uppercase tracking-wider">
-                COMPLIANT
-              </span>
+              <Badge
+                variant={
+                  !unionClearance
+                    ? "warning"
+                    : unionClearance.isCompliant === false
+                    ? "destructive"
+                    : "success"
+                }
+                withDot
+              >
+                {!unionClearance
+                  ? "NOT CHECKED"
+                  : unionClearance.isCompliant === false
+                  ? "BELOW MINIMUM"
+                  : "COMPLIANT"}
+              </Badge>
             </div>
             <div className="w-1/3 flex items-center justify-end gap-2 text-[13px] text-[#5C5C5C]">
-              <span>Verified</span>
+              <span>
+                {!unionClearance
+                  ? "Check required"
+                  : unionClearance.isCompliant === false
+                  ? "Action Required"
+                  : "Verified Scale"}
+              </span>
               <RiArrowDownSLine className="size-4 text-[#A4A4A4]" />
             </div>
           </div>
@@ -762,9 +849,9 @@ export function ComplianceTab({
           <div className="px-4 py-3.5 flex items-center justify-between text-[14px]">
             <span className="w-1/3 font-medium text-[#171717]">Absence monitoring</span>
             <div className="w-1/3">
-              <span className="px-2 py-0.5 rounded-full bg-[#E3F7EC] text-[#0B4627] text-[10px] font-bold uppercase tracking-wider">
+              <Badge variant="success" withDot>
                 COMPLIANT
-              </span>
+              </Badge>
             </div>
             <div className="w-1/3 flex items-center justify-end gap-2 text-[13px] text-[#5C5C5C]">
               <span>Active</span>
@@ -808,9 +895,9 @@ export function ComplianceTab({
           <div className="px-4 py-3.5 flex items-center justify-between text-[14px]">
             <span className="w-1/3 font-medium text-[#171717]">Right to work share code</span>
             <div className="w-1/3">
-              <span className="px-2 py-0.5 rounded-full bg-[#FFFAEB] text-[#B45309] text-[10px] font-bold uppercase tracking-wider">
+              <Badge variant="warning" withDot>
                 IN PROGRESS
-              </span>
+              </Badge>
             </div>
             <div className="w-1/3 flex items-center justify-end gap-2 text-[13px] text-[#5C5C5C]">
               <span>—</span>
@@ -821,9 +908,9 @@ export function ComplianceTab({
           <div className="px-4 py-3.5 flex items-center justify-between text-[14px]">
             <span className="w-1/3 font-medium text-[#171717]">Proof of address</span>
             <div className="w-1/3">
-              <span className="px-2 py-0.5 rounded-full bg-[#E3F7EC] text-[#0B4627] text-[10px] font-bold uppercase tracking-wider">
+              <Badge variant="success" withDot>
                 VERIFIED
-              </span>
+              </Badge>
             </div>
             <div className="w-1/3 flex items-center justify-end gap-2 text-[13px] text-[#5C5C5C]">
               <span>—</span>
@@ -834,9 +921,9 @@ export function ComplianceTab({
           <div className="px-4 py-3.5 flex items-center justify-between text-[14px]">
             <span className="w-1/3 font-medium text-[#171717]">Passport</span>
             <div className="w-1/3">
-              <span className="px-2 py-0.5 rounded-full bg-[#E3F7EC] text-[#0B4627] text-[10px] font-bold uppercase tracking-wider">
+              <Badge variant="success" withDot>
                 VERIFIED
-              </span>
+              </Badge>
             </div>
             <div className="w-1/3 flex items-center justify-end gap-2 text-[13px] text-[#5C5C5C]">
               <span>{expiryDateString ? new Date(expiryDateString).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Valid"}</span>
@@ -850,6 +937,16 @@ export function ComplianceTab({
         open={curtailmentModalOpen}
         onOpenChange={setCurtailmentModalOpen}
         caseData={caseData}
+      />
+
+      <UnionRateModal
+        open={unionModalOpen}
+        onOpenChange={setUnionModalOpen}
+        caseId={id}
+        migrantName={caseData?.name || caseData?.migrant?.name}
+        initialSalary={caseData?.personal?.jobPay || caseData?.cos?.salary || caseData?.employment?.grossSalary}
+        initialJobTitle={caseData?.personal?.jobTitle || caseData?.cos?.jobTitle || caseData?.jobInfo?.jobTitle}
+        onSuccess={(res) => setUnionClearance(res)}
       />
     </div>
   );

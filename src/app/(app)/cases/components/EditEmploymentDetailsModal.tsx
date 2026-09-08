@@ -19,6 +19,13 @@ import {
 import { apiClient } from "@/lib/api-client";
 import { ENDPOINTS } from "@/lib/api-endpoints";
 import { XIcon, Upload, Calendar, Info, FileText } from "lucide-react";
+import { RiShieldCheckLine, RiAlertLine, RiCheckLine } from "@remixicon/react";
+import {
+  validateRemuneration,
+  formatCurrency,
+  parseSalaryAmount,
+  detectSalaryPeriod,
+} from "@/lib/union-rates";
 import { toast } from "sonner";
 
 interface EditEmploymentDetailsModalProps {
@@ -43,8 +50,9 @@ export function EditEmploymentDetailsModal({
   const [startDate, setStartDate] = React.useState(initialData?.startDate || "");
   const [endDate, setEndDate] = React.useState(initialData?.endDate || "");
   const [contract, setContract] = React.useState(initialData?.contract || "");
-  const [hoursPerWeek, setHoursPerWeek] = React.useState(initialData?.hoursPerWeek || "");
+  const [hoursPerWeek, setHoursPerWeek] = React.useState(initialData?.hoursPerWeek || "37.5");
   const [annualSalary, setAnnualSalary] = React.useState(initialData?.grossSalary || "");
+  const [union, setUnion] = React.useState<string>("EQUITY");
   const [addressLine1, setAddressLine1] = React.useState(initialData?.mainWorkAddressLine1 || "");
   const [addressLine2, setAddressLine2] = React.useState(initialData?.mainWorkAddressLine2 || "");
   const [city, setCity] = React.useState("");
@@ -63,8 +71,19 @@ export function EditEmploymentDetailsModal({
       if (initialData.grossSalary) setAnnualSalary(initialData.grossSalary);
       if (initialData.mainWorkAddressLine1) setAddressLine1(initialData.mainWorkAddressLine1);
       if (initialData.mainWorkAddressLine2) setAddressLine2(initialData.mainWorkAddressLine2);
+      if (initialData.union) setUnion(initialData.union);
     }
   }, [open, initialData]);
+
+  const unionValidation = React.useMemo(() => {
+    return validateRemuneration({
+      union,
+      jobTitle,
+      amount: annualSalary,
+      period: "ANNUAL",
+      hoursPerWeek,
+    });
+  }, [union, jobTitle, annualSalary, hoursPerWeek]);
 
   const handleSave = async () => {
     try {
@@ -79,6 +98,7 @@ export function EditEmploymentDetailsModal({
           contract,
           hoursPerWeek,
           grossSalary: annualSalary,
+          union,
           mainWorkAddressLine1: addressLine1,
           mainWorkAddressLine2: fullWorkAddress2 || addressLine2,
           city,
@@ -97,6 +117,7 @@ export function EditEmploymentDetailsModal({
               jobPay: annualSalary,
               workAddress1: addressLine1,
               workAddress2: fullWorkAddress2 || addressLine2,
+              unionScale: union,
             }
           });
         } catch (apiErr) {
@@ -126,14 +147,16 @@ export function EditEmploymentDetailsModal({
           <h3 className="text-[16px] font-medium text-[#171717] leading-[24px]">
             Edit employment details
           </h3>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             aria-label="Close"
             onClick={() => onOpenChange(false)}
-            className="size-6 rounded-[6px] bg-[#F5F5F5] text-[#5C5C5C] hover:text-[#171717] hover:bg-[#EBEBEB] flex items-center justify-center transition-colors cursor-pointer"
+            className="size-6 rounded-compact text-neutral-500 hover:text-neutral-900 flex items-center justify-center transition-colors"
           >
             <XIcon className="size-4" />
-          </button>
+          </Button>
         </div>
 
         {/* Scrollable Content (No horizontal scroll) */}
@@ -141,20 +164,21 @@ export function EditEmploymentDetailsModal({
           {/* AI Banner */}
           <div className="flex items-center justify-between p-[12px_16px] gap-[12px] bg-[#F5F5F5] rounded-[8px] min-h-[56px] shrink-0 w-full">
             <div className="flex items-center gap-[12px] flex-1 min-w-0">
-              <div className="size-[24px] rounded-[6.4px] bg-[#7D52F4] flex items-center justify-center shrink-0">
-                <FileText className="size-3.5 text-[#EFEBFF]" />
+              <div className="size-6 rounded-compact bg-brand-medium flex items-center justify-center shrink-0">
+                <FileText className="size-3.5 text-brand-light" />
               </div>
-              <span className="text-[13px] leading-[20px] text-[#171717] tracking-[-0.006em] flex-1 min-w-0">
+              <span className="text-[13px] leading-[20px] text-foreground tracking-[-0.006em] flex-1 min-w-0">
                 Upload the CoS reference and AI will auto-fill these fields for you.
               </span>
             </div>
-            <button
+            <Button
               type="button"
-              className="flex items-center justify-center gap-[4px] px-[12px] h-[32px] bg-[#171717] hover:bg-neutral-800 text-white rounded-[8px] text-[14px] font-medium leading-[20px] tracking-[-0.006em] transition-all cursor-pointer shrink-0"
+              size="sm"
+              className="flex items-center justify-center gap-xs px-3 h-8 bg-neutral-900 hover:bg-neutral-800 text-white rounded-button text-paragraph-sm font-medium leading-5 transition-all cursor-pointer shrink-0"
             >
               <Upload className="size-4 text-white" />
               Upload
-            </button>
+            </Button>
           </div>
 
           <div className="flex flex-col gap-[16px] w-full">
@@ -240,7 +264,7 @@ export function EditEmploymentDetailsModal({
                 <Input
                   value={hoursPerWeek}
                   onChange={(e) => setHoursPerWeek(e.target.value)}
-                  className="h-[40px] rounded-[10px] border-0 bg-[#F5F5F5] text-[#D1D1D1] text-[14px] px-[12px] w-full"
+                  className="h-[40px] rounded-[10px] border-0 bg-[#F5F5F5] text-[#171717] text-[14px] px-[12px] w-full"
                 />
               </div>
               <div className="flex-[2] min-w-0 flex flex-col gap-[4px]">
@@ -251,10 +275,78 @@ export function EditEmploymentDetailsModal({
                 <Input
                   value={annualSalary}
                   onChange={(e) => setAnnualSalary(e.target.value)}
-                  className="h-[40px] rounded-[10px] border-0 bg-[#F5F5F5] text-[#D1D1D1] text-[14px] px-[12px] w-full"
+                  placeholder="e.g. £48,000/year"
+                  className="h-[40px] rounded-[10px] border-0 bg-[#F5F5F5] text-[#171717] text-[14px] px-[12px] w-full"
                 />
               </div>
             </div>
+
+            {/* Governing Union Selector */}
+            <div className="flex flex-col gap-[4px] w-full">
+              <Label className="text-[14px] font-medium text-[#171717] leading-[20px]">
+                Governing Union Scale
+              </Label>
+              <Select value={union} onValueChange={(val) => val && setUnion(val)}>
+                <SelectTrigger className="h-[40px] rounded-[10px] border border-[#EBEBEB] text-[14px] px-[12px] text-[#171717] shadow-[0px_1px_2px_rgba(10,13,20,0.03)] w-full">
+                  <SelectValue placeholder="Select Union" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="EQUITY">Equity (Performers &amp; Stage)</SelectItem>
+                  <SelectItem value="PACT">PACT (Film &amp; Television)</SelectItem>
+                  <SelectItem value="BECTU">BECTU (Broadcasting &amp; Technical)</SelectItem>
+                  <SelectItem value="MU">Musicians&apos; Union (MU)</SelectItem>
+                  <SelectItem value="NONE">None / Exempt</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Live Union Rate Compliance Pill */}
+            {annualSalary && (
+              <div
+                className={`p-2.5 rounded-input border flex items-center justify-between gap-2 text-xs ${
+                  unionValidation.isCompliant
+                    ? "bg-success-light border-success-dark/20 text-success-dark"
+                    : "bg-error-light border-error-dark/20 text-error-dark"
+                }`}
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {unionValidation.isCompliant ? (
+                    <RiCheckLine className="size-4 shrink-0" />
+                  ) : (
+                    <RiAlertLine className="size-4 shrink-0" />
+                  )}
+                  <span className="truncate">
+                    {unionValidation.isCompliant
+                      ? `✓ Meets ${unionValidation.unionName} minimum scale`
+                      : `⚠️ Below ${unionValidation.union} minimum (${formatCurrency(unionValidation.minimumRate, "GBP")}/${unionValidation.period.toLowerCase()} required)`}
+                  </span>
+                </div>
+
+                {!unionValidation.isCompliant && unionValidation.minimumRate > 0 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-[11px] font-semibold text-error-dark hover:bg-error-light/50 rounded-compact shrink-0"
+                    onClick={() => {
+                      const hours = Number(hoursPerWeek) || 37.5;
+                      const perYear =
+                        unionValidation.period === "WEEKLY"
+                          ? unionValidation.minimumRate * 52
+                          : unionValidation.period === "DAILY" ||
+                            unionValidation.period === "PER_PERFORMANCE"
+                          ? unionValidation.minimumRate * 5 * 52
+                          : unionValidation.period === "HOURLY"
+                          ? unionValidation.minimumRate * hours * 52
+                          : unionValidation.minimumRate;
+                      setAnnualSalary(String(Math.round(perYear)));
+                    }}
+                  >
+                    Apply Minimum
+                  </Button>
+                )}
+              </div>
+            )}
 
             {/* Address Line 1 */}
             <div className="flex flex-col gap-[4px] w-full">
@@ -301,12 +393,12 @@ export function EditEmploymentDetailsModal({
         </div>
 
         {/* Footer */}
-        <DialogFooter className="px-[20px] py-[16px] border-t border-[#EBEBEB] bg-white flex flex-row items-center justify-end gap-[12px] shrink-0 h-[68px]">
+        <DialogFooter className="px-5 py-4 border-t border-border bg-card flex flex-row items-center justify-end gap-3 shrink-0 h-[68px]">
           <Button
             type="button"
             variant="ghost"
             onClick={() => onOpenChange(false)}
-            className="w-[70px] h-[36px] bg-[#F5F5F5] hover:bg-neutral-200 text-[#5C5C5C] font-medium rounded-[8px] text-[14px] leading-[20px] tracking-[-0.006em]"
+            className="w-[70px] h-9 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 font-medium rounded-button text-paragraph-sm leading-5"
             disabled={isSaving}
           >
             Cancel
@@ -314,7 +406,7 @@ export function EditEmploymentDetailsModal({
           <Button
             type="button"
             onClick={handleSave}
-            className="w-[117px] h-[36px] bg-[#7D52F4] hover:bg-brand-dark text-white font-medium rounded-[8px] text-[14px] leading-[20px] tracking-[-0.006em] disabled:opacity-50"
+            className="w-[117px] h-9 bg-brand-medium hover:bg-brand-dark text-white font-medium rounded-button text-paragraph-sm leading-5 disabled:opacity-50"
             disabled={isSaving}
           >
             {isSaving ? "Saving..." : "Save changes"}
