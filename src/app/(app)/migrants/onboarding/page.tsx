@@ -29,7 +29,7 @@ import {
   RiInformationLine,
 } from "@remixicon/react";
 import { toast } from "sonner";
-import { validateRemuneration, formatCurrency } from "@/lib/union-rates";
+import { validateRemuneration, formatCurrency, checkUnionRatesApi, UnionValidationResult } from "@/lib/union-rates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -135,7 +135,7 @@ export default function MigrantOnboardingPage() {
     workPostCode: "SW7 2AP",
   });
 
-  const unionValidation = React.useMemo(() => {
+  const fallbackValidation = React.useMemo(() => {
     return validateRemuneration({
       union: form.unionScale || "EQUITY",
       jobTitle: form.jobTitle,
@@ -144,6 +144,35 @@ export default function MigrantOnboardingPage() {
       hoursPerWeek: form.hoursPerWeek,
     });
   }, [form.unionScale, form.jobTitle, form.annualSalary, form.hoursPerWeek]);
+
+  const [liveValidation, setLiveValidation] = React.useState<UnionValidationResult | null>(null);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await checkUnionRatesApi({
+          union: form.unionScale || "EQUITY",
+          jobTitle: form.jobTitle,
+          amount: form.annualSalary,
+          period: "ANNUAL",
+          hoursPerWeek: form.hoursPerWeek,
+        });
+        if (isMounted) {
+          setLiveValidation(res);
+        }
+      } catch {
+        // Handled internally
+      }
+    }, 200);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [form.unionScale, form.jobTitle, form.annualSalary, form.hoursPerWeek]);
+
+  const unionValidation = liveValidation || fallbackValidation;
 
   const [extraAddresses, setExtraAddresses] = React.useState<
     Array<{ id: string; addressLine1: string; addressLine2: string; city: string; postCode: string }>

@@ -216,4 +216,13 @@ export const ENDPOINTS = {
     types: `${API_BASE}/custom-fields/types`,
     delete: `${API_BASE}/custom-fields/delete`,
   },
+
+  // ─── Union Rates ───────────────────────────────────────────────────────────
+  unionRates: {
+    base: `${API_BASE}/union-rates`,
+    check: `${API_BASE}/union-rates/check`,
+    unions: `${API_BASE}/union-rates/unions`,
+    validate: `${API_BASE}/union-rates/validate`,
+    byId: (id: number | string) => `${API_BASE}/union-rates/${id}`,
+  },
 } as const;

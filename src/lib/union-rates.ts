@@ -8,6 +8,8 @@
  * 
  * Enforces Home Office Appendix Creative Worker & Temporary Work wage compliance.
  */
+import { apiClient } from "@/lib/api-client";
+import { ENDPOINTS } from "@/lib/api-endpoints";
 
 export type UnionType = "EQUITY" | "PACT" | "BECTU" | "MU" | "NONE";
 
@@ -44,6 +46,8 @@ export interface UnionRateValidationResult {
   message: string;
   recommendation?: string;
 }
+
+export type UnionValidationResult = UnionRateValidationResult;
 
 export interface ValidationParams {
   union: string;
@@ -521,23 +525,62 @@ export function validateRemuneration({
 }
 
 /**
+ * Asynchronously checks remuneration against the dedicated backend API endpoint
+ * GET /api/v1/union-rates/check (with automatic client-side fallback).
+ */
+export async function checkUnionRatesApi(params: {
+  union: string;
+  jobTitle: string;
+  amount: number | string;
+  period: string;
+  currency?: string;
+  hoursPerWeek?: number | string;
+}): Promise<UnionValidationResult> {
+  const numAmount = typeof params.amount === "number" ? params.amount : parseFloat(params.amount) || 0;
+  const numHours = typeof params.hoursPerWeek === "number" ? params.hoursPerWeek : (parseFloat(params.hoursPerWeek as string) || 37.5);
+  const unionCode = (params.union || "NONE").toUpperCase();
+
+  // If role is non-union or no job title entered, resolve immediately
+  if (unionCode === "NONE" || !params.jobTitle?.trim()) {
+    return validateRemuneration(params);
+  }
+
+  try {
+    const queryParams: Record<string, string> = {
+      union: unionCode,
+      jobTitle: params.jobTitle,
+      amount: String(numAmount),
+      period: params.period || "ANNUAL",
+      currency: params.currency || "GBP",
+      hoursPerWeek: String(numHours),
+    };
+
+    const res = await apiClient.get<UnionValidationResult>(ENDPOINTS.unionRates.check, {
+      params: queryParams,
+    });
+
+    if (res && res.status) {
+      return res;
+    }
+  } catch {
+    // Seamless fallback to embedded rate rules
+  }
+
+  return validateRemuneration(params);
+}
+
+/**
  * Fetch union rate cards from backend API with local fallback.
  */
 export async function fetchUnionRates(query?: { union?: string; search?: string }): Promise<UnionRateCard[]> {
   try {
-    const params = new URLSearchParams();
-    if (query?.union) params.set("union", query.union);
-    if (query?.search) params.set("search", query.search);
+    const params: Record<string, string> = {};
+    if (query?.union) params.union = query.union;
+    if (query?.search) params.search = query.search;
 
-    const res = await fetch(`/api/union-rates?${params.toString()}`, {
-      headers: { Accept: "application/json" },
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        return data;
-      }
+    const data = await apiClient.get<UnionRateCard[]>(ENDPOINTS.unionRates.base, { params });
+    if (Array.isArray(data) && data.length > 0) {
+      return data;
     }
   } catch {
     // Fall back to embedded offline rates
@@ -559,3 +602,4 @@ export async function fetchUnionRates(query?: { union?: string; search?: string 
   }
   return list;
 }
+

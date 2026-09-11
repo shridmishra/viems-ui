@@ -25,6 +25,8 @@ import {
   formatCurrency,
   parseSalaryAmount,
   detectSalaryPeriod,
+  checkUnionRatesApi,
+  UnionValidationResult,
 } from "@/lib/union-rates";
 import { toast } from "sonner";
 
@@ -75,7 +77,7 @@ export function EditEmploymentDetailsModal({
     }
   }, [open, initialData]);
 
-  const unionValidation = React.useMemo(() => {
+  const fallbackValidation = React.useMemo(() => {
     return validateRemuneration({
       union,
       jobTitle,
@@ -84,6 +86,35 @@ export function EditEmploymentDetailsModal({
       hoursPerWeek,
     });
   }, [union, jobTitle, annualSalary, hoursPerWeek]);
+
+  const [liveValidation, setLiveValidation] = React.useState<UnionValidationResult | null>(null);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await checkUnionRatesApi({
+          union,
+          jobTitle,
+          amount: annualSalary,
+          period: "ANNUAL",
+          hoursPerWeek,
+        });
+        if (isMounted) {
+          setLiveValidation(res);
+        }
+      } catch {
+        // Handled with internal fallback
+      }
+    }, 200);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [union, jobTitle, annualSalary, hoursPerWeek]);
+
+  const unionValidation = liveValidation || fallbackValidation;
 
   const handleSave = async () => {
     try {
