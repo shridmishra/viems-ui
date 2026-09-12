@@ -576,7 +576,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
             <div className="grid grid-cols-12 gap-4 px-4 py-2 text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider select-none">
               <button
                 type="button"
-                className="col-span-12 sm:col-span-6 flex items-center gap-1 cursor-pointer hover:text-[#171717] transition-colors border-0 bg-transparent p-0 text-left text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider outline-none"
+                className="col-span-12 sm:col-span-5 flex items-center gap-1 cursor-pointer hover:text-[#171717] transition-colors border-0 bg-transparent p-0 text-left text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider outline-none"
                 onClick={() => handleSort("name")}
                 aria-sort={sortField === "name" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
               >
@@ -585,7 +585,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
               </button>
               <button
                 type="button"
-                className="hidden sm:flex sm:col-span-3 items-center gap-1 cursor-pointer hover:text-[#171717] transition-colors border-0 bg-transparent p-0 text-left text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider outline-none"
+                className="hidden sm:flex sm:col-span-4 items-center gap-1 cursor-pointer hover:text-[#171717] transition-colors border-0 bg-transparent p-0 text-left text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider outline-none"
                 onClick={() => handleSort("role")}
                 aria-sort={sortField === "role" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
               >
@@ -613,7 +613,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
                   className="bg-white rounded-[16px] border border-[#EBEBEB] p-4 shadow-x-small hover:border-[#D4D4D4] transition-all grid grid-cols-12 gap-4 items-center"
                 >
                   {/* Member Info */}
-                  <div className="col-span-12 sm:col-span-6 flex items-center gap-3.5 min-w-0">
+                  <div className="col-span-12 sm:col-span-5 flex items-center gap-3.5 min-w-0">
                     <Avatar className="size-10 rounded-full bg-[#EFEBFF] text-[#7D52F4] flex items-center justify-center text-[13px] font-medium">
                       {m.avatarImage && <AvatarImage src={m.avatarImage} alt={m.name} />}
                       <AvatarFallback className="bg-[#EFEBFF] text-[#7D52F4] font-medium">
@@ -631,7 +631,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
                   </div>
 
                   {/* Role Badge */}
-                  <div className="hidden sm:block sm:col-span-3">
+                  <div className="hidden sm:block sm:col-span-4">
                     {getRoleBadge(m.role)}
                   </div>
 
