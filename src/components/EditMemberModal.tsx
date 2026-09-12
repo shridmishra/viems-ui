@@ -144,13 +144,25 @@ export function EditMemberModal({
 
     try {
       if (!isNaN(Number(member.id))) {
-        await apiClient.patch(ENDPOINTS.employees.byId(member.id), {
-          firstName,
-          lastName,
-          email: email.trim(),
-          jobTitle: role,
-          userStatus: rawStatus,
-        });
+        try {
+          await apiClient.put(ENDPOINTS.organisation.teamMemberById(member.id), {
+            name: name.trim(),
+            firstName,
+            lastName,
+            email: email.trim(),
+            role: role.toUpperCase(),
+            smsRole: rawSms,
+            status: rawStatus,
+          });
+        } catch {
+          await apiClient.patch(ENDPOINTS.employees.byId(member.id), {
+            firstName,
+            lastName,
+            email: email.trim(),
+            jobTitle: role,
+            userStatus: rawStatus,
+          }).catch(() => null);
+        }
       }
 
       onUpdateMember(updatedData);
