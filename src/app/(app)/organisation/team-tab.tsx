@@ -228,29 +228,49 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
         }
       } catch {}
     }
-    try {
-      const savedMembers = localStorage.getItem("viems_org_team_members");
-      if (savedMembers) {
-        const parsed = JSON.parse(savedMembers);
-        if (Array.isArray(parsed)) {
-          setMembers(parsed);
+
+    async function loadTeam() {
+      try {
+        const data = await apiClient.get<TeamMember[]>(ENDPOINTS.organisation.team);
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setMembers(data);
+          return;
         }
+      } catch {
+        // continue
       }
-    } catch {}
+      try {
+        const savedMembers = localStorage.getItem("viems_org_team_members");
+        if (savedMembers) {
+          const parsed = JSON.parse(savedMembers);
+          if (Array.isArray(parsed) && isMounted) {
+            setMembers(parsed);
+          }
+        }
+      } catch {}
+    }
+
     loadRoles();
+    loadTeam();
     return () => {
       isMounted = false;
     };
   }, []);
 
-  const saveMembersList = (updated: TeamMember[]) => {
+  const saveMembersList = async (updated: TeamMember[]) => {
     setMembers(updated);
+    try {
+      await apiClient.put(ENDPOINTS.organisation.team, updated);
+    } catch {
+      // offline fallback
+    }
     try {
       localStorage.setItem("viems_org_team_members", JSON.stringify(updated));
     } catch {
       // ignore
     }
   };
+
 
   const handleSort = (field: keyof TeamMember) => {
     if (sortField === field) {
@@ -310,19 +330,53 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
     }
   };
 
-  const handleMemberSave = (updatedMember: TeamMember) => {
+  const handleMemberSave = async (updatedMember: TeamMember) => {
     const updated = members.map((m) => (m.id === updatedMember.id ? updatedMember : m));
-    saveMembersList(updated);
+    setMembers(updated);
+    try {
+      if (typeof updatedMember.id === "number" || !isNaN(Number(updatedMember.id))) {
+        await apiClient.put(ENDPOINTS.organisation.teamMemberById(updatedMember.id), {
+          name: updatedMember.name,
+          firstName: updatedMember.firstName,
+          lastName: updatedMember.lastName,
+          email: updatedMember.email,
+          avatarText: updatedMember.avatarText,
+          role: updatedMember.role,
+          smsRole: updatedMember.smsRole,
+          status: updatedMember.status,
+        });
+      } else {
+        await apiClient.put(ENDPOINTS.organisation.team, updated);
+      }
+    } catch {
+      // offline fallback
+    }
+    try {
+      localStorage.setItem("viems_org_team_members", JSON.stringify(updated));
+    } catch {}
     toast.success(`Updated ${updatedMember.name}`);
     setEditingMember(null);
   };
 
-  const handleMemberDelete = (id: string) => {
-    const target = members.find((m) => m.id === id);
-    const updated = members.filter((m) => m.id !== id);
-    saveMembersList(updated);
+  const handleMemberDelete = async (id: string | number) => {
+    const target = members.find((m) => String(m.id) === String(id));
+    const updated = members.filter((m) => String(m.id) !== String(id));
+    setMembers(updated);
+    try {
+      if (typeof id === "number" || !isNaN(Number(id))) {
+        await apiClient.delete(ENDPOINTS.organisation.teamMemberById(id));
+      } else {
+        await apiClient.put(ENDPOINTS.organisation.team, updated);
+      }
+    } catch {
+      // offline fallback
+    }
+    try {
+      localStorage.setItem("viems_org_team_members", JSON.stringify(updated));
+    } catch {}
     toast.success(`Removed ${target?.name || "member"}`);
   };
+
 
   const handleResendInvite = (member: TeamMember) => {
     toast.success(`Invitation email resent to ${member.email}`);
@@ -763,10 +817,26 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
       <InviteMemberModal
         isOpen={isInviteOpen}
         onClose={() => setIsInviteOpen(false)}
-        onSendInvite={(memberData: TeamMember) => {
-          saveMembersList([...members, memberData]);
+        onSendInvite={async (memberData: TeamMember) => {
+          try {
+            const res = await apiClient.post<TeamMember>(ENDPOINTS.organisation.team, {
+              name: memberData.name,
+              firstName: memberData.firstName,
+              lastName: memberData.lastName,
+              email: memberData.email,
+              avatarText: memberData.avatarText,
+              role: memberData.role,
+              smsRole: memberData.smsRole,
+              status: memberData.status,
+            });
+            const created = res || memberData;
+            saveMembersList([...members, created]);
+          } catch {
+            saveMembersList([...members, memberData]);
+          }
         }}
       />
+
 
       {/* Edit Member Modal */}
       {editingMember && (

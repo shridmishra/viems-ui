@@ -205,9 +205,11 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
           localStorage.setItem(getStorageKey("structure"), JSON.stringify(structureData));
           break;
         case "subsidiaries":
+          await apiClient.put(ENDPOINTS.organisation.subsidiaries, subsidiaries);
           localStorage.setItem(getStorageKey("subsidiaries"), JSON.stringify(subsidiaries));
           break;
         case "licence-groups":
+          await apiClient.put(ENDPOINTS.organisation.licenceGroups, licenceGroups);
           localStorage.setItem(getStorageKey("licence_groups"), JSON.stringify(licenceGroups));
           break;
       }
@@ -230,10 +232,17 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
         case "structure":
           localStorage.setItem(getStorageKey("structure"), JSON.stringify(structureData));
           break;
+        case "subsidiaries":
+          localStorage.setItem(getStorageKey("subsidiaries"), JSON.stringify(subsidiaries));
+          break;
+        case "licence-groups":
+          localStorage.setItem(getStorageKey("licence_groups"), JSON.stringify(licenceGroups));
+          break;
       }
       toast.success(`${label} changes saved (offline)`);
     }
   };
+
 
   const handleCancel = (section: SectionId) => {
     try {

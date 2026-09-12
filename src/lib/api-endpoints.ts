@@ -240,8 +240,11 @@ export const ENDPOINTS = {
     licenceGroups: `${API_BASE}/organisation/licence-groups`,
     licenceGroupById: (id: number | string) => `${API_BASE}/organisation/licence-groups/${id}`,
     ukviRoles: `${API_BASE}/organisation/ukvi-roles`,
+    team: `${API_BASE}/organisation/team`,
+    teamMemberById: (id: number | string) => `${API_BASE}/organisation/team/${id}`,
     documents: `${API_BASE}/organisation/documents`,
     documentById: (id: number | string) => `${API_BASE}/organisation/documents/${id}`,
     history: `${API_BASE}/organisation/history`,
   },
 } as const;
+
