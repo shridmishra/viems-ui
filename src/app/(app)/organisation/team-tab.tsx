@@ -389,7 +389,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
       return (
         <Badge
           variant="role-purple"
-          className="h-auto py-1 px-3 text-center text-[11px] leading-[14px] whitespace-normal rounded-[10px]"
+          className="h-6 px-2.5 text-[11px] font-semibold tracking-wide whitespace-nowrap rounded-full"
         >
           ADMIN
         </Badge>
@@ -399,7 +399,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
       return (
         <Badge
           variant="role-blue"
-          className="h-auto py-1 px-3 text-center text-[11px] leading-[14px] whitespace-normal rounded-[10px]"
+          className="h-6 px-2.5 text-[11px] font-semibold tracking-wide whitespace-nowrap rounded-full"
         >
           AUTHORISING OFFICER
         </Badge>
@@ -409,7 +409,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
       return (
         <Badge
           variant="role-blue"
-          className="h-auto py-1 px-3 text-center text-[11px] leading-[14px] whitespace-normal rounded-[10px]"
+          className="h-6 px-2.5 text-[11px] font-semibold tracking-wide whitespace-nowrap rounded-full"
         >
           COMPLIANCE OFFICER
         </Badge>
@@ -419,7 +419,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
       return (
         <Badge
           variant="role-blue"
-          className="h-auto py-1 px-3 text-center text-[11px] leading-[14px] whitespace-normal rounded-[10px]"
+          className="h-6 px-2.5 text-[11px] font-semibold tracking-wide whitespace-nowrap rounded-full"
         >
           KEY CONTACT
         </Badge>
@@ -429,7 +429,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
       return (
         <Badge
           variant="role-orange"
-          className="h-auto py-1 px-3 text-center text-[11px] leading-[14px] whitespace-normal rounded-[10px]"
+          className="h-6 px-2.5 text-[11px] font-semibold tracking-wide whitespace-nowrap rounded-full"
         >
           INVITED
         </Badge>
@@ -438,7 +438,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
     return (
       <Badge
         variant="neutral-lighter"
-        className="h-auto py-1 px-3 text-center text-[11px] leading-[14px] whitespace-normal rounded-[10px]"
+        className="h-6 px-2.5 text-[11px] font-semibold tracking-wide whitespace-nowrap rounded-full"
       >
         {role}
       </Badge>
