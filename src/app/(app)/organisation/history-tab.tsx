@@ -19,6 +19,8 @@ import {
   RiBuildingLine,
 } from "@remixicon/react";
 import { toast } from "sonner";
+import { apiClient } from "@/lib/api-client";
+import { ENDPOINTS } from "@/lib/api-endpoints";
 
 export interface HistoryLogItem {
   id: string;
@@ -138,9 +140,27 @@ const INITIAL_HISTORY: HistoryLogItem[] = [
 ];
 
 export function HistoryTab() {
-  const [historyLogs] = React.useState<HistoryLogItem[]>(INITIAL_HISTORY);
+  const [historyLogs, setHistoryLogs] = React.useState<HistoryLogItem[]>(INITIAL_HISTORY);
   const [search, setSearch] = React.useState("");
   const [selectedCategory, setSelectedCategory] = React.useState("All Categories");
+
+  React.useEffect(() => {
+    let isMounted = true;
+    async function loadHistory() {
+      try {
+        const data = await apiClient.get<HistoryLogItem[]>(ENDPOINTS.organisation.history);
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setHistoryLogs(data);
+        }
+      } catch {
+        // keep initial history
+      }
+    }
+    loadHistory();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredHistory = historyLogs.filter((log) => {
     const matchesSearch =

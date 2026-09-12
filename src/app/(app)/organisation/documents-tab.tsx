@@ -19,6 +19,8 @@ import {
   RiDeleteBinLine,
 } from "@remixicon/react";
 import { toast } from "sonner";
+import { apiClient } from "@/lib/api-client";
+import { ENDPOINTS } from "@/lib/api-endpoints";
 import {
   UploadDocumentModal,
   UploadedDocument,
@@ -124,19 +126,35 @@ export function DocumentsTab() {
   const [sortDirection, setSortDirection] = React.useState<"asc" | "desc">("asc");
   const [isUploadOpen, setIsUploadOpen] = React.useState(false);
 
-  // Load from localStorage
+  // Load from API with localStorage fallback
   React.useEffect(() => {
-    try {
-      const saved = localStorage.getItem("viems_org_documents");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setDocuments(parsed);
+    let isMounted = true;
+    async function loadDocs() {
+      try {
+        const data = await apiClient.get<CompanyDocumentItem[]>(ENDPOINTS.organisation.documents);
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setDocuments(data);
+          return;
         }
+      } catch {
+        // continue to fallback
       }
-    } catch {
-      // ignore
+      try {
+        const saved = localStorage.getItem("viems_org_documents");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && isMounted) {
+            setDocuments(parsed);
+          }
+        }
+      } catch {
+        // ignore
+      }
     }
+    loadDocs();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const saveDocs = (docs: CompanyDocumentItem[]) => {
@@ -173,24 +191,57 @@ export function DocumentsTab() {
     });
   }, [documents, sortField, sortDirection]);
 
-  const handleUploadNewDoc = (newDoc: UploadedDocument) => {
-    const updated = [newDoc, ...documents];
-    saveDocs(updated);
+  const handleUploadNewDoc = async (newDoc: UploadedDocument) => {
+    try {
+      const res = await apiClient.post<CompanyDocumentItem>(ENDPOINTS.organisation.documents, {
+        title: newDoc.title,
+        subtitle: newDoc.subtitle,
+        category: newDoc.category,
+        date: newDoc.date,
+        status: newDoc.status,
+        fileName: newDoc.fileName,
+        fileSize: newDoc.fileSize,
+      });
+      const created = res || newDoc;
+      const updated = [created, ...documents];
+      saveDocs(updated);
+      toast.success("Document uploaded successfully");
+    } catch {
+      const updated = [newDoc, ...documents];
+      saveDocs(updated);
+      toast.success("Document uploaded");
+    }
   };
 
-  const handleToggleStatus = (id: string) => {
+  const handleToggleStatus = async (id: string | number) => {
+    const target = documents.find((d) => String(d.id) === String(id));
+    const newStatus = target?.status === "CURRENT" ? "ARCHIVED" : "CURRENT";
+    try {
+      if (typeof id === "number" || !isNaN(Number(id))) {
+        await apiClient.put(ENDPOINTS.organisation.documentById(id), { status: newStatus });
+      }
+    } catch {
+      // continue
+    }
     const updated = documents.map((d) =>
-      d.id === id
-        ? { ...d, status: (d.status === "CURRENT" ? "ARCHIVED" : "CURRENT") as "CURRENT" | "ARCHIVED" }
+      String(d.id) === String(id)
+        ? { ...d, status: newStatus as "CURRENT" | "ARCHIVED" }
         : d
     );
     saveDocs(updated);
     toast.success("Document status updated");
   };
 
-  const handleDeleteDoc = (id: string) => {
-    const target = documents.find((d) => d.id === id);
-    const updated = documents.filter((d) => d.id !== id);
+  const handleDeleteDoc = async (id: string | number) => {
+    const target = documents.find((d) => String(d.id) === String(id));
+    try {
+      if (typeof id === "number" || !isNaN(Number(id))) {
+        await apiClient.delete(ENDPOINTS.organisation.documentById(id));
+      }
+    } catch {
+      // continue
+    }
+    const updated = documents.filter((d) => String(d.id) !== String(id));
     saveDocs(updated);
     toast.success(`Removed "${target?.title || "Document"}"`);
   };

@@ -32,6 +32,8 @@ import {
   RiFilter3Line,
 } from "@remixicon/react";
 import { toast } from "sonner";
+import { apiClient } from "@/lib/api-client";
+import { ENDPOINTS } from "@/lib/api-endpoints";
 import { InviteMemberModal } from "@/components/InviteMemberModal";
 import { EditMemberModal, TeamMember } from "@/components/EditMemberModal";
 import {
@@ -203,8 +205,29 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
   const [isInviteOpen, setIsInviteOpen] = React.useState(false);
   const [editingMember, setEditingMember] = React.useState<TeamMember | null>(null);
 
-  // Load from localStorage
+  // Load from API with localStorage fallback
   React.useEffect(() => {
+    let isMounted = true;
+    async function loadRoles() {
+      try {
+        const data = await apiClient.get<UkviRoleAssignment[]>(ENDPOINTS.organisation.ukviRoles);
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setUkviRoles(data);
+          return;
+        }
+      } catch {
+        // continue
+      }
+      try {
+        const savedRoles = localStorage.getItem("viems_org_ukvi_roles");
+        if (savedRoles) {
+          const parsed = JSON.parse(savedRoles);
+          if (Array.isArray(parsed) && isMounted) {
+            setUkviRoles(parsed);
+          }
+        }
+      } catch {}
+    }
     try {
       const savedMembers = localStorage.getItem("viems_org_team_members");
       if (savedMembers) {
@@ -213,16 +236,11 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
           setMembers(parsed);
         }
       }
-      const savedRoles = localStorage.getItem("viems_org_ukvi_roles");
-      if (savedRoles) {
-        const parsed = JSON.parse(savedRoles);
-        if (Array.isArray(parsed)) {
-          setUkviRoles(parsed);
-        }
-      }
-    } catch {
-      // ignore
-    }
+    } catch {}
+    loadRoles();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const saveMembersList = (updated: TeamMember[]) => {
@@ -268,7 +286,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
   const pendingCount = members.filter((m) => m.status === "invited").length;
   const smsCount = members.filter((m) => m.smsRole && m.smsRole !== "—").length;
 
-  const handleRoleSave = (
+  const handleRoleSave = async (
     roleCode: "AO" | "KC" | "L1" | "L2",
     updatedMembers: string[],
     _meta?: { effectiveDate: string; notes?: string }
@@ -277,6 +295,14 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
       r.roleCode === roleCode ? { ...r, assignedMembers: updatedMembers } : r
     );
     setUkviRoles(updated);
+    try {
+      await apiClient.put(ENDPOINTS.organisation.ukviRoles, {
+        roleCode,
+        assignedMembers: updatedMembers,
+      });
+    } catch {
+      // continue
+    }
     try {
       localStorage.setItem("viems_org_ukvi_roles", JSON.stringify(updated));
     } catch {
