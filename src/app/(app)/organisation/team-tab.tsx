@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -386,43 +387,61 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
     const normalized = role.toUpperCase();
     if (normalized.includes("ADMIN")) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#EFEBFF] text-[#7D52F4]">
+        <Badge
+          variant="role-purple"
+          className="h-auto py-1 px-3 text-center text-[11px] leading-[14px] whitespace-normal rounded-[10px]"
+        >
           ADMIN
-        </span>
+        </Badge>
       );
     }
     if (normalized.includes("AUTHORISING")) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#EBF1FF] text-[#335CFF]">
+        <Badge
+          variant="role-blue"
+          className="h-auto py-1 px-3 text-center text-[11px] leading-[14px] whitespace-normal rounded-[10px]"
+        >
           AUTHORISING OFFICER
-        </span>
+        </Badge>
       );
     }
     if (normalized.includes("COMPLIANCE")) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#EBF1FF] text-[#335CFF]">
+        <Badge
+          variant="role-blue"
+          className="h-auto py-1 px-3 text-center text-[11px] leading-[14px] whitespace-normal rounded-[10px]"
+        >
           COMPLIANCE OFFICER
-        </span>
+        </Badge>
       );
     }
     if (normalized.includes("KEY CONTACT")) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#EBF1FF] text-[#335CFF]">
+        <Badge
+          variant="role-blue"
+          className="h-auto py-1 px-3 text-center text-[11px] leading-[14px] whitespace-normal rounded-[10px]"
+        >
           KEY CONTACT
-        </span>
+        </Badge>
       );
     }
     if (normalized.includes("INVITED")) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#FFF3EB] text-[#F6B51E]">
+        <Badge
+          variant="role-orange"
+          className="h-auto py-1 px-3 text-center text-[11px] leading-[14px] whitespace-normal rounded-[10px]"
+        >
           INVITED
-        </span>
+        </Badge>
       );
     }
     return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#F5F5F5] text-[#737373]">
+      <Badge
+        variant="neutral-lighter"
+        className="h-auto py-1 px-3 text-center text-[11px] leading-[14px] whitespace-normal rounded-[10px]"
+      >
         {role}
-      </span>
+      </Badge>
     );
   };
 
@@ -532,13 +551,14 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
                 Team members
               </h2>
 
-              <button
+              <Button
                 type="button"
+                variant="primary-neutral"
                 onClick={() => setIsInviteOpen(true)}
-                className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
+                className="h-10 px-5 text-[13px] font-medium rounded-[10px]"
               >
                 Invite member
-              </button>
+              </Button>
             </div>
 
             {/* Search Input Bar */}
@@ -659,20 +679,22 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
 
             {/* Footer Buttons */}
             <div className="flex items-center justify-end gap-3 pt-3">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => toast.info("Team members list refreshed")}
-                className="h-10 px-5 text-[14px] font-medium text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-200/50 rounded-[10px] transition-colors border-0 bg-transparent cursor-pointer"
+                className="h-10 px-5 text-sm font-medium text-[#5C5C5C] hover:text-[#171717] rounded-[10px]"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="primary-neutral"
                 onClick={() => toast.success("Team changes saved successfully")}
-                className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
+                className="h-10 px-5 text-[13px] font-medium rounded-[10px]"
               >
                 Save changes
-              </button>
+              </Button>
             </div>
           </div>
         )}

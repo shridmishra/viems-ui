@@ -22,6 +22,9 @@ const badgeVariants = cva(
         warning: "bg-warning-light text-warning-dark hover:bg-[#FEEFC7] hover:text-[#4D3B12]",
         info: "bg-info-light text-info-dark hover:bg-[#D7E4FF] hover:text-[#0D194B]",
         "neutral-lighter": "bg-neutral-100 text-neutral-600 hover:bg-neutral-200",
+        "role-blue": "bg-role-blue-bg text-role-blue-text font-semibold uppercase tracking-wide",
+        "role-purple": "bg-role-purple-bg text-role-purple-text font-semibold uppercase tracking-wide",
+        "role-orange": "bg-role-orange-bg text-role-orange-text font-semibold uppercase tracking-wide",
       },
     },
     defaultVariants: {

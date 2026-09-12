@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -257,15 +258,15 @@ export function DocumentsTab() {
   const getStatusBadge = (status: "CURRENT" | "ARCHIVED") => {
     if (status === "CURRENT") {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#E8F8F0] text-[#12B76A]">
+        <Badge variant="success" className="text-[11px] font-semibold uppercase tracking-wide">
           CURRENT
-        </span>
+        </Badge>
       );
     }
     return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#F5F5F5] text-[#737373]">
+      <Badge variant="neutral-lighter" className="text-[11px] font-semibold uppercase tracking-wide">
         ARCHIVED
-      </span>
+      </Badge>
     );
   };
 
@@ -318,13 +319,14 @@ export function DocumentsTab() {
             Company documents
           </h2>
 
-          <button
+          <Button
             type="button"
+            variant="primary-neutral"
             onClick={() => setIsUploadOpen(true)}
-            className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
+            className="h-10 px-5 text-[13px] font-medium rounded-[10px]"
           >
             Upload
-          </button>
+          </Button>
         </div>
 
         {/* Column Header Row matching Figma */}
@@ -454,20 +456,22 @@ export function DocumentsTab() {
 
         {/* Footer Action Buttons */}
         <div className="flex items-center justify-end gap-3 pt-3">
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => toast.info("Document repository refreshed")}
-            className="h-10 px-5 text-[14px] font-medium text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-200/50 rounded-[10px] transition-colors border-0 bg-transparent cursor-pointer"
+            className="h-10 px-5 text-sm font-medium text-[#5C5C5C] hover:text-[#171717] rounded-[10px]"
           >
             Refresh
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="primary-neutral"
             onClick={() => toast.success("Compliance pack downloaded")}
-            className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
+            className="h-10 px-5 text-[13px] font-medium rounded-[10px]"
           >
             Download pack
-          </button>
+          </Button>
         </div>
       </div>
 
