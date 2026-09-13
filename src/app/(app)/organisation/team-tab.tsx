@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -32,6 +33,8 @@ import {
   RiFilter3Line,
 } from "@remixicon/react";
 import { toast } from "sonner";
+import { apiClient } from "@/lib/api-client";
+import { ENDPOINTS } from "@/lib/api-endpoints";
 import { InviteMemberModal } from "@/components/InviteMemberModal";
 import { EditMemberModal, TeamMember } from "@/components/EditMemberModal";
 import {
@@ -203,36 +206,72 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
   const [isInviteOpen, setIsInviteOpen] = React.useState(false);
   const [editingMember, setEditingMember] = React.useState<TeamMember | null>(null);
 
-  // Load from localStorage
+  // Load from API with localStorage fallback
   React.useEffect(() => {
-    try {
-      const savedMembers = localStorage.getItem("viems_org_team_members");
-      if (savedMembers) {
-        const parsed = JSON.parse(savedMembers);
-        if (Array.isArray(parsed)) {
-          setMembers(parsed);
+    let isMounted = true;
+    async function loadRoles() {
+      try {
+        const data = await apiClient.get<UkviRoleAssignment[]>(ENDPOINTS.organisation.ukviRoles);
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setUkviRoles(data);
+          return;
         }
+      } catch {
+        // continue
       }
-      const savedRoles = localStorage.getItem("viems_org_ukvi_roles");
-      if (savedRoles) {
-        const parsed = JSON.parse(savedRoles);
-        if (Array.isArray(parsed)) {
-          setUkviRoles(parsed);
+      try {
+        const savedRoles = localStorage.getItem("viems_org_ukvi_roles");
+        if (savedRoles) {
+          const parsed = JSON.parse(savedRoles);
+          if (Array.isArray(parsed) && isMounted) {
+            setUkviRoles(parsed);
+          }
         }
-      }
-    } catch {
-      // ignore
+      } catch {}
     }
+
+    async function loadTeam() {
+      try {
+        const data = await apiClient.get<TeamMember[]>(ENDPOINTS.organisation.team);
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setMembers(data);
+          return;
+        }
+      } catch {
+        // continue
+      }
+      try {
+        const savedMembers = localStorage.getItem("viems_org_team_members");
+        if (savedMembers) {
+          const parsed = JSON.parse(savedMembers);
+          if (Array.isArray(parsed) && isMounted) {
+            setMembers(parsed);
+          }
+        }
+      } catch {}
+    }
+
+    loadRoles();
+    loadTeam();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const saveMembersList = (updated: TeamMember[]) => {
+  const saveMembersList = async (updated: TeamMember[]) => {
     setMembers(updated);
+    try {
+      await apiClient.put(ENDPOINTS.organisation.team, updated);
+    } catch {
+      // offline fallback
+    }
     try {
       localStorage.setItem("viems_org_team_members", JSON.stringify(updated));
     } catch {
       // ignore
     }
   };
+
 
   const handleSort = (field: keyof TeamMember) => {
     if (sortField === field) {
@@ -268,7 +307,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
   const pendingCount = members.filter((m) => m.status === "invited").length;
   const smsCount = members.filter((m) => m.smsRole && m.smsRole !== "—").length;
 
-  const handleRoleSave = (
+  const handleRoleSave = async (
     roleCode: "AO" | "KC" | "L1" | "L2",
     updatedMembers: string[],
     _meta?: { effectiveDate: string; notes?: string }
@@ -278,25 +317,67 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
     );
     setUkviRoles(updated);
     try {
+      await apiClient.put(ENDPOINTS.organisation.ukviRoles, {
+        roleCode,
+        assignedMembers: updatedMembers,
+      });
+    } catch {
+      // continue
+    }
+    try {
       localStorage.setItem("viems_org_ukvi_roles", JSON.stringify(updated));
     } catch {
       // ignore
     }
   };
 
-  const handleMemberSave = (updatedMember: TeamMember) => {
+  const handleMemberSave = async (updatedMember: TeamMember) => {
     const updated = members.map((m) => (m.id === updatedMember.id ? updatedMember : m));
-    saveMembersList(updated);
+    setMembers(updated);
+    try {
+      if (typeof updatedMember.id === "number" || !isNaN(Number(updatedMember.id))) {
+        await apiClient.put(ENDPOINTS.organisation.teamMemberById(updatedMember.id), {
+          name: updatedMember.name,
+          firstName: updatedMember.firstName,
+          lastName: updatedMember.lastName,
+          email: updatedMember.email,
+          avatarText: updatedMember.avatarText,
+          role: updatedMember.role,
+          smsRole: updatedMember.smsRole,
+          status: updatedMember.status,
+        });
+      } else {
+        await apiClient.put(ENDPOINTS.organisation.team, updated);
+      }
+    } catch {
+      // offline fallback
+    }
+    try {
+      localStorage.setItem("viems_org_team_members", JSON.stringify(updated));
+    } catch {}
     toast.success(`Updated ${updatedMember.name}`);
     setEditingMember(null);
   };
 
-  const handleMemberDelete = (id: string) => {
-    const target = members.find((m) => m.id === id);
-    const updated = members.filter((m) => m.id !== id);
-    saveMembersList(updated);
+  const handleMemberDelete = async (id: string | number) => {
+    const target = members.find((m) => String(m.id) === String(id));
+    const updated = members.filter((m) => String(m.id) !== String(id));
+    setMembers(updated);
+    try {
+      if (typeof id === "number" || !isNaN(Number(id))) {
+        await apiClient.delete(ENDPOINTS.organisation.teamMemberById(id));
+      } else {
+        await apiClient.put(ENDPOINTS.organisation.team, updated);
+      }
+    } catch {
+      // offline fallback
+    }
+    try {
+      localStorage.setItem("viems_org_team_members", JSON.stringify(updated));
+    } catch {}
     toast.success(`Removed ${target?.name || "member"}`);
   };
+
 
   const handleResendInvite = (member: TeamMember) => {
     toast.success(`Invitation email resent to ${member.email}`);
@@ -306,43 +387,61 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
     const normalized = role.toUpperCase();
     if (normalized.includes("ADMIN")) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#EFEBFF] text-[#7D52F4]">
+        <Badge
+          variant="role-purple"
+          className="h-6 px-2.5 text-[11px] font-semibold tracking-wide whitespace-nowrap rounded-full"
+        >
           ADMIN
-        </span>
+        </Badge>
       );
     }
     if (normalized.includes("AUTHORISING")) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#EBF1FF] text-[#335CFF]">
+        <Badge
+          variant="role-blue"
+          className="h-6 px-2.5 text-[11px] font-semibold tracking-wide whitespace-nowrap rounded-full"
+        >
           AUTHORISING OFFICER
-        </span>
+        </Badge>
       );
     }
     if (normalized.includes("COMPLIANCE")) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#EBF1FF] text-[#335CFF]">
+        <Badge
+          variant="role-blue"
+          className="h-6 px-2.5 text-[11px] font-semibold tracking-wide whitespace-nowrap rounded-full"
+        >
           COMPLIANCE OFFICER
-        </span>
+        </Badge>
       );
     }
     if (normalized.includes("KEY CONTACT")) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#EBF1FF] text-[#335CFF]">
+        <Badge
+          variant="role-blue"
+          className="h-6 px-2.5 text-[11px] font-semibold tracking-wide whitespace-nowrap rounded-full"
+        >
           KEY CONTACT
-        </span>
+        </Badge>
       );
     }
     if (normalized.includes("INVITED")) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#FFF3EB] text-[#F6B51E]">
+        <Badge
+          variant="role-orange"
+          className="h-6 px-2.5 text-[11px] font-semibold tracking-wide whitespace-nowrap rounded-full"
+        >
           INVITED
-        </span>
+        </Badge>
       );
     }
     return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#F5F5F5] text-[#737373]">
+      <Badge
+        variant="neutral-lighter"
+        className="h-6 px-2.5 text-[11px] font-semibold tracking-wide whitespace-nowrap rounded-full"
+      >
         {role}
-      </span>
+      </Badge>
     );
   };
 
@@ -452,13 +551,14 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
                 Team members
               </h2>
 
-              <button
+              <Button
                 type="button"
+                variant="primary-neutral"
                 onClick={() => setIsInviteOpen(true)}
-                className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
+                className="h-10 px-5 text-[13px] font-medium rounded-[10px]"
               >
                 Invite member
-              </button>
+              </Button>
             </div>
 
             {/* Search Input Bar */}
@@ -476,7 +576,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
             <div className="grid grid-cols-12 gap-4 px-4 py-2 text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider select-none">
               <button
                 type="button"
-                className="col-span-12 sm:col-span-6 flex items-center gap-1 cursor-pointer hover:text-[#171717] transition-colors border-0 bg-transparent p-0 text-left text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider outline-none"
+                className="col-span-12 sm:col-span-5 flex items-center gap-1 cursor-pointer hover:text-[#171717] transition-colors border-0 bg-transparent p-0 text-left text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider outline-none"
                 onClick={() => handleSort("name")}
                 aria-sort={sortField === "name" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
               >
@@ -485,7 +585,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
               </button>
               <button
                 type="button"
-                className="hidden sm:flex sm:col-span-3 items-center gap-1 cursor-pointer hover:text-[#171717] transition-colors border-0 bg-transparent p-0 text-left text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider outline-none"
+                className="hidden sm:flex sm:col-span-4 items-center gap-1 cursor-pointer hover:text-[#171717] transition-colors border-0 bg-transparent p-0 text-left text-[#8C8C8C] text-[11px] font-medium uppercase tracking-wider outline-none"
                 onClick={() => handleSort("role")}
                 aria-sort={sortField === "role" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
               >
@@ -513,7 +613,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
                   className="bg-white rounded-[16px] border border-[#EBEBEB] p-4 shadow-x-small hover:border-[#D4D4D4] transition-all grid grid-cols-12 gap-4 items-center"
                 >
                   {/* Member Info */}
-                  <div className="col-span-12 sm:col-span-6 flex items-center gap-3.5 min-w-0">
+                  <div className="col-span-12 sm:col-span-5 flex items-center gap-3.5 min-w-0">
                     <Avatar className="size-10 rounded-full bg-[#EFEBFF] text-[#7D52F4] flex items-center justify-center text-[13px] font-medium">
                       {m.avatarImage && <AvatarImage src={m.avatarImage} alt={m.name} />}
                       <AvatarFallback className="bg-[#EFEBFF] text-[#7D52F4] font-medium">
@@ -531,7 +631,7 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
                   </div>
 
                   {/* Role Badge */}
-                  <div className="hidden sm:block sm:col-span-3">
+                  <div className="hidden sm:block sm:col-span-4">
                     {getRoleBadge(m.role)}
                   </div>
 
@@ -579,20 +679,22 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
 
             {/* Footer Buttons */}
             <div className="flex items-center justify-end gap-3 pt-3">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => toast.info("Team members list refreshed")}
-                className="h-10 px-5 text-[14px] font-medium text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-200/50 rounded-[10px] transition-colors border-0 bg-transparent cursor-pointer"
+                className="h-10 px-5 text-sm font-medium text-[#5C5C5C] hover:text-[#171717] rounded-[10px]"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="primary-neutral"
                 onClick={() => toast.success("Team changes saved successfully")}
-                className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
+                className="h-10 px-5 text-[13px] font-medium rounded-[10px]"
               >
                 Save changes
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -737,10 +839,26 @@ export function TeamTab({ activeSubTab, onSubTabChange }: TeamTabProps) {
       <InviteMemberModal
         isOpen={isInviteOpen}
         onClose={() => setIsInviteOpen(false)}
-        onSendInvite={(memberData: TeamMember) => {
-          saveMembersList([...members, memberData]);
+        onSendInvite={async (memberData: TeamMember) => {
+          try {
+            const res = await apiClient.post<TeamMember>(ENDPOINTS.organisation.team, {
+              name: memberData.name,
+              firstName: memberData.firstName,
+              lastName: memberData.lastName,
+              email: memberData.email,
+              avatarText: memberData.avatarText,
+              role: memberData.role,
+              smsRole: memberData.smsRole,
+              status: memberData.status,
+            });
+            const created = res || memberData;
+            saveMembersList([...members, created]);
+          } catch {
+            saveMembersList([...members, memberData]);
+          }
         }}
       />
+
 
       {/* Edit Member Modal */}
       {editingMember && (

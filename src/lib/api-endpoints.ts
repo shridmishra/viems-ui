@@ -216,4 +216,35 @@ export const ENDPOINTS = {
     types: `${API_BASE}/custom-fields/types`,
     delete: `${API_BASE}/custom-fields/delete`,
   },
+
+  // ─── Union Rates ───────────────────────────────────────────────────────────
+  unionRates: {
+    base: `${API_BASE}/union-rates`,
+    check: `${API_BASE}/union-rates/check`,
+    unions: `${API_BASE}/union-rates/unions`,
+    validate: `${API_BASE}/union-rates/validate`,
+    byId: (id: number | string) => `${API_BASE}/union-rates/${id}`,
+  },
+
+  // ─── Organisation Suite ───────────────────────────────────────────────────
+  organisation: {
+    base: `${API_BASE}/organisation`,
+    details: `${API_BASE}/organisation/details`,
+    size: `${API_BASE}/organisation/size`,
+    structure: `${API_BASE}/organisation/structure`,
+    address: `${API_BASE}/organisation/address`,
+    addresses: `${API_BASE}/organisation/addresses`,
+    licence: `${API_BASE}/organisation/licence`,
+    subsidiaries: `${API_BASE}/organisation/subsidiaries`,
+    subsidiaryById: (id: number | string) => `${API_BASE}/organisation/subsidiaries/${id}`,
+    licenceGroups: `${API_BASE}/organisation/licence-groups`,
+    licenceGroupById: (id: number | string) => `${API_BASE}/organisation/licence-groups/${id}`,
+    ukviRoles: `${API_BASE}/organisation/ukvi-roles`,
+    team: `${API_BASE}/organisation/team`,
+    teamMemberById: (id: number | string) => `${API_BASE}/organisation/team/${id}`,
+    documents: `${API_BASE}/organisation/documents`,
+    documentById: (id: number | string) => `${API_BASE}/organisation/documents/${id}`,
+    history: `${API_BASE}/organisation/history`,
+  },
 } as const;
+

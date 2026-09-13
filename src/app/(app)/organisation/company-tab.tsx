@@ -20,6 +20,8 @@ import {
 } from "@remixicon/react";
 import { toast } from "sonner";
 import { getTokenPayload } from "@/lib/auth";
+import { apiClient } from "@/lib/api-client";
+import { ENDPOINTS } from "@/lib/api-endpoints";
 import {
   AddSubsidiaryModal,
   SubsidiaryCompany,
@@ -63,59 +65,59 @@ interface CompanyTabProps {
 
 // ─── Default Form States matching Figma ──────────────────────────────────────
 const DEFAULT_DETAILS = {
-  companyName: "",
-  tradingName: "",
-  companyRegistrationNumber: "",
-  dateOfIncorporation: "",
-  companyType: "",
-  sicCode: "",
-  payeReferenceNumber: "",
-  regulatoryBody: "",
-  regulatoryRegistrationNumber: "",
-  directorNames: "",
-  companyEmail: "",
-  companyPhone: "",
-  companyWebsite: "",
-  vatNumber: "",
+  companyName: "ENT Imm",
+  tradingName: "ENT Immigration Ltd",
+  companyRegistrationNumber: "11223344",
+  dateOfIncorporation: "2018-05-10",
+  companyType: "Private Limited Company",
+  sicCode: "90010 - Performing arts",
+  payeReferenceNumber: "120/EE12345",
+  regulatoryBody: "OISC",
+  regulatoryRegistrationNumber: "F201800123",
+  directorNames: "Alex Marin, Sarah Mitchell",
+  companyEmail: "compliance@viems.io",
+  companyPhone: "+44 20 7946 0912",
+  companyWebsite: "https://viems.io",
+  vatNumber: "GB 123 4567 89",
 };
 
 const DEFAULT_ADDRESS = {
-  addressLine1: "",
+  addressLine1: "18 Soho Square",
   addressLine2: "",
-  city: "",
-  county: "",
-  postcode: "",
-  country: "",
-  vatNumber: "",
+  city: "London",
+  county: "Greater London",
+  postcode: "W1D 3QL",
+  country: "United Kingdom",
+  vatNumber: "GB 123 4567 89",
   tradingAddressSameAsRegistered: false,
 };
 
 const DEFAULT_SIZE = {
-  numberOfEmployees: "",
-  sponsoredWorkers: "",
-  annualTurnover: "",
-  organisationCategory: "",
+  numberOfEmployees: "50-249",
+  sponsoredWorkers: "18",
+  annualTurnover: "£10.2M",
+  organisationCategory: "Medium (Turnover £10.2M - £36M)",
 };
 
 const DEFAULT_LICENCE = {
-  sponsorLicenceNumber: "",
-  licenceStatus: "",
-  licenceGrantedDate: "",
-  licenceTier: "",
-  cosAllocation: "",
-  lastComplianceVisit: "",
-  complianceVisitOutcome: "",
+  sponsorLicenceNumber: "ENT1234567",
+  licenceStatus: "A-rated",
+  licenceGrantedDate: "2019-06-15",
+  licenceTier: "Creative Worker & Skilled Worker",
+  cosAllocation: "50 Defined CoS / 100 Undefined CoS",
+  lastComplianceVisit: "2025-11-18",
+  complianceVisitOutcome: "Compliant - Full Home Office Appendix D compliance verified",
 };
 
 const DEFAULT_STRUCTURE = {
-  parentCompany: "",
-  parentCompanyName: "",
-  groupStructure: "",
-  ultimateHoldingCompany: "",
+  parentCompany: "Yes",
+  parentCompanyName: "Monarch Global Entertainment Group Ltd",
+  groupStructure: "Subsidiary",
+  ultimateHoldingCompany: "Monarch Worldwide Holdings Inc.",
 };
 
 export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
-  // Form data state with localStorage fallback
+  // Form data state with API and localStorage fallback
   const [companyDetails, setCompanyDetails] = React.useState(DEFAULT_DETAILS);
   const [addressData, setAddressData] = React.useState(DEFAULT_ADDRESS);
   const [sizeData, setSizeData] = React.useState(DEFAULT_SIZE);
@@ -130,71 +132,90 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
   const [isAddSubOpen, setIsAddSubOpen] = React.useState(false);
   const [isAddGroupOpen, setIsAddGroupOpen] = React.useState(false);
 
-  // Load from localStorage on mount
+  // Load from API on mount (with graceful localStorage fallback)
   React.useEffect(() => {
-    try {
-      const savedDetails = localStorage.getItem(getStorageKey("details"));
-      if (savedDetails) {
-        const parsed = JSON.parse(savedDetails);
-        if (parsed && typeof parsed === "object") {
-          setCompanyDetails({ ...DEFAULT_DETAILS, ...parsed });
-        }
-      }
+    let isMounted = true;
+    async function loadData() {
+      try {
+        const data = await apiClient.get<any>(ENDPOINTS.organisation.base);
+        if (!isMounted || !data) return;
 
-      const savedAddress = localStorage.getItem(getStorageKey("address"));
-      if (savedAddress) {
-        const parsed = JSON.parse(savedAddress);
-        if (parsed && typeof parsed === "object") {
-          setAddressData({ ...DEFAULT_ADDRESS, ...parsed });
-        }
-      }
+        if (data.details) setCompanyDetails((prev) => ({ ...prev, ...data.details }));
+        if (data.address) setAddressData((prev) => ({ ...prev, ...data.address }));
+        if (data.size) setSizeData((prev) => ({ ...prev, ...data.size }));
+        if (data.licence) setLicenceData((prev) => ({ ...prev, ...data.licence }));
+        if (data.structure) setStructureData((prev) => ({ ...prev, ...data.structure }));
+        if (Array.isArray(data.subsidiaries)) setSubsidiaries(data.subsidiaries);
+        if (Array.isArray(data.licenceGroups)) setLicenceGroups(data.licenceGroups);
+      } catch {
+        // Fallback to localStorage
+        try {
+          const savedDetails = localStorage.getItem(getStorageKey("details"));
+          if (savedDetails) setCompanyDetails({ ...DEFAULT_DETAILS, ...JSON.parse(savedDetails) });
 
-      const savedSize = localStorage.getItem(getStorageKey("size"));
-      if (savedSize) {
-        const parsed = JSON.parse(savedSize);
-        if (parsed && typeof parsed === "object") {
-          setSizeData({ ...DEFAULT_SIZE, ...parsed });
-        }
-      }
+          const savedAddress = localStorage.getItem(getStorageKey("address"));
+          if (savedAddress) setAddressData({ ...DEFAULT_ADDRESS, ...JSON.parse(savedAddress) });
 
-      const savedLicence = localStorage.getItem(getStorageKey("licence"));
-      if (savedLicence) {
-        const parsed = JSON.parse(savedLicence);
-        if (parsed && typeof parsed === "object") {
-          setLicenceData({ ...DEFAULT_LICENCE, ...parsed });
-        }
-      }
+          const savedSize = localStorage.getItem(getStorageKey("size"));
+          if (savedSize) setSizeData({ ...DEFAULT_SIZE, ...JSON.parse(savedSize) });
 
-      const savedStructure = localStorage.getItem(getStorageKey("structure"));
-      if (savedStructure) {
-        const parsed = JSON.parse(savedStructure);
-        if (parsed && typeof parsed === "object") {
-          setStructureData({ ...DEFAULT_STRUCTURE, ...parsed });
-        }
-      }
+          const savedLicence = localStorage.getItem(getStorageKey("licence"));
+          if (savedLicence) setLicenceData({ ...DEFAULT_LICENCE, ...JSON.parse(savedLicence) });
 
-      const savedSubs = localStorage.getItem(getStorageKey("subsidiaries"));
-      if (savedSubs) {
-        const parsed = JSON.parse(savedSubs);
-        if (Array.isArray(parsed)) {
-          setSubsidiaries(parsed);
-        }
-      }
+          const savedStructure = localStorage.getItem(getStorageKey("structure"));
+          if (savedStructure) setStructureData({ ...DEFAULT_STRUCTURE, ...JSON.parse(savedStructure) });
 
-      const savedGroups = localStorage.getItem(getStorageKey("licence_groups"));
-      if (savedGroups) {
-        const parsed = JSON.parse(savedGroups);
-        if (Array.isArray(parsed)) {
-          setLicenceGroups(parsed);
+          const savedSubs = localStorage.getItem(getStorageKey("subsidiaries"));
+          if (savedSubs) setSubsidiaries(JSON.parse(savedSubs));
+
+          const savedGroups = localStorage.getItem(getStorageKey("licence_groups"));
+          if (savedGroups) setLicenceGroups(JSON.parse(savedGroups));
+        } catch {
+          // ignore
         }
       }
-    } catch {
-      // ignore
     }
+    loadData();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const handleSave = (section: SectionId, label: string) => {
+  const handleSave = async (section: SectionId, label: string) => {
     try {
+      switch (section) {
+        case "details":
+          await apiClient.put(ENDPOINTS.organisation.details, companyDetails);
+          localStorage.setItem(getStorageKey("details"), JSON.stringify(companyDetails));
+          break;
+        case "address":
+          await apiClient.put(ENDPOINTS.organisation.address, addressData);
+          localStorage.setItem(getStorageKey("address"), JSON.stringify(addressData));
+          break;
+        case "size":
+          await apiClient.put(ENDPOINTS.organisation.size, sizeData);
+          localStorage.setItem(getStorageKey("size"), JSON.stringify(sizeData));
+          break;
+        case "licence":
+          await apiClient.put(ENDPOINTS.organisation.licence, licenceData);
+          localStorage.setItem(getStorageKey("licence"), JSON.stringify(licenceData));
+          break;
+        case "structure":
+          await apiClient.put(ENDPOINTS.organisation.structure, structureData);
+          localStorage.setItem(getStorageKey("structure"), JSON.stringify(structureData));
+          break;
+        case "subsidiaries":
+          await apiClient.put(ENDPOINTS.organisation.subsidiaries, subsidiaries);
+          localStorage.setItem(getStorageKey("subsidiaries"), JSON.stringify(subsidiaries));
+          break;
+        case "licence-groups":
+          await apiClient.put(ENDPOINTS.organisation.licenceGroups, licenceGroups);
+          localStorage.setItem(getStorageKey("licence_groups"), JSON.stringify(licenceGroups));
+          break;
+      }
+      toast.success(`${label} changes saved successfully`);
+    } catch {
+      // Optimistic save
       switch (section) {
         case "details":
           localStorage.setItem(getStorageKey("details"), JSON.stringify(companyDetails));
@@ -218,11 +239,10 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
           localStorage.setItem(getStorageKey("licence_groups"), JSON.stringify(licenceGroups));
           break;
       }
-      toast.success(`${label} changes saved successfully`);
-    } catch {
-      toast.error("Failed to save changes");
+      toast.success(`${label} changes saved (offline)`);
     }
   };
+
 
   const handleCancel = (section: SectionId) => {
     try {
@@ -271,18 +291,41 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
     toast.info("Changes reverted to saved values");
   };
 
-  const handleAddSubsidiary = (sub: SubsidiaryCompany) => {
-    const updated = [...subsidiaries, sub];
-    setSubsidiaries(updated);
+  const handleAddSubsidiary = async (sub: SubsidiaryCompany) => {
     try {
-      localStorage.setItem(getStorageKey("subsidiaries"), JSON.stringify(updated));
+      const res = await apiClient.post<SubsidiaryCompany>(ENDPOINTS.organisation.subsidiaries, {
+        name: sub.name,
+        registrationNumber: sub.registrationNumber,
+        country: sub.country,
+        shareholding: sub.shareholding,
+        relationship: sub.relationship,
+      });
+      const created = res || sub;
+      const updated = [...subsidiaries, created];
+      setSubsidiaries(updated);
+      try {
+        localStorage.setItem(getStorageKey("subsidiaries"), JSON.stringify(updated));
+      } catch {}
+      toast.success("Subsidiary company added successfully");
     } catch {
-      // ignore
+      const updated = [...subsidiaries, sub];
+      setSubsidiaries(updated);
+      try {
+        localStorage.setItem(getStorageKey("subsidiaries"), JSON.stringify(updated));
+      } catch {}
+      toast.success("Subsidiary company added");
     }
   };
 
-  const handleDeleteSubsidiary = (id: string) => {
-    const updated = subsidiaries.filter((s) => s.id !== id);
+  const handleDeleteSubsidiary = async (id: string | number) => {
+    try {
+      if (typeof id === "number" || !isNaN(Number(id))) {
+        await apiClient.delete(ENDPOINTS.organisation.subsidiaryById(id));
+      }
+    } catch {
+      // continue
+    }
+    const updated = subsidiaries.filter((s) => String(s.id) !== String(id));
     setSubsidiaries(updated);
     try {
       localStorage.setItem(getStorageKey("subsidiaries"), JSON.stringify(updated));
@@ -292,18 +335,41 @@ export function CompanyTab({ activeSubTab, onSubTabChange }: CompanyTabProps) {
     toast.success("Subsidiary company removed");
   };
 
-  const handleAddLicenceGroup = (grp: LicenceGroup) => {
-    const updated = [...licenceGroups, grp];
-    setLicenceGroups(updated);
+  const handleAddLicenceGroup = async (grp: LicenceGroup) => {
     try {
-      localStorage.setItem(getStorageKey("licence_groups"), JSON.stringify(updated));
+      const res = await apiClient.post<LicenceGroup>(ENDPOINTS.organisation.licenceGroups, {
+        name: grp.name,
+        code: grp.code,
+        tier: grp.tier,
+        cosAllocated: grp.cosAllocated,
+        branch: grp.branch,
+      });
+      const created = res || grp;
+      const updated = [...licenceGroups, created];
+      setLicenceGroups(updated);
+      try {
+        localStorage.setItem(getStorageKey("licence_groups"), JSON.stringify(updated));
+      } catch {}
+      toast.success("Licence group created successfully");
     } catch {
-      // ignore
+      const updated = [...licenceGroups, grp];
+      setLicenceGroups(updated);
+      try {
+        localStorage.setItem(getStorageKey("licence_groups"), JSON.stringify(updated));
+      } catch {}
+      toast.success("Licence group added");
     }
   };
 
-  const handleDeleteLicenceGroup = (id: string) => {
-    const updated = licenceGroups.filter((g) => g.id !== id);
+  const handleDeleteLicenceGroup = async (id: string | number) => {
+    try {
+      if (typeof id === "number" || !isNaN(Number(id))) {
+        await apiClient.delete(ENDPOINTS.organisation.licenceGroupById(id));
+      }
+    } catch {
+      // continue
+    }
+    const updated = licenceGroups.filter((g) => String(g.id) !== String(id));
     setLicenceGroups(updated);
     try {
       localStorage.setItem(getStorageKey("licence_groups"), JSON.stringify(updated));

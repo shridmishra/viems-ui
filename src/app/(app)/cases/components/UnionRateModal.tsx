@@ -39,6 +39,8 @@ import {
   parseSalaryAmount,
   detectSalaryPeriod,
   OFFICIAL_UNION_RATES,
+  fetchUnionRates,
+  checkUnionRatesApi,
 } from "@/lib/union-rates";
 
 interface UnionRateModalProps {
@@ -119,8 +121,26 @@ function UnionRateModalContent({
   const [searchQuery, setSearchQuery] = React.useState<string>("");
   const [browserUnionFilter, setBrowserUnionFilter] = React.useState<string>("ALL");
 
+  // Database-backed rate cards with local fallback
+  const [dbRates, setDbRates] = React.useState<UnionRateCard[]>(OFFICIAL_UNION_RATES);
+
+  React.useEffect(() => {
+    if (!open) return;
+    let isMounted = true;
+    fetchUnionRates()
+      .then((rates) => {
+        if (isMounted && rates && rates.length > 0) {
+          setDbRates(rates);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [open]);
+
   // Live validation computation
-  const validation: UnionRateValidationResult = React.useMemo(() => {
+  const fallbackValidation: UnionRateValidationResult = React.useMemo(() => {
     return validateRemuneration({
       union: selectedUnion,
       jobTitle,
@@ -130,6 +150,36 @@ function UnionRateModalContent({
       hoursPerWeek,
     });
   }, [selectedUnion, jobTitle, amount, period, hoursPerWeek]);
+
+  const [liveValidation, setLiveValidation] = React.useState<UnionRateValidationResult | null>(null);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await checkUnionRatesApi({
+          union: selectedUnion,
+          jobTitle,
+          amount,
+          period,
+          currency: "GBP",
+          hoursPerWeek,
+        });
+        if (isMounted) {
+          setLiveValidation(res);
+        }
+      } catch {
+        // Handled with internal fallback
+      }
+    }, 200);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [selectedUnion, jobTitle, amount, period, hoursPerWeek]);
+
+  const validation = liveValidation || fallbackValidation;
 
   // Handle applying union minimum pay with 1 click
   const handleApplyMinimum = () => {
@@ -169,9 +219,9 @@ function UnionRateModalContent({
       onSuccess(validation);
     }
 
-    toast.success("Union rate and salary compliance recorded", {
+    toast.success("Union Rate Compliance Saved", {
       description: validation.isCompliant
-        ? `Remuneration conforms with ${validation.agreementName}.`
+        ? `Remuneration verified as compliant under ${validation.union} scales.`
         : `Flagged below ${validation.union} minimum rate.`,
     });
 
@@ -180,7 +230,7 @@ function UnionRateModalContent({
 
   // Filtered rate cards for browser tab
   const filteredRateCards = React.useMemo(() => {
-    return OFFICIAL_UNION_RATES.filter((rate) => {
+    return dbRates.filter((rate) => {
       if (browserUnionFilter !== "ALL" && rate.union !== browserUnionFilter) {
         return false;
       }
@@ -193,16 +243,16 @@ function UnionRateModalContent({
         rate.union.toLowerCase().includes(q)
       );
     });
-  }, [browserUnionFilter, searchQuery]);
+  }, [dbRates, browserUnionFilter, searchQuery]);
 
   // Union counts for directory filter pills
   const unionCounts = React.useMemo(() => {
-    const counts: Record<string, number> = { ALL: OFFICIAL_UNION_RATES.length };
-    OFFICIAL_UNION_RATES.forEach((r) => {
+    const counts: Record<string, number> = { ALL: dbRates.length };
+    dbRates.forEach((r) => {
       counts[r.union] = (counts[r.union] || 0) + 1;
     });
     return counts;
-  }, []);
+  }, [dbRates]);
 
   // Handle selecting a rate card from the browser
   const handleSelectRateCard = (card: UnionRateCard) => {

@@ -50,7 +50,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { validateRemuneration, formatCurrency } from "@/lib/union-rates";
+import { validateRemuneration, formatCurrency, checkUnionRatesApi, UnionValidationResult } from "@/lib/union-rates";
 
 interface PersonalDetailsState {
   firstName: string;
@@ -491,7 +491,7 @@ export default function AddMigrantPage() {
     socCode: "3416",
   });
 
-  const unionValidation = React.useMemo(() => {
+  const fallbackValidation = React.useMemo(() => {
     return validateRemuneration({
       union: form.unionScale || "EQUITY",
       jobTitle: form.jobTitle,
@@ -500,6 +500,35 @@ export default function AddMigrantPage() {
       hoursPerWeek: form.hoursPerWeek,
     });
   }, [form.unionScale, form.jobTitle, form.annualSalary, form.hoursPerWeek]);
+
+  const [liveValidation, setLiveValidation] = React.useState<UnionValidationResult | null>(null);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await checkUnionRatesApi({
+          union: form.unionScale || "EQUITY",
+          jobTitle: form.jobTitle,
+          amount: form.annualSalary,
+          period: "ANNUAL",
+          hoursPerWeek: form.hoursPerWeek,
+        });
+        if (isMounted) {
+          setLiveValidation(res);
+        }
+      } catch {
+        // Fallback handled internally
+      }
+    }, 200);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [form.unionScale, form.jobTitle, form.annualSalary, form.hoursPerWeek]);
+
+  const unionValidation = liveValidation || fallbackValidation;
 
   // Restore draft on mount
   React.useEffect(() => {

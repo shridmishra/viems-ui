@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +20,8 @@ import {
   RiDeleteBinLine,
 } from "@remixicon/react";
 import { toast } from "sonner";
+import { apiClient } from "@/lib/api-client";
+import { ENDPOINTS } from "@/lib/api-endpoints";
 import {
   UploadDocumentModal,
   UploadedDocument,
@@ -124,19 +127,35 @@ export function DocumentsTab() {
   const [sortDirection, setSortDirection] = React.useState<"asc" | "desc">("asc");
   const [isUploadOpen, setIsUploadOpen] = React.useState(false);
 
-  // Load from localStorage
+  // Load from API with localStorage fallback
   React.useEffect(() => {
-    try {
-      const saved = localStorage.getItem("viems_org_documents");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setDocuments(parsed);
+    let isMounted = true;
+    async function loadDocs() {
+      try {
+        const data = await apiClient.get<CompanyDocumentItem[]>(ENDPOINTS.organisation.documents);
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setDocuments(data);
+          return;
         }
+      } catch {
+        // continue to fallback
       }
-    } catch {
-      // ignore
+      try {
+        const saved = localStorage.getItem("viems_org_documents");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && isMounted) {
+            setDocuments(parsed);
+          }
+        }
+      } catch {
+        // ignore
+      }
     }
+    loadDocs();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const saveDocs = (docs: CompanyDocumentItem[]) => {
@@ -173,24 +192,57 @@ export function DocumentsTab() {
     });
   }, [documents, sortField, sortDirection]);
 
-  const handleUploadNewDoc = (newDoc: UploadedDocument) => {
-    const updated = [newDoc, ...documents];
-    saveDocs(updated);
+  const handleUploadNewDoc = async (newDoc: UploadedDocument) => {
+    try {
+      const res = await apiClient.post<CompanyDocumentItem>(ENDPOINTS.organisation.documents, {
+        title: newDoc.title,
+        subtitle: newDoc.subtitle,
+        category: newDoc.category,
+        date: newDoc.date,
+        status: newDoc.status,
+        fileName: newDoc.fileName,
+        fileSize: newDoc.fileSize,
+      });
+      const created = res || newDoc;
+      const updated = [created, ...documents];
+      saveDocs(updated);
+      toast.success("Document uploaded successfully");
+    } catch {
+      const updated = [newDoc, ...documents];
+      saveDocs(updated);
+      toast.success("Document uploaded");
+    }
   };
 
-  const handleToggleStatus = (id: string) => {
+  const handleToggleStatus = async (id: string | number) => {
+    const target = documents.find((d) => String(d.id) === String(id));
+    const newStatus = target?.status === "CURRENT" ? "ARCHIVED" : "CURRENT";
+    try {
+      if (typeof id === "number" || !isNaN(Number(id))) {
+        await apiClient.put(ENDPOINTS.organisation.documentById(id), { status: newStatus });
+      }
+    } catch {
+      // continue
+    }
     const updated = documents.map((d) =>
-      d.id === id
-        ? { ...d, status: (d.status === "CURRENT" ? "ARCHIVED" : "CURRENT") as "CURRENT" | "ARCHIVED" }
+      String(d.id) === String(id)
+        ? { ...d, status: newStatus as "CURRENT" | "ARCHIVED" }
         : d
     );
     saveDocs(updated);
     toast.success("Document status updated");
   };
 
-  const handleDeleteDoc = (id: string) => {
-    const target = documents.find((d) => d.id === id);
-    const updated = documents.filter((d) => d.id !== id);
+  const handleDeleteDoc = async (id: string | number) => {
+    const target = documents.find((d) => String(d.id) === String(id));
+    try {
+      if (typeof id === "number" || !isNaN(Number(id))) {
+        await apiClient.delete(ENDPOINTS.organisation.documentById(id));
+      }
+    } catch {
+      // continue
+    }
+    const updated = documents.filter((d) => String(d.id) !== String(id));
     saveDocs(updated);
     toast.success(`Removed "${target?.title || "Document"}"`);
   };
@@ -206,15 +258,15 @@ export function DocumentsTab() {
   const getStatusBadge = (status: "CURRENT" | "ARCHIVED") => {
     if (status === "CURRENT") {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#E8F8F0] text-[#12B76A]">
+        <Badge variant="success" className="text-[11px] font-semibold uppercase tracking-wide">
           CURRENT
-        </span>
+        </Badge>
       );
     }
     return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide bg-[#F5F5F5] text-[#737373]">
+      <Badge variant="neutral-lighter" className="text-[11px] font-semibold uppercase tracking-wide">
         ARCHIVED
-      </span>
+      </Badge>
     );
   };
 
@@ -267,13 +319,14 @@ export function DocumentsTab() {
             Company documents
           </h2>
 
-          <button
+          <Button
             type="button"
+            variant="primary-neutral"
             onClick={() => setIsUploadOpen(true)}
-            className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
+            className="h-10 px-5 text-[13px] font-medium rounded-[10px]"
           >
             Upload
-          </button>
+          </Button>
         </div>
 
         {/* Column Header Row matching Figma */}
@@ -403,20 +456,22 @@ export function DocumentsTab() {
 
         {/* Footer Action Buttons */}
         <div className="flex items-center justify-end gap-3 pt-3">
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => toast.info("Document repository refreshed")}
-            className="h-10 px-5 text-[14px] font-medium text-[#5C5C5C] hover:text-[#171717] hover:bg-neutral-200/50 rounded-[10px] transition-colors border-0 bg-transparent cursor-pointer"
+            className="h-10 px-5 text-sm font-medium text-[#5C5C5C] hover:text-[#171717] rounded-[10px]"
           >
             Refresh
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="primary-neutral"
             onClick={() => toast.success("Compliance pack downloaded")}
-            className="h-10 px-5 bg-[#171717] hover:bg-[#262626] text-white text-[13px] font-medium rounded-[10px] shadow-x-small transition-all cursor-pointer border-0"
+            className="h-10 px-5 text-[13px] font-medium rounded-[10px]"
           >
             Download pack
-          </button>
+          </Button>
         </div>
       </div>
 

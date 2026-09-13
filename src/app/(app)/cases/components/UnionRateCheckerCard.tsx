@@ -17,6 +17,7 @@ import {
   validateRemuneration,
   formatCurrency,
   detectSalaryPeriod,
+  checkUnionRatesApi,
 } from "@/lib/union-rates";
 import { UnionRateModal } from "./UnionRateModal";
 
@@ -96,7 +97,7 @@ export function UnionRateCheckerCard({
   const currentPeriod = localOverrides?.period ?? detectSalaryPeriod(currentSalary);
   const isCleared = localOverrides?.cleared ?? false;
 
-  const validation: UnionRateValidationResult = React.useMemo(() => {
+  const fallbackValidation: UnionRateValidationResult = React.useMemo(() => {
     return validateRemuneration({
       union: currentUnion,
       jobTitle: currentJobTitle,
@@ -105,6 +106,35 @@ export function UnionRateCheckerCard({
       currency: "GBP",
     });
   }, [currentUnion, currentJobTitle, currentSalary, currentPeriod]);
+
+  const [liveValidation, setLiveValidation] = React.useState<UnionRateValidationResult | null>(null);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await checkUnionRatesApi({
+          union: currentUnion,
+          jobTitle: currentJobTitle,
+          amount: currentSalary,
+          period: currentPeriod,
+          currency: "GBP",
+        });
+        if (isMounted) {
+          setLiveValidation(res);
+        }
+      } catch {
+        // Handled internally
+      }
+    }, 200);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [currentUnion, currentJobTitle, currentSalary, currentPeriod]);
+
+  const validation = liveValidation || fallbackValidation;
 
   const handleModalSuccess = (result: UnionRateValidationResult) => {
     setLocalOverrides({

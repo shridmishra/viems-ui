@@ -24,6 +24,8 @@ import { DocumentsTab } from "./documents-tab";
 import { HistoryTab } from "./history-tab";
 import { TeamTab, TeamSubTab, TEAM_SUB_TABS } from "./team-tab";
 import { getTokenPayload } from "@/lib/auth";
+import { apiClient } from "@/lib/api-client";
+import { ENDPOINTS } from "@/lib/api-endpoints";
 
 export const MAIN_TABS = ["company", "documents", "history", "team"] as const;
 export type MainTab = (typeof MAIN_TABS)[number];
@@ -77,38 +79,66 @@ function OrganisationPageContent() {
       let registeredAddress = "18 Soho Square, London W1D 3QL";
       let authorisingOfficer = "Alex Marin - Authorising Officer";
 
+      // 1. First attempt to fetch live organisation bundle from backend API
       try {
-        const payload = getTokenPayload();
-        const userId = payload?.email || (payload as any)?.id || (payload as any)?.sub;
-        const prefix = userId ? `viems_org_${userId}_` : `viems_org_`;
-
-        const detailsRaw = localStorage.getItem(`${prefix}details`);
-        if (detailsRaw) {
-          const d = JSON.parse(detailsRaw);
-          if (d.companyName) companyName = d.companyName;
-          if (d.businessSector) businessSector = d.businessSector;
-        }
-
-        const licenceRaw = localStorage.getItem(`${prefix}licence`);
-        if (licenceRaw) {
-          const l = JSON.parse(licenceRaw);
-          if (l.sponsorLicenceNumber) sponsorLicence = l.sponsorLicenceNumber;
-        }
-
-        const addressRaw = localStorage.getItem(`${prefix}address`);
-        if (addressRaw) {
-          const a = JSON.parse(addressRaw);
-          const parts = [a.addressLine1, a.addressLine2, a.city, a.county, a.postcode, a.country].filter(Boolean);
-          if (parts.length > 0) registeredAddress = parts.join(", ");
-        }
-
-        const rolesRaw = localStorage.getItem("viems_org_ukvi_roles");
-        if (rolesRaw) {
-          const r = JSON.parse(rolesRaw);
-          if (r.authorisingOfficer) authorisingOfficer = `${r.authorisingOfficer} - Authorising Officer`;
+        const liveOrg = await apiClient.get<any>(ENDPOINTS.organisation.base);
+        if (liveOrg) {
+          if (liveOrg.details?.companyName) companyName = liveOrg.details.companyName;
+          if (liveOrg.details?.sicCode) businessSector = liveOrg.details.sicCode;
+          if (liveOrg.licence?.sponsorLicenceNumber) sponsorLicence = liveOrg.licence.sponsorLicenceNumber;
+          if (liveOrg.address) {
+            const parts = [
+              liveOrg.address.addressLine1,
+              liveOrg.address.addressLine2,
+              liveOrg.address.city,
+              liveOrg.address.county,
+              liveOrg.address.postcode,
+              liveOrg.address.country,
+            ].filter(Boolean);
+            if (parts.length > 0) registeredAddress = parts.join(", ");
+          }
+          if (Array.isArray(liveOrg.ukviRoles)) {
+            const aoRole = liveOrg.ukviRoles.find((r: any) => r.roleCode === "AO");
+            if (aoRole && Array.isArray(aoRole.assignedMembers) && aoRole.assignedMembers.length > 0) {
+              authorisingOfficer = `${aoRole.assignedMembers[0]} - Authorising Officer`;
+            }
+          }
         }
       } catch {
-        // Fallback to defaults
+        // Fallback to localStorage
+        try {
+          const payload = getTokenPayload();
+          const userId = payload?.email || (payload as any)?.id || (payload as any)?.sub;
+          const prefix = userId ? `viems_org_${userId}_` : `viems_org_`;
+
+          const detailsRaw = localStorage.getItem(`${prefix}details`);
+          if (detailsRaw) {
+            const d = JSON.parse(detailsRaw);
+            if (d.companyName) companyName = d.companyName;
+            if (d.businessSector) businessSector = d.businessSector;
+          }
+
+          const licenceRaw = localStorage.getItem(`${prefix}licence`);
+          if (licenceRaw) {
+            const l = JSON.parse(licenceRaw);
+            if (l.sponsorLicenceNumber) sponsorLicence = l.sponsorLicenceNumber;
+          }
+
+          const addressRaw = localStorage.getItem(`${prefix}address`);
+          if (addressRaw) {
+            const a = JSON.parse(addressRaw);
+            const parts = [a.addressLine1, a.addressLine2, a.city, a.county, a.postcode, a.country].filter(Boolean);
+            if (parts.length > 0) registeredAddress = parts.join(", ");
+          }
+
+          const rolesRaw = localStorage.getItem("viems_org_ukvi_roles");
+          if (rolesRaw) {
+            const r = JSON.parse(rolesRaw);
+            if (r.authorisingOfficer) authorisingOfficer = `${r.authorisingOfficer} - Authorising Officer`;
+          }
+        } catch {
+          // Fallback to defaults
+        }
       }
 
       const cleanSlug = companyName.toUpperCase().replace(/[^A-Z0-9]/g, "");

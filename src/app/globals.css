@@ -158,6 +158,14 @@
   --color-accent-yellow-light: oklch(0.947 0.060 87.4);
   --color-accent-red-light: oklch(0.866 0.073 13.4);
 
+  /* Role Badge Tokens */
+  --color-role-blue-bg: oklch(0.955 0.028 260.0);
+  --color-role-blue-text: oklch(0.550 0.210 260.0);
+  --color-role-purple-bg: oklch(0.955 0.030 295.0);
+  --color-role-purple-text: oklch(0.530 0.220 292.0);
+  --color-role-orange-bg: oklch(0.965 0.035 70.0);
+  --color-role-orange-text: oklch(0.680 0.160 65.0);
+
   --shadow-regular-medium: 0px 16px 32px -12px rgba(14, 18, 27, 0.1);
   --shadow-custom-medium: 0px 0px 0px 1px rgba(245, 245, 245, 1), 0px 48px 48px -24px rgba(51, 51, 51, 0.04), 0px 24px 24px -12px rgba(51, 51, 51, 0.04), 0px 12px 12px -6px rgba(51, 51, 51, 0.04), 0px 6px 6px -3px rgba(51, 51, 51, 0.04), 0px 3px 3px -1.5px rgba(51, 51, 51, 0.02), 0px 1px 1px 0.5px rgba(51, 51, 51, 0.04), inset 0px -1px 1px -0.5px rgba(51, 51, 51, 0.06);
   --shadow-card-large: 0px 0px 0px 1px rgba(23, 23, 23, 0.08), 0px 1px 1px -0.5px rgba(23, 23, 23, 0.04), 0px 3px 3px -1.5px rgba(23, 23, 23, 0.04), 0px 6px 6px -3px rgba(23, 23, 23, 0.04), 0px 10px 10px -5px rgba(23, 23, 23, 0.04), 0px 20px 20px -10px rgba(23, 23, 23, 0.04), inset 0px -1px 1px -0.5px rgba(23, 23, 23, 0.06);
@@ -368,4 +376,24 @@
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+/* Role Badge Utility Classes */
+@utility bg-role-blue-bg {
+  background-color: var(--color-role-blue-bg);
+}
+@utility text-role-blue-text {
+  color: var(--color-role-blue-text);
+}
+@utility bg-role-purple-bg {
+  background-color: var(--color-role-purple-bg);
+}
+@utility text-role-purple-text {
+  color: var(--color-role-purple-text);
+}
+@utility bg-role-orange-bg {
+  background-color: var(--color-role-orange-bg);
+}
+@utility text-role-orange-text {
+  color: var(--color-role-orange-text);
 }
