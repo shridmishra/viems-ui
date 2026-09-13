@@ -87,7 +87,7 @@ export function CaseHeader({
     const diff = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
     return {
       delayDays: diff,
-      isSmsThresholdExceeded: diff >= 28,
+      isSmsThresholdExceeded: diff > 28,
       formattedDate: start.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
     };
   }, [workStartDate, hasArrived]);

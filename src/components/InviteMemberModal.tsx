@@ -90,11 +90,15 @@ export function InviteMemberModal({
           email: email.trim(),
           jobTitle: role,
           userStatus: isInvited ? "invited" : "active",
-        }).catch(() => null);
+        });
         createdId = response?.id || response?.data?.id;
       }
 
-      const backendId = createdId ? String(createdId) : `local-${Date.now()}`;
+      if (!createdId) {
+        throw new Error("No team member ID returned from server");
+      }
+
+      const backendId = String(createdId);
 
       const newMember: TeamMember = {
         id: backendId,

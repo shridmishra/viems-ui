@@ -163,6 +163,8 @@ export function CurtailmentLetterModal({
   const [downloading, setDownloading] = React.useState<boolean>(false);
   const [overrideCosRef, setOverrideCosRef] = React.useState<string>("");
   const [overrideJobTitle, setOverrideJobTitle] = React.useState<string>("");
+  const [overrideSponsorName, setOverrideSponsorName] = React.useState<string>("");
+  const [overrideSponsorLicence, setOverrideSponsorLicence] = React.useState<string>("");
 
   // Case identity tracking for fresh reset
   const caseKey = `${caseData?.id || ""}_${caseData?.caseId || ""}_${migrant?.id || ""}`;
@@ -209,7 +211,7 @@ export function CurtailmentLetterModal({
         migrant?.cosNumber ||
         migrant?.cosReference ||
         migrant?.employment?.cosReference ||
-        "CoS-C5C1M27333Y-NO"
+        ""
       );
       setOverrideCosRef(detectedCos);
 
@@ -224,9 +226,29 @@ export function CurtailmentLetterModal({
         migrant?.role ||
         migrant?.employment?.jobTitle ||
         migrant?.personal?.jobTitle ||
-        "Creative Worker / Musician"
+        ""
       );
       setOverrideJobTitle(detectedRole);
+
+      const detectedSponsor = safeStringVal(
+        caseData?.sponsor_name ||
+        caseData?.employer ||
+        caseData?.employment?.employer ||
+        migrant?.sponsor_name ||
+        migrant?.employer ||
+        migrant?.employment?.employer ||
+        ""
+      );
+      setOverrideSponsorName(detectedSponsor);
+
+      const detectedLicence = safeStringVal(
+        caseData?.sponsor_licence_number ||
+        caseData?.sponsorLicenceNumber ||
+        migrant?.sponsor_licence_number ||
+        migrant?.sponsorLicenceNumber ||
+        ""
+      );
+      setOverrideSponsorLicence(detectedLicence);
     }
   }, [open, caseKey, initialCessationType, initialReason, initialNotes, caseData, migrant]);
 
@@ -311,21 +333,23 @@ export function CurtailmentLetterModal({
   const jobTitle = overrideJobTitle.trim() || rawJobTitle;
 
   const rawSponsorName =
+    overrideSponsorName.trim() ||
     safeStringVal(caseData?.sponsor_name) ||
     safeStringVal(caseData?.employer) ||
     safeStringVal(caseData?.employment?.employer) ||
     safeStringVal(m.sponsor_name) ||
     safeStringVal(m.employer) ||
     safeStringVal(m.employment?.employer) ||
-    "ENT Immigration Ltd";
+    "";
   const sponsorName = rawSponsorName;
 
   const rawSponsorLicence =
+    overrideSponsorLicence.trim() ||
     safeStringVal(caseData?.sponsor_licence_number) ||
     safeStringVal(caseData?.sponsorLicenceNumber) ||
     safeStringVal(m.sponsor_licence_number) ||
     safeStringVal(m.sponsorLicenceNumber) ||
-    "ENT1234567";
+    "";
   const sponsorLicence = rawSponsorLicence;
 
   // Validate required notice metadata
@@ -402,43 +426,54 @@ export function CurtailmentLetterModal({
         (caseData as any)?.caseId ??
         migrant?.id;
       const targetCaseId =
-        typeof rawTargetId === "number"
+        typeof rawTargetId === "number" && rawTargetId > 0
           ? rawTargetId
-          : parseInt(String(rawTargetId || ""), 10);
+          : typeof rawTargetId === "string" && rawTargetId.trim().length > 0
+          ? rawTargetId.trim()
+          : null;
 
-      if (targetCaseId && !isNaN(targetCaseId) && targetCaseId > 0) {
-        try {
-          const auditPayload = {
-            cessationType,
-            cessationReason: finalReason,
-            effectiveDate: effectiveDate ? new Date(effectiveDate).toISOString() : new Date().toISOString(),
-            refNumber: generatedRef,
-            notes: notes.trim() || undefined,
-            smsReportReference: smsReference.trim() || undefined,
-            authorisingOfficer: authorisingOfficer.trim() || "Nathan Wood",
-            authorisingOfficerRole: officerRole.trim() || "Compliance Officer",
-            migrantName,
-            caseNumber,
-            cosReference: cosReference || undefined,
-            jobTitle: jobTitle || undefined,
-            sponsorName: sponsorName || undefined,
-            sponsorLicenceNumber: sponsorLicence || undefined,
-            lastDayOfWork: lastDayOfWork ? new Date(lastDayOfWork).toISOString() : undefined,
-          };
+      if (!targetCaseId) {
+        toast.error("Valid Case ID is required to generate and archive statutory notice.");
+        return;
+      }
 
-          const res = await apiClient.post<any>(
-            ENDPOINTS.cases.curtailment(targetCaseId),
-            auditPayload
+      try {
+        const auditPayload = {
+          cessationType,
+          cessationReason: finalReason,
+          effectiveDate: effectiveDate ? new Date(effectiveDate).toISOString() : new Date().toISOString(),
+          refNumber: generatedRef,
+          notes: notes.trim() || undefined,
+          smsReportReference: smsReference.trim() || undefined,
+          authorisingOfficer: authorisingOfficer.trim() || "Nathan Wood",
+          authorisingOfficerRole: officerRole.trim() || "Compliance Officer",
+          migrantName,
+          caseNumber,
+          cosReference: cosReference || undefined,
+          jobTitle: jobTitle || undefined,
+          sponsorName: sponsorName || undefined,
+          sponsorLicenceNumber: sponsorLicence || undefined,
+          lastDayOfWork: lastDayOfWork ? new Date(lastDayOfWork).toISOString() : undefined,
+        };
+
+        const res = await apiClient.post<any>(
+          ENDPOINTS.cases.curtailment(targetCaseId),
+          auditPayload
+        );
+
+        if (res?.emailDispatch?.recipients?.length > 0) {
+          toast.success(
+            `Audit saved & confirmation notice dispatched to ${res.emailDispatch.recipients.join(", ")}.`
           );
-
-          if (res?.emailDispatch?.recipients?.length > 0) {
-            toast.success(
-              `Audit saved & confirmation notice dispatched to ${res.emailDispatch.recipients.join(", ")}.`
-            );
-          }
-        } catch (apiErr) {
-          console.warn("Audit persistence notice (proceeding with PDF generation):", apiErr);
         }
+      } catch (apiErr: any) {
+        console.error("Audit persistence failed:", apiErr);
+        const errorMsg =
+          apiErr?.response?.data?.message ||
+          apiErr?.message ||
+          "Failed to archive statutory curtailment record on server.";
+        toast.error(`${errorMsg} Notice generation halted to preserve compliance integrity.`);
+        return;
       }
 
       // 2. Generate and download client PDF
@@ -586,6 +621,34 @@ export function CurtailmentLetterModal({
                 placeholder="e.g. Musicians with entourage"
                 value={overrideJobTitle}
                 onChange={(e) => setOverrideJobTitle(e.target.value)}
+                className="h-9 text-[13px] rounded-[10px] border border-neutral-200 bg-white"
+              />
+            </div>
+          </div>
+
+          {/* Two-Column: Sponsor Name & Sponsor Licence */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-[12px] font-medium text-[#171717]">
+                Sponsor Name <span className="text-[#FB3748]">*</span>
+              </Label>
+              <Input
+                type="text"
+                placeholder="e.g. ENT Immigration Ltd"
+                value={overrideSponsorName}
+                onChange={(e) => setOverrideSponsorName(e.target.value)}
+                className="h-9 text-[13px] rounded-[10px] border border-neutral-200 bg-white"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-[12px] font-medium text-[#171717]">
+                Sponsor Licence Number <span className="text-[#FB3748]">*</span>
+              </Label>
+              <Input
+                type="text"
+                placeholder="e.g. ENT1234567"
+                value={overrideSponsorLicence}
+                onChange={(e) => setOverrideSponsorLicence(e.target.value)}
                 className="h-9 text-[13px] rounded-[10px] border border-neutral-200 bg-white"
               />
             </div>

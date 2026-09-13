@@ -645,8 +645,13 @@ export default function MigrantOverviewPage() {
           cosRef={migrant.cosRef}
           socCode={migrant.cos?.socCode}
           approvalStatus={migrant.approvalStatus}
-          workStartDate={migrant.rawCase?.personal?.workStartDate || migrant.employment?.startDate}
-          hasArrived={Boolean(migrant.rawCase?.caseMovement?.isEntered || rawMigrantData?.caseMovement?.isEntered)}
+          workStartDate={migrant.rawCase?.personal?.workStartDate}
+          hasArrived={Boolean(
+            migrant.rawCase?.caseMovement?.isEntered ||
+            rawMigrantData?.caseMovement?.isEntered ||
+            migrant.rawCase?.flightEntered?.isEntered ||
+            rawMigrantData?.flightEntered?.isEntered
+          )}
           onBack={() => router.push("/cases")}
           onChangeStatus={() => setIsChangeStatusOpen(true)}
           onEditHeader={() => setIsPersonalModalOpen(true)}
@@ -1162,7 +1167,7 @@ export default function MigrantOverviewPage() {
             open={isUpdateStartDateOpen}
             onOpenChange={setIsUpdateStartDateOpen}
             caseData={migrant}
-            initialStartDate={migrant.rawCase?.personal?.workStartDate || migrant.employment?.startDate}
+            initialStartDate={migrant.rawCase?.personal?.workStartDate}
             onSuccess={() => {
               loadCaseDetail();
             }}

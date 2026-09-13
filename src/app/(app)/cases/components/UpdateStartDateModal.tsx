@@ -93,21 +93,21 @@ export function UpdateStartDateModal({
     caseData?.cosStartDate ||
     "";
 
-  const sponsorLicence =
+  const detectedSponsorLicence =
     safeExtract(caseData?.sponsor_licence_number) ||
     safeExtract(caseData?.sponsorLicenceNumber) ||
-    "ENT1234567";
+    "";
 
   const sponsorName =
     safeExtract(caseData?.sponsor_name) ||
     safeExtract(caseData?.employer) ||
     "ENT Immigration Ltd";
 
-  const cosNumber =
+  const detectedCosNumber =
     safeExtract(caseData?.cosNumber) ||
     safeExtract(caseData?.cos_number) ||
     safeExtract(caseData?.cos?.cosNumber) ||
-    "C5C3I-ASSIGNED";
+    "";
 
   // Calculate elapsed delay
   const computedDelayDays = React.useMemo(() => {
@@ -120,7 +120,7 @@ export function UpdateStartDateModal({
     return Math.max(0, diff);
   }, [initialDelayDays, originalStartDate]);
 
-  const isSmsThresholdExceeded = computedDelayDays >= 28;
+  const isSmsThresholdExceeded = computedDelayDays > 28;
 
   // Form states
   const [newStartDate, setNewStartDate] = React.useState<string>(() => {
@@ -139,6 +139,8 @@ export function UpdateStartDateModal({
   const [notifyHomeOffice, setNotifyHomeOffice] = React.useState<boolean>(isSmsThresholdExceeded);
   const [isSubmitting, setIsSubmitting] = React.useState<boolean>(false);
   const [copiedSms, setCopiedSms] = React.useState<boolean>(false);
+  const [overrideSponsorLicence, setOverrideSponsorLicence] = React.useState<string>("");
+  const [overrideCosNumber, setOverrideCosNumber] = React.useState<string>("");
 
   // Sync state on open
   React.useEffect(() => {
@@ -150,11 +152,16 @@ export function UpdateStartDateModal({
       setCustomReasonText("");
       setNotes("");
       setCopiedSms(false);
-      setNotifyHomeOffice(computedDelayDays >= 28);
+      setNotifyHomeOffice(computedDelayDays > 28);
       const generatedSms = `SMS-DLY-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${caseNumber.replace(/[^\w]/g, "")}`;
       setSmsReference(generatedSms);
+      setOverrideSponsorLicence(detectedSponsorLicence);
+      setOverrideCosNumber(detectedCosNumber);
     }
-  }, [open, caseNumber, initialReason, computedDelayDays]);
+  }, [open, caseNumber, initialReason, computedDelayDays, detectedSponsorLicence, detectedCosNumber]);
+
+  const sponsorLicence = overrideSponsorLicence.trim() || detectedSponsorLicence;
+  const cosNumber = overrideCosNumber.trim() || detectedCosNumber;
 
   const activeReasonLabel =
     selectedReason === "other"
@@ -206,11 +213,23 @@ Reference: ${smsReference || "N/A"}`;
       toast.error("Please enter a custom delay reason.");
       return;
     }
+    if (!sponsorLicence.trim()) {
+      toast.error("Sponsor licence number is required before recording start date delay.");
+      return;
+    }
+    if (!cosNumber.trim()) {
+      toast.error("Certificate of Sponsorship (CoS) number is required before recording start date delay.");
+      return;
+    }
 
-    const numericCaseId =
-      typeof caseId === "number" ? caseId : parseInt(String(caseId || ""), 10);
+    const validCaseId =
+      typeof caseId === "number"
+        ? caseId
+        : typeof caseId === "string" && caseId.trim().length > 0
+        ? caseId.trim()
+        : null;
 
-    if (!numericCaseId || isNaN(numericCaseId)) {
+    if (!validCaseId) {
       toast.error("Invalid case ID for update.");
       return;
     }
@@ -227,7 +246,7 @@ Reference: ${smsReference || "N/A"}`;
       };
 
       const res = await apiClient.post<any>(
-        ENDPOINTS.notifications.updateStartDate(numericCaseId),
+        ENDPOINTS.notifications.updateStartDate(validCaseId),
         payload
       );
 
@@ -251,18 +270,11 @@ Reference: ${smsReference || "N/A"}`;
       onOpenChange(false);
     } catch (err: any) {
       console.error("Failed to update work start date:", err);
-      // Fallback: If backend returns error, update local UI gracefully
-      toast.success(
-        `Work start date updated locally to ${new Date(newStartDate).toLocaleDateString("en-GB")}.`
-      );
-      if (onSuccess) {
-        onSuccess({
-          newStartDate,
-          delayReason: activeReasonLabel,
-          smsReference,
-        });
-      }
-      onOpenChange(false);
+      const errorMessage =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to update work start date on server. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -294,7 +306,9 @@ Reference: ${smsReference || "N/A"}`;
           <div className="p-3.5 bg-neutral-50 border border-neutral-200 rounded-[12px] flex flex-col gap-2.5">
             <div className="flex items-center justify-between gap-3 text-[12px]">
               <span className="font-semibold text-[#171717] truncate max-w-[280px]">{migrantName}</span>
-              <span className="font-mono text-[#7B7B7B] text-[11px] shrink-0">{caseNumber} · {cosNumber}</span>
+              <span className="font-mono text-[#7B7B7B] text-[11px] shrink-0">
+                {caseNumber}{cosNumber ? ` · ${cosNumber}` : ""}
+              </span>
             </div>
             <div className="flex items-center justify-between text-[12px] pt-2 border-t border-neutral-200/70">
               <div className="flex items-center gap-1.5 text-[#5C5C5C]">
@@ -394,6 +408,34 @@ Reference: ${smsReference || "N/A"}`;
             </div>
           )}
 
+          {/* Statutory Identifiers: CoS Number & Sponsor Licence */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="cos-number" className="text-[12px] font-medium text-[#171717]">
+                CoS Number <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="cos-number"
+                placeholder="e.g. C5C3I-ASSIGNED"
+                value={overrideCosNumber}
+                onChange={(e) => setOverrideCosNumber(e.target.value)}
+                className="h-9 text-[12px] font-mono rounded-[10px] border border-neutral-200 bg-white"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="sponsor-licence" className="text-[12px] font-medium text-[#171717]">
+                Sponsor Licence Number <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="sponsor-licence"
+                placeholder="e.g. ENT1234567"
+                value={overrideSponsorLicence}
+                onChange={(e) => setOverrideSponsorLicence(e.target.value)}
+                className="h-9 text-[12px] font-mono rounded-[10px] border border-neutral-200 bg-white"
+              />
+            </div>
+          </div>
+
           {/* SMS Reference & Notes */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
@@ -479,8 +521,8 @@ Reference: ${smsReference || "N/A"}`;
               type="button"
               variant="default"
               onClick={handleUpdate}
-              disabled={isSubmitting}
-              className="rounded-[10px] text-[13px] h-9 px-4 bg-brand-medium text-white hover:bg-brand-dark font-medium shadow-sm cursor-pointer"
+              disabled={isSubmitting || !sponsorLicence.trim() || !cosNumber.trim()}
+              className="rounded-[10px] text-[13px] h-9 px-4 bg-brand-medium text-white hover:bg-brand-dark font-medium shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? "Updating..." : "1-Click Update Start Date"}
             </Button>
