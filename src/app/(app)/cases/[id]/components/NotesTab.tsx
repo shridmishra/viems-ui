@@ -7,6 +7,7 @@ import {
   RiPushpinLine,
   RiPushpinFill,
   RiAtLine,
+  RiDeleteBinLine,
 } from "@remixicon/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,6 +103,11 @@ export function NotesTab({ id }: { id?: string }) {
     setNotes((prev) =>
       prev.map((n) => (n.id === pinId ? { ...n, pinned: !n.pinned } : n))
     );
+  };
+
+  const handleDeleteNote = (noteId: string) => {
+    setNotes((prev) => prev.filter((n) => n.id !== noteId));
+    toast.success("Note deleted successfully");
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -242,13 +248,24 @@ export function NotesTab({ id }: { id?: string }) {
                         <span className="text-paragraph-xs text-neutral-400 font-normal">{note.date}</span>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => togglePin(note.id)}
-                      className="size-6 flex items-center justify-center text-[#7D52F4] hover:text-[#683fd1] cursor-pointer border-0 bg-transparent"
-                    >
-                      <RiPushpinFill className="size-4" />
-                    </button>
+                    <div className="flex items-center gap-xs">
+                      <button
+                        type="button"
+                        onClick={() => togglePin(note.id)}
+                        aria-label="Unpin note"
+                        className="size-6 flex items-center justify-center text-[#7D52F4] hover:text-[#683fd1] cursor-pointer border-0 bg-transparent"
+                      >
+                        <RiPushpinFill className="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteNote(note.id)}
+                        aria-label="Delete note"
+                        className="size-6 flex items-center justify-center text-neutral-400 hover:text-red-600 cursor-pointer border-0 bg-transparent transition-colors"
+                      >
+                        <RiDeleteBinLine className="size-4" />
+                      </button>
+                    </div>
                   </div>
                   {/* Content */}
                   <p className="text-paragraph-sm text-[#171717] font-normal leading-6 pr-lg">
@@ -288,13 +305,24 @@ export function NotesTab({ id }: { id?: string }) {
                         <span className="text-paragraph-xs text-neutral-400 font-normal">{note.date}</span>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => togglePin(note.id)}
-                      className="size-6 flex items-center justify-center text-neutral-400 hover:text-[#7D52F4] cursor-pointer border-0 bg-transparent transition-colors"
-                    >
-                      <RiPushpinLine className="size-4" />
-                    </button>
+                    <div className="flex items-center gap-xs">
+                      <button
+                        type="button"
+                        onClick={() => togglePin(note.id)}
+                        aria-label="Pin note"
+                        className="size-6 flex items-center justify-center text-neutral-400 hover:text-[#7D52F4] cursor-pointer border-0 bg-transparent transition-colors"
+                      >
+                        <RiPushpinLine className="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteNote(note.id)}
+                        aria-label="Delete note"
+                        className="size-6 flex items-center justify-center text-neutral-400 hover:text-red-600 cursor-pointer border-0 bg-transparent transition-colors"
+                      >
+                        <RiDeleteBinLine className="size-4" />
+                      </button>
+                    </div>
                   </div>
                   {/* Content */}
                   <p className="text-paragraph-sm text-[#171717] font-normal leading-6 pr-lg">

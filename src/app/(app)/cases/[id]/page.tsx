@@ -49,6 +49,7 @@ import { ArchiveCaseModal } from "../components/ArchiveCaseModal";
 import { DeleteCaseModal } from "../components/DeleteCaseModal";
 import { AddNoteModal } from "../components/AddNoteModal";
 import { CurtailmentLetterModal } from "../components/CurtailmentLetterModal";
+import { UpdateStartDateModal } from "../components/UpdateStartDateModal";
 import { CaseHeader } from "./components/CaseHeader";
 import { MigrationStatusCard, PersonalDetailsCard, PriorityActionsCard, TimelineCard, ProfileCard } from "./components/OverviewCards";
 import { ComplianceCard } from "./components/ComplianceCard";
@@ -500,6 +501,7 @@ export default function MigrantOverviewPage() {
   const [isArchiveOpen, setIsArchiveOpen] = React.useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
   const [isCurtailmentModalOpen, setIsCurtailmentModalOpen] = React.useState(false);
+  const [isUpdateStartDateOpen, setIsUpdateStartDateOpen] = React.useState(false);
 
   const handleArchiveCase = async () => {
     if (!id) return;
@@ -643,12 +645,20 @@ export default function MigrantOverviewPage() {
           cosRef={migrant.cosRef}
           socCode={migrant.cos?.socCode}
           approvalStatus={migrant.approvalStatus}
+          workStartDate={migrant.rawCase?.personal?.workStartDate}
+          hasArrived={Boolean(
+            migrant.rawCase?.caseMovement?.isEntered ||
+            rawMigrantData?.caseMovement?.isEntered ||
+            migrant.rawCase?.flightEntered?.isEntered ||
+            rawMigrantData?.flightEntered?.isEntered
+          )}
           onBack={() => router.push("/cases")}
           onChangeStatus={() => setIsChangeStatusOpen(true)}
           onEditHeader={() => setIsPersonalModalOpen(true)}
           onAddNote={() => setIsAddNoteOpen(true)}
           onUpload={() => setActiveTab("Documents")}
           onCurtailmentLetter={() => setIsCurtailmentModalOpen(true)}
+          onUpdateStartDate={() => setIsUpdateStartDateOpen(true)}
           onArchive={() => setIsArchiveOpen(true)}
           onDelete={() => setIsDeleteOpen(true)}
         />
@@ -1152,6 +1162,15 @@ export default function MigrantOverviewPage() {
             onOpenChange={setIsCurtailmentModalOpen}
             caseData={migrant}
             migrant={migrant}
+          />
+          <UpdateStartDateModal
+            open={isUpdateStartDateOpen}
+            onOpenChange={setIsUpdateStartDateOpen}
+            caseData={migrant}
+            initialStartDate={migrant.rawCase?.personal?.workStartDate}
+            onSuccess={() => {
+              loadCaseDetail();
+            }}
           />
         </>
       )}

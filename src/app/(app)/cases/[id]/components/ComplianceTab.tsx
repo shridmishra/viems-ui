@@ -148,13 +148,15 @@ export function ComplianceTab({
         .filter(Boolean)
         .map((w: string) => w[0]?.toUpperCase() || "")
         .join("") || "M";
+      const resolvedJobTitle =
+        (typeof caseData?.role === "string" ? caseData?.role : caseData?.role?.name) ||
+        caseData?.job_title ||
+        caseData?.employment?.jobTitle ||
+        "—";
+
       const doc = generateCaseDossierReport({
         migrantName,
-        jobTitle:
-          caseData?.role ||
-          caseData?.job_title ||
-          caseData?.employment?.jobTitle ||
-          "—",
+        jobTitle: resolvedJobTitle,
         sponsorName: caseData?.sponsor_name || caseData?.employer || "ENT Imm",
         caseNumber: String(caseData?.caseIdDisplay || caseData?.caseNumber || id || "—"),
         cosReference: caseData?.cosNumber || caseData?.cos_number || "—",
@@ -169,7 +171,7 @@ export function ComplianceTab({
           fullName: migrantName,
           dob: caseData?.dob || caseData?.date_of_birth || caseData?.personal?.dob || "—",
           nationality: caseData?.nationality_value || caseData?.country || "—",
-          jobTitle: caseData?.role || caseData?.job_title || caseData?.employment?.jobTitle || "—",
+          jobTitle: resolvedJobTitle,
           projectAssignment: caseData?.project || caseData?.group || "—",
           sponsor: caseData?.sponsor_name || caseData?.employer || "ENT Imm",
         },

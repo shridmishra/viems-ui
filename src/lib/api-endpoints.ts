@@ -82,6 +82,8 @@ export const ENDPOINTS = {
     bulkArchivePreview: `${API_BASE}/cases/bulk-archive/preview`,
     bulkRestore: `${API_BASE}/cases/bulk-restore`,
     bulkRestorePreview: `${API_BASE}/cases/bulk-restore/preview`,
+    /** POST /api/v1/cases/:id/curtailment */
+    curtailment: (id: number | string) => `/api/v1/cases/${id}/curtailment`,
   },
 
   // ─── Case Templates ───────────────────────────────────────────────────────
@@ -245,6 +247,12 @@ export const ENDPOINTS = {
     documents: `${API_BASE}/organisation/documents`,
     documentById: (id: number | string) => `${API_BASE}/organisation/documents/${id}`,
     history: `${API_BASE}/organisation/history`,
+  },
+
+  // ─── Notifications & Start Date Delays ─────────────────────────────────────
+  notifications: {
+    workStartDelays: `${API_BASE}/notifications/work-start-delays`,
+    updateStartDate: (caseId: number | string) => `${API_BASE}/notifications/work-start-delays/${caseId}/update-start-date`,
   },
 } as const;
 

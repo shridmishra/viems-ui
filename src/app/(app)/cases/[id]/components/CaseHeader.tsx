@@ -11,7 +11,11 @@ import {
   RiArchiveLine,
   RiDeleteBinLine,
   RiFileTextLine,
+  RiAlertLine,
+  RiTimer2Line,
+  RiCalendarLine,
 } from "@remixicon/react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,12 +35,15 @@ interface CaseHeaderProps {
   approvalStatus: string;
   showSocCode?: boolean;
   socCode?: string;
+  workStartDate?: string;
+  hasArrived?: boolean;
   onBack: () => void;
   onChangeStatus?: () => void;
   onEditHeader?: () => void;
   onAddNote?: () => void;
   onUpload?: () => void;
   onCurtailmentLetter?: () => void;
+  onUpdateStartDate?: () => void;
   onArchive?: () => void;
   onDelete?: () => void;
 }
@@ -51,12 +58,15 @@ export function CaseHeader({
   approvalStatus,
   showSocCode = false,
   socCode,
+  workStartDate,
+  hasArrived = false,
   onBack,
   onChangeStatus,
   onEditHeader,
   onAddNote,
   onUpload,
   onCurtailmentLetter,
+  onUpdateStartDate,
   onArchive,
   onDelete,
 }: CaseHeaderProps) {
@@ -68,8 +78,23 @@ export function CaseHeader({
   const formattedCosRef = cosRef ? `COS ${cosRef.replace(/^COS\s*/i, '')}` : "No CoS assigned";
   const activeSoc = socCode || null;
 
+  const delayInfo = React.useMemo(() => {
+    if (!workStartDate || hasArrived) return null;
+    const start = new Date(workStartDate);
+    if (isNaN(start.getTime())) return null;
+    const now = new Date();
+    if (start.getTime() >= now.getTime()) return null;
+    const diff = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    return {
+      delayDays: diff,
+      isSmsThresholdExceeded: diff > 28,
+      formattedDate: start.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+    };
+  }, [workStartDate, hasArrived]);
+
   return (
-    <div className="px-[64px] pt-[32px] pb-[24px] flex items-center justify-between font-sans">
+    <div className="flex flex-col w-full">
+      <div className="px-[64px] pt-[32px] pb-[20px] flex items-center justify-between font-sans">
       {/* Left: Back Button + Avatar + Name & Subtitle */}
       <div className="flex items-center gap-[16px] flex-1 min-w-0">
         {/* Back Button */}
@@ -270,5 +295,70 @@ export function CaseHeader({
         )}
       </div>
     </div>
+
+    {/* Interactive Work Start Date Delay Banner */}
+    {delayInfo && (
+      <div
+        className={`mx-[64px] mb-[16px] px-4 py-3 rounded-[12px] flex items-center justify-between border shadow-2xs transition-all animate-fade-in ${
+          delayInfo.isSmsThresholdExceeded
+            ? "bg-error-light border-error-medium/40 text-error-dark"
+            : "bg-warning-light border-warning-medium/40 text-warning-dark"
+        }`}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div
+            className={`size-8 rounded-full flex items-center justify-center shrink-0 ${
+              delayInfo.isSmsThresholdExceeded
+                ? "bg-error-medium/20 text-error-dark"
+                : "bg-warning-medium/20 text-warning-dark"
+            }`}
+          >
+            {delayInfo.isSmsThresholdExceeded ? (
+              <RiAlertLine className="size-4" />
+            ) : (
+              <RiTimer2Line className="size-4" />
+            )}
+          </div>
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-label-sm font-semibold">
+                {delayInfo.isSmsThresholdExceeded
+                  ? `Work Start Date Delayed by ${delayInfo.delayDays} Days (>28d Statutory Limit)`
+                  : `Work Start Date Elapsed (${delayInfo.delayDays}d ago) — Arrival Pending`}
+              </span>
+              <span
+                className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                  delayInfo.isSmsThresholdExceeded
+                    ? "bg-error-dark text-white"
+                    : "bg-warning-dark text-white"
+                }`}
+              >
+                {delayInfo.isSmsThresholdExceeded ? "SMS REPORT MANDATORY" : "ACTION REQUIRED"}
+              </span>
+            </div>
+            <p className="text-paragraph-xs opacity-90 truncate">
+              {delayInfo.isSmsThresholdExceeded
+                ? `Scheduled start date was ${delayInfo.formattedDate} with no recorded arrival. Under UKVI Appendix D rules, delays exceeding 28 days must be reported to Home Office SMS within 10 working days.`
+                : `Scheduled start date was ${delayInfo.formattedDate}. Verify migrant travel arrival or update scheduled start date to maintain compliance.`}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 ml-4">
+          {onUpdateStartDate && (
+            <Button
+              type="button"
+              variant={delayInfo.isSmsThresholdExceeded ? "destructive" : "default"}
+              onClick={onUpdateStartDate}
+              className="h-8 px-3 text-paragraph-xs font-medium rounded-button flex items-center gap-1.5 shadow-x-small"
+            >
+              <RiCalendarLine className="size-3.5" />
+              <span>{delayInfo.isSmsThresholdExceeded ? "Report Delay & Update Date" : "Update Start Date"}</span>
+            </Button>
+          )}
+        </div>
+      </div>
+    )}
+  </div>
   );
 }
