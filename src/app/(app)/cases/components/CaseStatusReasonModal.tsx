@@ -126,12 +126,13 @@ export function CaseStatusReasonModal({
     const caseNumber = String(caseInfo.caseId || caseInfo.id || "").trim();
     const cosReference = (caseInfo.cosNumber || (caseInfo as any)?.cosReference || "").trim();
     const sponsorName = (caseInfo.sponsor_name || (caseInfo as any)?.employer || "").trim();
-    const sponsorLicence = (
+    const sponsorLicence = String(
       (caseInfo as any)?.sponsor_licence_number ||
       (caseInfo as any)?.sponsorLicenceNumber ||
       ""
     ).trim();
-    const jobTitle = (caseInfo.role || (caseInfo as any)?.job_title || "").trim();
+    const rawJob = typeof caseInfo.role === "string" ? caseInfo.role : (caseInfo.role as any)?.name || (caseInfo as any)?.job_title || "";
+    const jobTitle = String(rawJob || "").trim();
     const passportNumber = (
       caseInfo.passportNumber ||
       (caseInfo as any)?.passport_number ||

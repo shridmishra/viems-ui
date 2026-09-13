@@ -13,6 +13,11 @@ import {
   RiCheckLine,
   RiExternalLinkLine,
   RiMoreFill,
+  RiAlertLine,
+  RiCalendarLine,
+  RiTimer2Line,
+  RiArrowRightLine,
+  RiShieldCheckLine,
 } from "@remixicon/react";
 import {
   DropdownMenu,
@@ -23,6 +28,9 @@ import {
 import { apiClient } from "@/lib/api-client";
 import { ENDPOINTS } from "@/lib/api-endpoints";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { UpdateStartDateModal } from "../cases/components/UpdateStartDateModal";
 import {
   getReadIds,
   persistReadId,
@@ -59,6 +67,32 @@ export default function NotificationsPage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const [itemsPerPage, setItemsPerPage] = React.useState(10);
   const [loading, setLoading] = React.useState(true);
+
+  // Work Start Date Delay states
+  const [delayedData, setDelayedData] = React.useState<{
+    totalDelayed: number;
+    smsThresholdExceededCount: number;
+    cases: any[];
+  }>({ totalDelayed: 0, smsThresholdExceededCount: 0, cases: [] });
+  const [selectedDelayCase, setSelectedDelayCase] = React.useState<any>(null);
+  const [isDelayModalOpen, setIsDelayModalOpen] = React.useState(false);
+  const [delayBannerDismissed, setDelayBannerDismissed] = React.useState(false);
+  const [isDelaysExpanded, setIsDelaysExpanded] = React.useState(true);
+
+  const fetchWorkStartDelays = React.useCallback(async () => {
+    try {
+      const res = await apiClient.get<any>(ENDPOINTS.notifications.workStartDelays);
+      if (res && Array.isArray(res.cases)) {
+        setDelayedData({
+          totalDelayed: typeof res.totalDelayed === "number" ? res.totalDelayed : res.cases.length,
+          smsThresholdExceededCount: typeof res.smsThresholdExceededCount === "number" ? res.smsThresholdExceededCount : 0,
+          cases: res.cases,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch work start delays:", err);
+    }
+  }, []);
 
   const fetchPageNotifications = React.useCallback(async () => {
     try {
@@ -114,6 +148,7 @@ export default function NotificationsPage() {
 
   React.useEffect(() => {
     fetchPageNotifications();
+    fetchWorkStartDelays();
 
     const handleUpdate = () => {
       const readIds = getReadIds();
@@ -123,13 +158,14 @@ export default function NotificationsPage() {
           isUnread: !readIds.includes(item.id),
         }))
       );
+      fetchWorkStartDelays();
     };
 
     window.addEventListener("viems_notifications_updated", handleUpdate);
     return () => {
       window.removeEventListener("viems_notifications_updated", handleUpdate);
     };
-  }, [fetchPageNotifications]);
+  }, [fetchPageNotifications, fetchWorkStartDelays]);
 
   const handleMarkAllRead = () => {
     const allIds = items.map((i) => i.id);
@@ -217,15 +253,185 @@ export default function NotificationsPage() {
           </p>
         </div>
         {items.length > 0 && hasUnread && (
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={handleMarkAllRead}
-            className="w-[133px] h-[40px] bg-[#F5F5F5] hover:bg-[#EBEBEB] active:bg-[#E0E0E0] text-[#5C5C5C] hover:text-[#171717] rounded-[10px] text-[14px] font-medium transition-all cursor-pointer border-0 flex items-center justify-center shadow-[0px_1px_2px_rgba(10,13,20,0.03)]"
+            className="h-10 px-4 text-paragraph-sm font-medium rounded-button"
           >
             Mark all as read
-          </button>
+          </Button>
         )}
       </div>
+
+      {/* Work Start Date Delay Compliance Alert Banner */}
+      {delayedData.totalDelayed > 0 && !delayBannerDismissed && (
+        <div
+          className={`p-xl rounded-card border shadow-x-small transition-all flex flex-col gap-md ${
+            delayedData.smsThresholdExceededCount > 0
+              ? "bg-red-50/70 border-red-200/90 text-neutral-900"
+              : "bg-amber-50/70 border-amber-200/90 text-neutral-900"
+          }`}
+        >
+          {/* Banner Header Row */}
+          <div className="flex items-start justify-between gap-md">
+            <div className="flex items-start gap-md min-w-0 flex-1">
+              <div
+                className={`size-9 rounded-full flex items-center justify-center shrink-0 border ${
+                  delayedData.smsThresholdExceededCount > 0
+                    ? "bg-red-100 text-red-700 border-red-200/70"
+                    : "bg-amber-100 text-amber-700 border-amber-200/70"
+                }`}
+              >
+                {delayedData.smsThresholdExceededCount > 0 ? (
+                  <RiAlertLine className="size-5" />
+                ) : (
+                  <RiTimer2Line className="size-5" />
+                )}
+              </div>
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-[15px] font-semibold font-aeonik-medium text-neutral-900">
+                    Work Start Date Delay Alerts
+                  </h3>
+                  <Badge
+                    variant="outline"
+                    className="text-label-compact font-medium bg-white/90 border-neutral-300 text-neutral-700 shadow-2xs"
+                  >
+                    {delayedData.totalDelayed} Case{delayedData.totalDelayed > 1 ? "s" : ""} Overdue
+                  </Badge>
+                  {delayedData.smsThresholdExceededCount > 0 && (
+                    <Badge variant="destructive" withDot className="text-label-compact font-semibold shadow-2xs">
+                      {delayedData.smsThresholdExceededCount} Exceeding 28d Statutory SMS Limit
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-paragraph-xs text-neutral-600 mt-1 leading-relaxed">
+                  Under UKVI Appendix D sponsor duties, when a sponsored worker's start date has passed without recorded arrival, dates must be updated or reported to SMS within 10 working days if delayed by &gt;28 days.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => setIsDelaysExpanded((v) => !v)}
+                className="text-label-xs font-medium bg-white/90 border-neutral-200 text-neutral-700 hover:bg-white shadow-2xs cursor-pointer"
+              >
+                {isDelaysExpanded ? "Collapse" : "Expand cases"}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => setDelayBannerDismissed(true)}
+                title="Dismiss banner"
+                className="text-neutral-500 hover:text-neutral-900 hover:bg-black/5 cursor-pointer"
+              >
+                <RiCloseLine className="size-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Collapsible List of Delayed Cases */}
+          {isDelaysExpanded && (
+            <div
+              className={`flex flex-col gap-sm pt-xs border-t ${
+                delayedData.smsThresholdExceededCount > 0
+                  ? "border-red-200/80"
+                  : "border-amber-200/80"
+              }`}
+            >
+              {delayedData.cases.map((delayedCase) => {
+                const isCritical = delayedCase.isSmsThresholdExceeded;
+                return (
+                  <div
+                    key={delayedCase.caseId}
+                    className="p-3.5 rounded-input bg-white border border-neutral-200 hover:border-neutral-300 transition-all flex items-center justify-between gap-md flex-wrap text-card-foreground shadow-2xs"
+                  >
+                    <div className="flex items-center gap-md min-w-0">
+                      <div
+                        className={`size-8 rounded-full flex items-center justify-center shrink-0 border ${
+                          isCritical
+                            ? "bg-red-100/70 text-red-600 border-red-200/50"
+                            : "bg-amber-100/70 text-amber-600 border-amber-200/50"
+                        }`}
+                      >
+                        <RiCalendarLine className="size-4" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-sm flex-wrap">
+                          <span className="text-label-sm font-semibold text-neutral-900">
+                            {delayedCase.migrantName}
+                          </span>
+                          <span className="text-paragraph-xs font-mono text-neutral-500">
+                            {delayedCase.caseNumber}
+                          </span>
+                          <Badge
+                            variant={isCritical ? "destructive" : "warning"}
+                            withDot
+                            className="text-label-compact font-medium"
+                          >
+                            {isCritical
+                              ? `${delayedCase.delayDays}d overdue (SMS Required)`
+                              : `${delayedCase.delayDays}d delayed`}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-xs text-paragraph-xs text-neutral-500">
+                          <span>{delayedCase.jobTitle}</span>
+                          <span>•</span>
+                          <span>
+                            Original Start:{" "}
+                            <strong className="text-neutral-800 font-medium">
+                              {delayedCase.originalStartDate}
+                            </strong>
+                          </span>
+                          {isCritical && (
+                            <>
+                              <span>•</span>
+                              <span className="text-red-600 font-semibold">
+                                SMS Deadline: {delayedCase.smsDeadlineDate}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-sm shrink-0">
+                      <Button
+                        type="button"
+                        variant={isCritical ? "destructive" : "default"}
+                        size="sm"
+                        onClick={() => {
+                          setSelectedDelayCase(delayedCase);
+                          setIsDelayModalOpen(true);
+                        }}
+                        className={`h-8 text-[12px] font-medium flex items-center gap-1.5 shadow-2xs cursor-pointer ${
+                          !isCritical ? "bg-brand-medium text-white hover:bg-brand-dark" : ""
+                        }`}
+                      >
+                        <RiCalendarLine className="size-3.5" />
+                        <span>{isCritical ? "Report SMS & Update" : "Update Start Date"}</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push(`/cases/${delayedCase.caseId}`)}
+                        className="h-8 text-[12px] font-medium flex items-center gap-1 border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 shadow-2xs cursor-pointer"
+                      >
+                        <span>View Case</span>
+                        <RiArrowRightLine className="size-3.5 text-neutral-400" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Toolbar / Filters Row */}
       <div className="flex items-center gap-[12px] w-full">
@@ -530,6 +736,21 @@ export default function NotificationsPage() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* 1-Click Update Start Date Modal */}
+      {selectedDelayCase && (
+        <UpdateStartDateModal
+          open={isDelayModalOpen}
+          onOpenChange={setIsDelayModalOpen}
+          caseData={selectedDelayCase}
+          initialStartDate={selectedDelayCase?.originalStartDate}
+          initialDelayDays={selectedDelayCase?.delayDays}
+          onSuccess={() => {
+            fetchWorkStartDelays();
+            fetchPageNotifications();
+          }}
+        />
+      )}
     </div>
   );
 }

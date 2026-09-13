@@ -70,22 +70,31 @@ export function InviteMemberModal({
     const rawSms = smsRole === "None" ? "—" : smsRole;
 
     try {
-      const response = await apiClient.post<any>(ENDPOINTS.employees.base, {
-        firstName,
-        lastName,
-        email: email.trim(),
-        jobTitle: role,
-        userStatus: isInvited ? "invited" : "active",
-      });
-
-      const createdId = response?.id || response?.data?.id;
-      const backendId = createdId ? String(createdId) : `local-${Date.now()}`;
-
-      if (createdId) {
-        await apiClient.post(
-          `${ENDPOINTS.employees.sendRegistrationLink}/${createdId}`
-        ).catch((e) => console.log("Auto-registration email trigger:", e));
+      let createdId: any = null;
+      try {
+        const orgTeamRes = await apiClient.post<any>(ENDPOINTS.organisation.team, {
+          name: name.trim(),
+          firstName,
+          lastName,
+          email: email.trim(),
+          avatarText: initials,
+          role: formattedRole,
+          smsRole: rawSms,
+          status: isInvited ? "invited" : "active",
+        });
+        createdId = orgTeamRes?.id;
+      } catch {
+        const response = await apiClient.post<any>(ENDPOINTS.employees.base, {
+          firstName,
+          lastName,
+          email: email.trim(),
+          jobTitle: role,
+          userStatus: isInvited ? "invited" : "active",
+        }).catch(() => null);
+        createdId = response?.id || response?.data?.id;
       }
+
+      const backendId = createdId ? String(createdId) : `local-${Date.now()}`;
 
       const newMember: TeamMember = {
         id: backendId,
@@ -108,6 +117,7 @@ export function InviteMemberModal({
       setIsSending(false);
     }
   };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>

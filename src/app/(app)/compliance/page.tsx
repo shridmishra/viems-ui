@@ -1004,12 +1004,12 @@ export default function ComplianceCentrePage() {
               COMPLIANCE SCORE
             </span>
 
-            {/* Circular Progress Ring - 75x75px */}
-            <div className="relative size-[75px] flex items-center justify-center">
-              <svg className="size-[75px] -rotate-90" viewBox="0 0 36 36">
+            {/* Circular Progress Ring - 84x84px */}
+            <div className="relative size-[84px] flex items-center justify-center shrink-0">
+              <svg className="size-[84px] -rotate-90" viewBox="0 0 36 36">
                 <path
                   className="text-[#EBEBEB]"
-                  strokeWidth="4.5"
+                  strokeWidth="3.5"
                   stroke="currentColor"
                   fill="none"
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
@@ -1023,14 +1023,14 @@ export default function ComplianceCentrePage() {
                       : "text-[#FB3748]"
                   }
                   strokeDasharray={`${complianceScore}, 100`}
-                  strokeWidth="4.5"
+                  strokeWidth="3.5"
                   strokeLinecap="round"
                   stroke="currentColor"
                   fill="none"
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                 />
               </svg>
-              <span className="absolute text-[24px] leading-[32px] font-medium text-[#171717] font-aeonik-medium">
+              <span className="absolute font-aeonik-medium font-medium text-[#171717] tracking-tight tabular-nums select-none flex items-center justify-center text-[19px] leading-none">
                 {complianceScore}%
               </span>
             </div>
